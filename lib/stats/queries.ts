@@ -291,7 +291,7 @@ export async function getBotstatUserIdsRaw(
 ): Promise<string[]> {
   const result = await safeQuery<{ user_id: string }>(
     pool,
-    "SELECT user_id::text FROM users ORDER BY user_id ASC"
+    "SELECT user_id::text FROM users ORDER BY users.user_id ASC"
   )
   return result.rows.map((row) => row.user_id)
 }
