@@ -112,6 +112,8 @@ Keep the application origin private and make the reverse proxy the only network 
 
 Connect this repository as a Node.js application. The package scripts build with Vite and start Nitro's Node server from `.output/server/index.mjs`; the server honors the platform-provided `PORT`.
 
+The checked-in `railpack.json` keeps development dependencies available during the image build, even when the deployment environment sets npm's legacy `production` option. Vite and the Tailwind/Vite plugins are build-time dependencies and must be installed before `npm run build`.
+
 Set the health check path to `/api/health`. Keep PostgreSQL private where possible and allow only the deployment network to reach it.
 
 ## Security and privacy
