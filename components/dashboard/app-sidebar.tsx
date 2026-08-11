@@ -35,10 +35,12 @@ const navigation = [
 ]
 
 export function AppSidebar() {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="border-b">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -51,7 +53,7 @@ export function AppSidebar() {
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">TT Stats</span>
-                <span className="truncate text-xs">tt-bot analytics</span>
+                <span className="truncate text-xs">Operations dashboard</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>

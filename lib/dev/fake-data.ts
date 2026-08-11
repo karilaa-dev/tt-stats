@@ -6,11 +6,13 @@ import type {
   ChatScope,
   OtherStats,
   OverviewStats,
+  PaginatedUserDownloads,
   RankedValue,
   SeriesMetric,
   StatsBreakdown,
   StatsRange,
   TimeSeriesPoint,
+  UserDownload,
   UserStats,
 } from "@/lib/stats/types"
 
@@ -73,6 +75,18 @@ const fakeHistory: HistoryCsvRow[] = [
     Video: 'https://example.test/video,with-a-comma-and-"quotes"',
   },
 ]
+
+const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
+  const images = index % 5 === 2
+  return {
+    id: String(10_000 - index),
+    downloadedAt: FAKE_NOW_EPOCH - index * 14_417,
+    sharedLink: images
+      ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
+      : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
+    mediaKind: images ? "images" : "video",
+  }
+})
 
 export function isFakeDataEnabled(): boolean {
   return (
@@ -159,6 +173,25 @@ export function getFakeTimeSeries(
 
 export function getFakeUserStats(userId: string): UserStats | null {
   return fakeUsers[userId] ?? null
+}
+
+export function getFakeUserDownloads(
+  userId: string,
+  requestedPage: number,
+  pageSize: number
+): PaginatedUserDownloads {
+  const downloads = fakeUsers[userId] ? fakeDownloads : []
+  const totalPages = Math.ceil(downloads.length / pageSize)
+  const page = totalPages ? Math.min(requestedPage, totalPages) : 1
+  const offset = (page - 1) * pageSize
+
+  return {
+    items: downloads.slice(offset, offset + pageSize),
+    page,
+    pageSize,
+    total: String(downloads.length),
+    totalPages,
+  }
 }
 
 export function getFakeReferralStats(): RankedValue[] {

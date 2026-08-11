@@ -1,5 +1,8 @@
+import { DownloadIcon, ImagesIcon, Music2Icon, UsersIcon } from "lucide-react"
+
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -12,16 +15,17 @@ function count(value: string) {
 }
 
 const metrics = [
-  { key: "chats", label: "Registered chats" },
-  { key: "music", label: "Music downloads" },
-  { key: "downloads", label: "Downloads" },
-  { key: "images", label: "Image albums" },
+  { key: "chats", label: "Registered chats", icon: UsersIcon },
+  { key: "music", label: "Music downloads", icon: Music2Icon },
+  { key: "downloads", label: "Video downloads", icon: DownloadIcon },
+  { key: "images", label: "Image albums", icon: ImagesIcon },
 ] as const
 
 export function StatsCards({ stats }: { stats: StatsBreakdown }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {metrics.map((metric) => {
+        const Icon = metric.icon
         let total = stats.chats
         let detail = "Users or groups registered"
         if (metric.key === "music") {
@@ -38,11 +42,16 @@ export function StatsCards({ stats }: { stats: StatsBreakdown }) {
           <Card key={metric.key}>
             <CardHeader>
               <CardDescription>{metric.label}</CardDescription>
-              <CardTitle className="text-2xl tabular-nums">
+              <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
                 {count(total)}
               </CardTitle>
+              <CardAction>
+                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="size-4.5" aria-hidden="true" />
+                </div>
+              </CardAction>
             </CardHeader>
-            <CardContent className="text-xs text-muted-foreground">
+            <CardContent className="text-xs font-medium text-muted-foreground">
               {detail}
             </CardContent>
           </Card>

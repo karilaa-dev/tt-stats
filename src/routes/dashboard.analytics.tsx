@@ -54,24 +54,27 @@ function AnalyticsPage() {
           navigate({ search: { range: nextRange } })
         }
       />
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         <TimeSeriesChart
           title="Registrations"
           description="New private users and groups"
           points={users}
           range={range}
+          color="var(--chart-1)"
         />
         <TimeSeriesChart
           title="Video downloads"
           description="Video and image deliveries"
           points={videos}
           range={range}
+          color="var(--chart-2)"
         />
         <TimeSeriesChart
           title="Music downloads"
           description="Music download history"
           points={music}
           range={range}
+          color="var(--chart-3)"
         />
       </div>
     </>

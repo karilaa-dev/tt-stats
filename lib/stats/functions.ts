@@ -7,6 +7,7 @@ import {
   getFakeReferralStats,
   getFakeStatsBreakdown,
   getFakeTimeSeries,
+  getFakeUserDownloads,
   getFakeUserStats,
   isFakeDataEnabled,
 } from "@/lib/dev/fake-data"
@@ -16,6 +17,7 @@ import {
   getReferralStatsRaw,
   getStatsBreakdownRaw,
   getTimeSeriesRaw,
+  getUserDownloadsRaw,
   getUserStatsRaw,
 } from "@/lib/stats/queries"
 import { CHAT_SCOPES, SERIES_METRICS, STATS_RANGES } from "@/lib/stats/types"
@@ -24,6 +26,7 @@ const statsRange = z.enum(STATS_RANGES)
 const chatScope = z.enum(CHAT_SCOPES)
 const seriesMetric = z.enum(SERIES_METRICS)
 const telegramId = z.string().regex(/^-?\d+$/u)
+const positivePage = z.number().int().positive()
 
 export const getDashboardMeta = createServerFn({ method: "GET" }).handler(
   () => ({
@@ -52,8 +55,8 @@ export const getTimeSeries = createServerFn({ method: "GET" })
       : getTimeSeriesRaw(data.metric, data.range)
   )
 
-export const getReferralStats = createServerFn({ method: "GET" }).handler(
-  () => (isFakeDataEnabled() ? getFakeReferralStats() : getReferralStatsRaw())
+export const getReferralStats = createServerFn({ method: "GET" }).handler(() =>
+  isFakeDataEnabled() ? getFakeReferralStats() : getReferralStatsRaw()
 )
 
 export const getOtherStats = createServerFn({ method: "GET" }).handler(() =>
@@ -66,4 +69,18 @@ export const getUserStats = createServerFn({ method: "GET" })
     isFakeDataEnabled()
       ? getFakeUserStats(data.userId)
       : getUserStatsRaw(data.userId)
+  )
+
+export const getUserDownloads = createServerFn({ method: "GET" })
+  .validator(
+    z.object({
+      userId: telegramId,
+      page: positivePage,
+      pageSize: positivePage.max(50),
+    })
+  )
+  .handler(({ data }) =>
+    isFakeDataEnabled()
+      ? getFakeUserDownloads(data.userId, data.page, data.pageSize)
+      : getUserDownloadsRaw(data.userId, data.page, data.pageSize)
   )

@@ -1,12 +1,7 @@
 import { useIsFetching, useQueryClient } from "@tanstack/react-query"
 import { useRouter, useRouterState } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
-import {
-  MonitorIcon,
-  MoonIcon,
-  RefreshCwIcon,
-  SunIcon,
-} from "lucide-react"
+import { MonitorIcon, MoonIcon, RefreshCwIcon, SunIcon } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -50,7 +45,9 @@ export function DashboardHeader({
   refreshedAt?: number
   fakeMode?: boolean
 }) {
-  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const router = useRouter()
   const queryClient = useQueryClient()
   const refreshing = useIsFetching({ queryKey: statsQueryKey }) > 0
@@ -66,7 +63,7 @@ export function DashboardHeader({
     : null
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-3 sm:px-4">
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur sm:px-4">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-1 h-4" />
       <Breadcrumb className="min-w-0 flex-1">

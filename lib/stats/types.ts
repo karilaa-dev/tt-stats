@@ -47,6 +47,21 @@ export interface UserStats {
   images: string
 }
 
+export interface UserDownload {
+  id: string
+  downloadedAt: number | null
+  sharedLink: string
+  mediaKind: "video" | "images"
+}
+
+export interface PaginatedUserDownloads {
+  items: UserDownload[]
+  page: number
+  pageSize: number
+  total: string
+  totalPages: number
+}
+
 export interface RankedValue {
   value: string
   count: string

@@ -95,7 +95,7 @@ npm test
 - `/dashboard` — private-user and group overview
 - `/dashboard/analytics` — registration, video, and music time series
 - `/dashboard/detailed` — linkable scope and range filters
-- `/dashboard/users` — user/group lookup and streaming CSV history
+- `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, top downloaders, and Botstat
 - `/api/health` — detail-free database/configuration health check

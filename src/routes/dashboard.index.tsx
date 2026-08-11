@@ -24,31 +24,64 @@ function OverviewPage() {
         description="Private users and groups, all time and over the exact last 24 hours."
       />
       <Tabs defaultValue="users">
-        <TabsList>
-          <TabsTrigger value="users">Private users</TabsTrigger>
-          <TabsTrigger value="groups">Groups</TabsTrigger>
+        <TabsList className="w-full sm:w-fit">
+          <TabsTrigger value="users" className="flex-1 sm:flex-none">
+            Private users
+          </TabsTrigger>
+          <TabsTrigger value="groups" className="flex-1 sm:flex-none">
+            Groups
+          </TabsTrigger>
         </TabsList>
-        <TabsContent value="users" className="mt-4 flex flex-col gap-6">
+        <TabsContent value="users" className="mt-6 flex flex-col gap-8">
           <section>
-            <h2 className="mb-3 text-sm font-medium">All time</h2>
+            <SectionHeading
+              title="All time"
+              description="Complete private-user history"
+            />
             <StatsCards stats={overview.users.all} />
           </section>
           <section>
-            <h2 className="mb-3 text-sm font-medium">Last 24 hours</h2>
+            <SectionHeading
+              title="Last 24 hours"
+              description="Rolling 24-hour activity window"
+            />
             <StatsCards stats={overview.users.last24Hours} />
           </section>
         </TabsContent>
-        <TabsContent value="groups" className="mt-4 flex flex-col gap-6">
+        <TabsContent value="groups" className="mt-6 flex flex-col gap-8">
           <section>
-            <h2 className="mb-3 text-sm font-medium">All time</h2>
+            <SectionHeading
+              title="All time"
+              description="Complete group history"
+            />
             <StatsCards stats={overview.groups.all} />
           </section>
           <section>
-            <h2 className="mb-3 text-sm font-medium">Last 24 hours</h2>
+            <SectionHeading
+              title="Last 24 hours"
+              description="Rolling 24-hour activity window"
+            />
             <StatsCards stats={overview.groups.last24Hours} />
           </section>
         </TabsContent>
       </Tabs>
     </>
+  )
+}
+
+function SectionHeading({
+  title,
+  description,
+}: {
+  title: string
+  description: string
+}) {
+  return (
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div>
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+      </div>
+    </div>
   )
 }

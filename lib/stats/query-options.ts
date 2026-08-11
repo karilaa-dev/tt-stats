@@ -6,13 +6,10 @@ import {
   getReferralStats,
   getStatsBreakdown,
   getTimeSeries,
+  getUserDownloads,
   getUserStats,
 } from "@/lib/stats/functions"
-import type {
-  ChatScope,
-  SeriesMetric,
-  StatsRange,
-} from "@/lib/stats/types"
+import type { ChatScope, SeriesMetric, StatsRange } from "@/lib/stats/types"
 
 export const statsQueryKey = ["stats"] as const
 const STALE_TIME = 5 * 60 * 1000
@@ -67,6 +64,18 @@ export function userStatsQueryOptions(userId: string) {
   return queryOptions({
     queryKey: [...statsQueryKey, "user", userId],
     queryFn: () => getUserStats({ data: { userId } }),
+    staleTime: STALE_TIME,
+  })
+}
+
+export function userDownloadsQueryOptions(
+  userId: string,
+  page: number,
+  pageSize: number
+) {
+  return queryOptions({
+    queryKey: [...statsQueryKey, "user", userId, "downloads", page, pageSize],
+    queryFn: () => getUserDownloads({ data: { userId, page, pageSize } }),
     staleTime: STALE_TIME,
   })
 }

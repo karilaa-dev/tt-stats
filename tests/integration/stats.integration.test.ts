@@ -11,6 +11,7 @@ import {
   getReferralStatsRaw,
   getStatsBreakdownRaw,
   getTimeSeriesRaw,
+  getUserDownloadsRaw,
   getUserStatsRaw,
 } from "@/lib/stats/queries"
 
@@ -133,6 +134,24 @@ integration("PostgreSQL statistics queries", () => {
       images: "1",
     })
     expect(await getUserStatsRaw("999", pool)).toBeNull()
+  })
+
+  it("paginates user downloads in newest-first order", async () => {
+    const firstPage = await getUserDownloadsRaw("1", 1, 2, pool)
+    expect(firstPage).toMatchObject({
+      page: 1,
+      pageSize: 2,
+      total: "3",
+      totalPages: 2,
+    })
+    expect(firstPage.items.map((item) => item.sharedLink)).toEqual([
+      "https://example.test/new",
+      'https://example.test/images,"quoted"',
+    ])
+
+    const clampedPage = await getUserDownloadsRaw("1", 99, 2, pool)
+    expect(clampedPage.page).toBe(2)
+    expect(clampedPage.items[0]?.sharedLink).toBe("https://example.test/old")
   })
 
   it("streams escaped CSV in newest-first order with protected headers", async () => {

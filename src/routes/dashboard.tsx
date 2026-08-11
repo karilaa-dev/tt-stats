@@ -19,9 +19,9 @@ function DashboardLayout() {
       <AppSidebar />
       <SidebarInset>
         <DashboardHeader refreshedAt={refreshedAt} fakeMode={fakeMode} />
-        <div className="flex flex-1 flex-col p-4 md:p-6">
+        <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col p-4 md:p-6 lg:p-8">
           <Outlet />
-        </div>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   )

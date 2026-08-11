@@ -17,6 +17,7 @@ import type {
   StatsBreakdown,
   StatsRange,
   TimeSeriesPoint,
+  PaginatedUserDownloads,
   UserStats,
 } from "@/lib/stats/types"
 
@@ -236,6 +237,57 @@ export async function getUserStatsRaw(
     fileMode: row.file_mode,
     downloads: row.downloads,
     images: row.images,
+  }
+}
+
+export async function getUserDownloadsRaw(
+  userId: string,
+  requestedPage: number,
+  pageSize: number,
+  pool: Pool = getPool()
+): Promise<PaginatedUserDownloads> {
+  const countResult = await safeQuery<CountRow>(
+    pool,
+    `SELECT COUNT(*)::text AS count
+     FROM videos
+     WHERE user_id = $1::bigint`,
+    [userId]
+  )
+  const total = countResult.rows[0]?.count ?? "0"
+  const totalPages = Math.ceil(Number(total) / pageSize)
+  const page = totalPages ? Math.min(requestedPage, totalPages) : 1
+  const offset = (page - 1) * pageSize
+  const result = await safeQuery<{
+    id: string
+    downloaded_at: string | number | null
+    shared_link: string
+    media_kind: "video" | "images"
+  }>(
+    pool,
+    `SELECT
+       pk_id::text AS id,
+       downloaded_at,
+       shared_link,
+       media_kind
+     FROM videos
+     WHERE user_id = $1::bigint
+     ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC
+     LIMIT $2 OFFSET $3`,
+    [userId, pageSize, offset]
+  )
+
+  return {
+    items: result.rows.map((row) => ({
+      id: row.id,
+      downloadedAt:
+        row.downloaded_at === null ? null : Number(row.downloaded_at),
+      sharedLink: row.shared_link,
+      mediaKind: row.media_kind,
+    })),
+    page,
+    pageSize,
+    total,
+    totalPages,
   }
 }
 

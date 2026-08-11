@@ -31,7 +31,7 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
       `SELECT downloaded_at, shared_link
        FROM videos
        WHERE user_id = $1::bigint
-       ORDER BY downloaded_at DESC, pk_id DESC`,
+       ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC`,
       [parsedId]
     )
     const source = client.query(query)

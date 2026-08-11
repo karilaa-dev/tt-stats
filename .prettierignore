@@ -3,5 +3,6 @@ node_modules/
 .next/
 .turbo/
 coverage/
+src/routeTree.gen.ts
 pnpm-lock.yaml
 .pnpm-store/

@@ -14,6 +14,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination"
+import { Badge } from "@/components/ui/badge"
 import {
   Table,
   TableBody,
@@ -23,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { RankedValue } from "@/lib/stats/types"
+import { cn } from "@/lib/utils"
 
 const features = tableFeatures({
   rowPaginationFeature,
@@ -37,6 +39,7 @@ export function RankedTable({
   page = 1,
   pageSize,
   onPageChange,
+  renderValue,
 }: {
   rows: RankedValue[]
   valueLabel: string
@@ -44,21 +47,31 @@ export function RankedTable({
   page?: number
   pageSize?: number
   onPageChange?: (page: number) => void
+  renderValue?: (value: string) => React.ReactNode
 }) {
   const columns = useMemo(
     () =>
       columnHelper.columns([
         columnHelper.accessor("value", {
           header: valueLabel,
-          cell: ({ getValue }) => getValue(),
+          cell: ({ getValue, row }) => (
+            <div className="flex items-center gap-3">
+              <Badge
+                variant="outline"
+                className="w-8 shrink-0 justify-center tabular-nums"
+              >
+                {row.index + 1}
+              </Badge>
+              {renderValue ? renderValue(getValue()) : getValue()}
+            </div>
+          ),
         }),
         columnHelper.accessor("count", {
           header: countLabel,
-          cell: ({ getValue }) =>
-            BigInt(getValue()).toLocaleString("en-US"),
+          cell: ({ getValue }) => BigInt(getValue()).toLocaleString("en-US"),
         }),
       ]),
-    [countLabel, valueLabel]
+    [countLabel, renderValue, valueLabel]
   )
   const pagination = {
     pageIndex: Math.max(0, page - 1),
@@ -89,7 +102,9 @@ export function RankedTable({
               {headerGroup.headers.map((header) => (
                 <TableHead
                   key={header.id}
-                  className={header.column.id === "count" ? "text-right" : undefined}
+                  className={
+                    header.column.id === "count" ? "text-right" : undefined
+                  }
                 >
                   {header.isPlaceholder ? null : (
                     <table.FlexRender header={header} />
@@ -105,11 +120,11 @@ export function RankedTable({
               {row.getAllCells().map((cell) => (
                 <TableCell
                   key={cell.id}
-                  className={
-                    cell.column.id === "count"
-                      ? "text-right tabular-nums"
-                      : "font-mono"
-                  }
+                  className={cn(
+                    cell.column.id === "count" &&
+                      "text-right font-medium tabular-nums",
+                    cell.column.id !== "count" && !renderValue && "font-mono"
+                  )}
                 >
                   <table.FlexRender cell={cell} />
                 </TableCell>

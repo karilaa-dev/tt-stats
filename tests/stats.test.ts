@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 
+import { getLanguagePresentation } from "@/lib/language"
 import {
   cutoffForRange,
   fillTimeSeries,
@@ -26,6 +27,21 @@ describe("statistics validation", () => {
     expect(parseTelegramId("9223372036854775807")).toBe("9223372036854775807")
     expect(parseTelegramId("12.5")).toBeNull()
     expect(parseTelegramId(" 12")).toBeNull()
+  })
+})
+
+describe("language presentation", () => {
+  it("uses a country flag and readable name for stored language codes", () => {
+    expect(getLanguagePresentation("uk")).toEqual({
+      code: "uk",
+      flag: "🇺🇦",
+      name: "Ukrainian",
+    })
+    expect(getLanguagePresentation("en-US")).toMatchObject({
+      code: "en-US",
+      flag: "🇺🇸",
+      name: "English",
+    })
   })
 })
 

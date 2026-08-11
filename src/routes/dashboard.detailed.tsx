@@ -39,10 +39,14 @@ function DetailedPage() {
         scope={scope}
         range={range}
         onScopeChange={(nextScope) =>
-          navigate({ search: (previous) => ({ ...previous, scope: nextScope }) })
+          navigate({
+            search: (previous) => ({ ...previous, scope: nextScope }),
+          })
         }
         onRangeChange={(nextRange) =>
-          navigate({ search: (previous) => ({ ...previous, range: nextRange }) })
+          navigate({
+            search: (previous) => ({ ...previous, range: nextRange }),
+          })
         }
       />
       <StatsCards stats={stats} />
