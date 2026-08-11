@@ -1,7 +1,4 @@
-"use client"
-
-import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { Link, useRouterState } from "@tanstack/react-router"
 import {
   BarChart3Icon,
   ChartNoAxesCombinedIcon,
@@ -38,7 +35,7 @@ const navigation = [
 ]
 
 export function AppSidebar() {
-  const pathname = usePathname()
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -46,7 +43,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              render={<Link href="/dashboard" />}
+              render={<Link to="/dashboard" />}
               tooltip="TT Stats"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
@@ -75,7 +72,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       isActive={active}
                       tooltip={item.label}
-                      render={<Link href={item.href} />}
+                      render={<Link to={item.href} />}
                     >
                       <item.icon />
                       <span>{item.label}</span>

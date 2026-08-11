@@ -1,4 +1,4 @@
-import "server-only"
+import "@tanstack/react-start/server-only"
 
 import { Pool, type PoolClient, type QueryResultRow } from "pg"
 

@@ -1,16 +1,14 @@
-"use client"
-
-import { usePathname } from "next/navigation"
+import { useIsFetching, useQueryClient } from "@tanstack/react-query"
+import { useRouter, useRouterState } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
 import {
-  LogOutIcon,
   MonitorIcon,
   MoonIcon,
   RefreshCwIcon,
   SunIcon,
 } from "lucide-react"
 
-import { logoutAction, refreshStatsAction } from "@/app/actions"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Breadcrumb,
@@ -34,6 +32,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { statsQueryKey } from "@/lib/stats/query-options"
 
 const labels: Record<string, string> = {
   "/dashboard": "Overview",
@@ -44,8 +43,17 @@ const labels: Record<string, string> = {
   "/dashboard/other": "Other stats",
 }
 
-export function DashboardHeader({ refreshedAt }: { refreshedAt?: number }) {
-  const pathname = usePathname()
+export function DashboardHeader({
+  refreshedAt,
+  fakeMode = false,
+}: {
+  refreshedAt?: number
+  fakeMode?: boolean
+}) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const refreshing = useIsFetching({ queryKey: statsQueryKey }) > 0
   const { setTheme } = useTheme()
   const label = labels[pathname] ?? "Dashboard"
   const refreshed = refreshedAt
@@ -77,17 +85,27 @@ export function DashboardHeader({ refreshedAt }: { refreshedAt?: number }) {
           Refreshed {refreshed} UTC
         </span>
       ) : null}
-      <form action={refreshStatsAction}>
-        <Tooltip>
-          <TooltipTrigger
-            render={<Button type="submit" variant="ghost" size="icon-sm" />}
-          >
-            <RefreshCwIcon />
-            <span className="sr-only">Refresh statistics</span>
-          </TooltipTrigger>
-          <TooltipContent>Refresh statistics</TooltipContent>
-        </Tooltip>
-      </form>
+      {fakeMode ? <Badge variant="secondary">Fake data</Badge> : null}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              disabled={refreshing}
+              onClick={async () => {
+                await queryClient.invalidateQueries({ queryKey: statsQueryKey })
+                await router.invalidate()
+              }}
+            />
+          }
+        >
+          <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
+          <span className="sr-only">Refresh statistics</span>
+        </TooltipTrigger>
+        <TooltipContent>Refresh statistics</TooltipContent>
+      </Tooltip>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
           <SunIcon />
@@ -108,17 +126,6 @@ export function DashboardHeader({ refreshedAt }: { refreshedAt?: number }) {
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
-      <form action={logoutAction}>
-        <Tooltip>
-          <TooltipTrigger
-            render={<Button type="submit" variant="ghost" size="icon-sm" />}
-          >
-            <LogOutIcon />
-            <span className="sr-only">Sign out</span>
-          </TooltipTrigger>
-          <TooltipContent>Sign out</TooltipContent>
-        </Tooltip>
-      </form>
     </header>
   )
 }

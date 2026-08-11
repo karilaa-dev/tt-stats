@@ -1,4 +1,4 @@
-import "server-only"
+import "@tanstack/react-start/server-only"
 
 import { z } from "zod"
 
@@ -21,12 +21,6 @@ const dbEnvSchema = z.object({
   DB_POOL_SIZE: z.coerce.number().int().min(1).max(50).default(5),
 })
 
-const authEnvSchema = z.object({
-  STATS_USERNAME: z.string().min(1),
-  STATS_PASSWORD: z.string().min(1),
-  SESSION_SECRET: z.string().min(32),
-})
-
 const botstatEnvSchema = z.object({
   BOT_TOKEN: z.string().min(1),
   BOTSTAT_ACCESS_KEY: z.string().min(1),
@@ -39,15 +33,10 @@ const botstatEnvSchema = z.object({
 })
 
 export type DbEnv = z.output<typeof dbEnvSchema>
-export type AuthEnv = z.output<typeof authEnvSchema>
 export type BotstatEnv = z.output<typeof botstatEnvSchema>
 
 export function getDbEnv(source: NodeJS.ProcessEnv = process.env): DbEnv {
   return dbEnvSchema.parse(source)
-}
-
-export function getAuthEnv(source: NodeJS.ProcessEnv = process.env): AuthEnv {
-  return authEnvSchema.parse(source)
 }
 
 export function getBotstatEnv(
@@ -62,6 +51,5 @@ export function getBotstatEnv(
 
 export function validateRuntimeConfiguration(): void {
   getDbEnv()
-  getAuthEnv()
   getBotstatEnv()
 }

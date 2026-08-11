@@ -1,33 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-const mocks = vi.hoisted(() => ({ hasValidSession: vi.fn() }))
+const mocks = vi.hoisted(() => ({ connect: vi.fn() }))
 
-vi.mock("@/lib/auth/session", () => ({
-  hasValidSession: mocks.hasValidSession,
+vi.mock("@/lib/db/pool", () => ({ connect: mocks.connect }))
+vi.mock("@/lib/dev/fake-data", () => ({
+  isFakeDataEnabled: () => true,
+  getFakeHistory: () => [
+    { Time: "2026-08-10T04:58:00.000Z", Video: "https://example.test/a" },
+  ],
 }))
 
-import { GET } from "@/app/api/users/[userId]/history.csv/route"
+import { getHistoryCsvResponse } from "@/lib/csv/history"
 
-describe("CSV route authorization", () => {
+describe("public CSV route", () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it("rejects unauthenticated downloads before touching the database", async () => {
-    mocks.hasValidSession.mockResolvedValue(false)
-    const response = await GET(
-      new Request("http://localhost/api/users/1/history.csv"),
-      { params: Promise.resolve({ userId: "1" }) }
-    )
-    expect(response.status).toBe(401)
-    expect(await response.json()).toEqual({ error: "Unauthorized" })
+  it("rejects invalid IDs before touching the database", async () => {
+    const response = await getHistoryCsvResponse("nope")
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({ error: "Invalid user ID" })
+    expect(mocks.connect).not.toHaveBeenCalled()
   })
 
-  it("rejects invalid IDs after revalidating the session", async () => {
-    mocks.hasValidSession.mockResolvedValue(true)
-    const response = await GET(
-      new Request("http://localhost/api/users/nope/history.csv"),
-      { params: Promise.resolve({ userId: "nope" }) }
+  it("returns unguarded CSV with safe download headers", async () => {
+    const response = await getHistoryCsvResponse("1")
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8")
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="user_1.csv"'
     )
-    expect(response.status).toBe(400)
-    expect(mocks.hasValidSession).toHaveBeenCalledOnce()
+    expect(await response.text()).toContain("https://example.test/a")
   })
 })

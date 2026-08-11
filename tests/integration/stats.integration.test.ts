@@ -1,11 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { Pool } from "pg"
 
-vi.mock("@/lib/auth/session", () => ({
-  hasValidSession: () => Promise.resolve(true),
-}))
-
-import { GET as getHistoryCsv } from "@/app/api/users/[userId]/history.csv/route"
+import { getHistoryCsvResponse } from "@/lib/csv/history"
 import { getPool } from "@/lib/db/pool"
 
 import {
@@ -140,10 +136,7 @@ integration("PostgreSQL statistics queries", () => {
   })
 
   it("streams escaped CSV in newest-first order with protected headers", async () => {
-    const response = await getHistoryCsv(
-      new Request("http://localhost/api/users/1/history.csv"),
-      { params: Promise.resolve({ userId: "1" }) }
-    )
+    const response = await getHistoryCsvResponse("1")
     expect(response.status).toBe(200)
     expect(response.headers.get("content-type")).toBe("text/csv; charset=utf-8")
     expect(response.headers.get("content-disposition")).toBe(

@@ -1,6 +1,9 @@
-"use client"
-
-import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts"
+import { useMemo } from "react"
+import { Chart } from "@tanstack/charts/react"
+import { scaleBand } from "@tanstack/charts/scales/band"
+import { scaleLinear } from "@tanstack/charts/scales/linear"
+import { tooltip } from "@tanstack/charts/tooltip"
+import { defineChart, lineY } from "@tanstack/charts"
 
 import {
   Card,
@@ -9,17 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
 import type { StatsRange, TimeSeriesPoint } from "@/lib/stats/types"
-
-const chartConfig = {
-  count: { label: "Count", color: "var(--chart-2)" },
-} satisfies ChartConfig
 
 function label(epoch: number, range: StatsRange) {
   return new Date(epoch * 1000).toLocaleString("en-GB", {
@@ -43,10 +36,43 @@ export function TimeSeriesChart({
   points: TimeSeriesPoint[]
   range: StatsRange
 }) {
-  const data = points.map((point) => ({
-    ...point,
-    label: label(point.bucketEpoch, range),
-  }))
+  const definition = useMemo(() => {
+    const data = points.map((point) => ({
+      ...point,
+      label: label(point.bucketEpoch, range),
+    }))
+
+    return defineChart({
+      marks: [
+        lineY(data, {
+          x: "label",
+          y: "count",
+          stroke: "var(--chart-2)",
+          strokeWidth: 2,
+          points: false,
+        }),
+      ],
+      x: {
+        scale: () => scaleBand<string>().padding(0.1),
+        axis: {
+          ticks: { spacing: 72 },
+          tickLabels: { thin: { minGap: 12, priority: "ends" } },
+        },
+      },
+      y: {
+        scale: scaleLinear,
+        nice: true,
+        grid: true,
+        axis: {
+          label: "Count",
+          ticks: { format: (value) => value.toLocaleString("en-US") },
+        },
+      },
+      tooltip,
+      svgAnimation: true,
+    })
+  }, [points, range])
+
   return (
     <Card>
       <CardHeader>
@@ -54,39 +80,11 @@ export function TimeSeriesChart({
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto min-h-64 w-full"
-          aria-label={`${title}, UTC time series`}
-        >
-          <LineChart
-            accessibilityLayer
-            data={data}
-            margin={{ left: 4, right: 12 }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="label"
-              tickLine={false}
-              axisLine={false}
-              minTickGap={32}
-            />
-            <YAxis
-              allowDecimals={false}
-              tickLine={false}
-              axisLine={false}
-              width={36}
-            />
-            <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
-            <Line
-              dataKey="count"
-              type="monotone"
-              stroke="var(--color-count)"
-              strokeWidth={2}
-              dot={false}
-            />
-          </LineChart>
-        </ChartContainer>
+        <Chart
+          definition={definition}
+          height={256}
+          ariaLabel={`${title}, UTC time series`}
+        />
       </CardContent>
     </Card>
   )

@@ -3,7 +3,7 @@
 import { fireEvent, render, screen } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 
-import DashboardError from "@/app/(dashboard)/dashboard/error"
+import { DashboardError } from "@/components/dashboard/dashboard-error"
 
 describe("dashboard infrastructure failures", () => {
   it("renders an accessible generic alert without leaking exception details", () => {

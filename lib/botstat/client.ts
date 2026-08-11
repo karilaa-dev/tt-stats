@@ -1,5 +1,6 @@
-import "server-only"
+import "@tanstack/react-start/server-only"
 
+import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { getBotstatEnv, type BotstatEnv } from "@/lib/env"
 import { getBotstatUserIdsRaw } from "@/lib/stats/queries"
 
@@ -64,6 +65,10 @@ export function buildBotstatRequest(ids: string[], env: BotstatEnv) {
 export async function startBotstatVerification(
   fetcher: typeof fetch = fetch
 ): Promise<BotstatResult> {
+  if (isFakeDataEnabled()) {
+    return { ok: true, taskId: "demo-task-no-data-uploaded" }
+  }
+
   const env = getBotstatEnv()
   const ids = await getBotstatUserIdsRaw()
   const { formData, url } = buildBotstatRequest(ids, env)

@@ -1,7 +1,3 @@
-"use client"
-
-import { usePathname, useRouter, useSearchParams } from "next/navigation"
-
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { ChatScope, StatsRange } from "@/lib/stats/types"
@@ -22,21 +18,15 @@ export function StatsFilters({
   scope,
   range,
   showScope = true,
+  onScopeChange,
+  onRangeChange,
 }: {
   scope?: ChatScope
   range: StatsRange
   showScope?: boolean
+  onScopeChange?: (scope: ChatScope) => void
+  onRangeChange: (range: StatsRange) => void
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const search = useSearchParams()
-
-  function setParam(name: string, value: string) {
-    const params = new URLSearchParams(search)
-    params.set(name, value)
-    router.push(`${pathname}?${params.toString()}`)
-  }
-
   return (
     <FieldGroup className="mb-6 rounded-xl border bg-card p-4 sm:flex-row sm:items-end">
       {showScope && scope ? (
@@ -45,7 +35,7 @@ export function StatsFilters({
           <ToggleGroup
             value={[scope]}
             onValueChange={(values) =>
-              values[0] && setParam("scope", String(values[0]))
+              values[0] && onScopeChange?.(values[0] as ChatScope)
             }
             variant="outline"
             spacing={0}
@@ -64,7 +54,7 @@ export function StatsFilters({
         <ToggleGroup
           value={[range]}
           onValueChange={(values) =>
-            values[0] && setParam("range", String(values[0]))
+            values[0] && onRangeChange(values[0] as StatsRange)
           }
           variant="outline"
           spacing={0}

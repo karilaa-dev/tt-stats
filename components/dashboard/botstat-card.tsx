@@ -1,10 +1,8 @@
-"use client"
-
-import { useActionState, useEffect, useState } from "react"
+import { useState } from "react"
+import { useMutation } from "@tanstack/react-query"
 import { ShieldAlertIcon, UploadIcon } from "lucide-react"
 import { toast } from "sonner"
 
-import { botstatAction, type BotstatActionState } from "@/app/botstat-action"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -27,18 +25,23 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Spinner } from "@/components/ui/spinner"
-
-const initialState: BotstatActionState = { status: "idle", nonce: 0 }
+import { startBotstat } from "@/lib/botstat/functions"
 
 export function BotstatCard() {
   const [open, setOpen] = useState(false)
-  const [state, action, pending] = useActionState(botstatAction, initialState)
-
-  useEffect(() => {
-    if (state.status === "success")
-      toast.success(state.message, { description: `Task ID: ${state.taskId}` })
-    if (state.status === "error") toast.error(state.message)
-  }, [state.nonce, state.message, state.status, state.taskId])
+  const mutation = useMutation({
+    mutationFn: () => startBotstat(),
+    onSuccess: (result) => {
+      if (result.status === "success") {
+        toast.success(result.message, {
+          description: `Task ID: ${result.taskId}`,
+        })
+      } else {
+        toast.error(result.message)
+      }
+    },
+  })
+  const pending = mutation.isPending
 
   return (
     <Card>
@@ -75,20 +78,21 @@ export function BotstatCard() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={pending}>Cancel</AlertDialogCancel>
-              <form action={action} onSubmit={() => setOpen(false)}>
-                <AlertDialogAction
-                  type="submit"
-                  disabled={pending}
-                  className="w-full"
-                >
-                  {pending ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : (
-                    <UploadIcon data-icon="inline-start" />
-                  )}
-                  {pending ? "Starting…" : "Confirm upload"}
-                </AlertDialogAction>
-              </form>
+              <AlertDialogAction
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  setOpen(false)
+                  mutation.mutate()
+                }}
+              >
+                {pending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <UploadIcon data-icon="inline-start" />
+                )}
+                {pending ? "Starting…" : "Confirm upload"}
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
