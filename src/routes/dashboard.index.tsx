@@ -1,6 +1,7 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 
+import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsCards } from "@/components/dashboard/stats-cards"
@@ -9,62 +10,69 @@ import { overviewQueryOptions } from "@/lib/stats/query-options"
 
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({ meta: [{ title: "Overview · TT Stats" }] }),
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(overviewQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(overviewQueryOptions())
+  },
   component: OverviewPage,
-  pendingComponent: DashboardLoading,
 })
 
 function OverviewPage() {
-  const { data: overview } = useSuspenseQuery(overviewQueryOptions())
+  const overviewQuery = useQuery(overviewQueryOptions())
+  const overview = overviewQuery.data
   return (
     <>
       <PageHeading
         title="Overview"
         description="Private users and groups, all time and over the exact last 24 hours."
       />
-      <Tabs defaultValue="users">
-        <TabsList className="w-full sm:w-fit">
-          <TabsTrigger value="users" className="flex-1 sm:flex-none">
-            Private users
-          </TabsTrigger>
-          <TabsTrigger value="groups" className="flex-1 sm:flex-none">
-            Groups
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="users" className="mt-6 flex flex-col gap-8">
-          <section>
-            <SectionHeading
-              title="All time"
-              description="Complete private-user history"
-            />
-            <StatsCards stats={overview.users.all} />
-          </section>
-          <section>
-            <SectionHeading
-              title="Last 24 hours"
-              description="Rolling 24-hour activity window"
-            />
-            <StatsCards stats={overview.users.last24Hours} />
-          </section>
-        </TabsContent>
-        <TabsContent value="groups" className="mt-6 flex flex-col gap-8">
-          <section>
-            <SectionHeading
-              title="All time"
-              description="Complete group history"
-            />
-            <StatsCards stats={overview.groups.all} />
-          </section>
-          <section>
-            <SectionHeading
-              title="Last 24 hours"
-              description="Rolling 24-hour activity window"
-            />
-            <StatsCards stats={overview.groups.last24Hours} />
-          </section>
-        </TabsContent>
-      </Tabs>
+      {overviewQuery.isError && !overview ? (
+        <DashboardError reset={() => void overviewQuery.refetch()} />
+      ) : !overview ? (
+        <DashboardLoading />
+      ) : (
+        <Tabs defaultValue="users">
+          <TabsList className="w-full sm:w-fit">
+            <TabsTrigger value="users" className="flex-1 sm:flex-none">
+              Private users
+            </TabsTrigger>
+            <TabsTrigger value="groups" className="flex-1 sm:flex-none">
+              Groups
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="users" className="mt-6 flex flex-col gap-8">
+            <section>
+              <SectionHeading
+                title="All time"
+                description="Complete private-user history"
+              />
+              <StatsCards stats={overview.users.all} />
+            </section>
+            <section>
+              <SectionHeading
+                title="Last 24 hours"
+                description="Rolling 24-hour activity window"
+              />
+              <StatsCards stats={overview.users.last24Hours} />
+            </section>
+          </TabsContent>
+          <TabsContent value="groups" className="mt-6 flex flex-col gap-8">
+            <section>
+              <SectionHeading
+                title="All time"
+                description="Complete group history"
+              />
+              <StatsCards stats={overview.groups.all} />
+            </section>
+            <section>
+              <SectionHeading
+                title="Last 24 hours"
+                description="Rolling 24-hour activity window"
+              />
+              <StatsCards stats={overview.groups.last24Hours} />
+            </section>
+          </TabsContent>
+        </Tabs>
+      )}
     </>
   )
 }

@@ -13,12 +13,12 @@ export const Route = createFileRoute("/dashboard")({
 })
 
 function DashboardLayout() {
-  const { refreshedAt, fakeMode } = Route.useLoaderData()
+  const { fakeMode } = Route.useLoaderData()
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <DashboardHeader refreshedAt={refreshedAt} fakeMode={fakeMode} />
+        <DashboardHeader fakeMode={fakeMode} />
         <main className="mx-auto flex w-full max-w-screen-2xl flex-1 flex-col p-4 md:p-6 lg:p-8">
           <Outlet />
         </main>

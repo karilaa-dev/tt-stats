@@ -38,6 +38,24 @@ interface MetricRow {
   unique_image_users?: string
 }
 
+interface OverviewCountRow {
+  scope: "users" | "groups"
+  all_count: string
+  day_count: string
+}
+
+interface OverviewMetricRow {
+  scope: "users" | "groups"
+  all_total: string
+  all_unique_users: string
+  day_total: string
+  day_unique_users: string
+  all_images?: string
+  all_unique_image_users?: string
+  day_images?: string
+  day_unique_image_users?: string
+}
+
 async function safeQuery<Row extends QueryResultRow>(
   pool: Pool,
   text: string,
@@ -131,16 +149,118 @@ export async function getOverviewRaw(
   nowEpoch = Math.floor(Date.now() / 1000),
   pool: Pool = getPool()
 ): Promise<OverviewStats> {
-  const [usersAll, usersDay, groupsAll, groupsDay] = await Promise.all([
-    getStatsBreakdownRaw("users", "all", nowEpoch, pool),
-    getStatsBreakdownRaw("users", "24h", nowEpoch, pool),
-    getStatsBreakdownRaw("groups", "all", nowEpoch, pool),
-    getStatsBreakdownRaw("groups", "24h", nowEpoch, pool),
+  const dayStart = cutoffForRange("24h", nowEpoch)
+  const [chatsResult, downloadsResult, musicResult] = await Promise.all([
+    safeQuery<OverviewCountRow>(
+      pool,
+      `SELECT
+         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
+         COUNT(*)::text AS all_count,
+         COUNT(*) FILTER (
+           WHERE registered_at >= $1 AND registered_at <= $2
+         )::text AS day_count
+       FROM users
+       WHERE user_id <> 0
+       GROUP BY 1`,
+      [dayStart, nowEpoch]
+    ),
+    safeQuery<OverviewMetricRow>(
+      pool,
+      `SELECT
+         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
+         COUNT(*)::text AS all_total,
+         COUNT(DISTINCT user_id)::text AS all_unique_users,
+         COUNT(*) FILTER (
+           WHERE downloaded_at >= $1 AND downloaded_at <= $2
+         )::text AS day_total,
+         COUNT(DISTINCT user_id) FILTER (
+           WHERE downloaded_at >= $1 AND downloaded_at <= $2
+         )::text AS day_unique_users,
+         COUNT(*) FILTER (WHERE media_kind = 'images')::text AS all_images,
+         COUNT(DISTINCT user_id) FILTER (
+           WHERE media_kind = 'images'
+         )::text AS all_unique_image_users,
+         COUNT(*) FILTER (
+           WHERE media_kind = 'images'
+             AND downloaded_at >= $1
+             AND downloaded_at <= $2
+         )::text AS day_images,
+         COUNT(DISTINCT user_id) FILTER (
+           WHERE media_kind = 'images'
+             AND downloaded_at >= $1
+             AND downloaded_at <= $2
+         )::text AS day_unique_image_users
+       FROM videos
+       WHERE user_id <> 0
+       GROUP BY 1`,
+      [dayStart, nowEpoch]
+    ),
+    safeQuery<OverviewMetricRow>(
+      pool,
+      `SELECT
+         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
+         COUNT(*)::text AS all_total,
+         COUNT(DISTINCT user_id)::text AS all_unique_users,
+         COUNT(*) FILTER (
+           WHERE downloaded_at >= $1 AND downloaded_at <= $2
+         )::text AS day_total,
+         COUNT(DISTINCT user_id) FILTER (
+           WHERE downloaded_at >= $1 AND downloaded_at <= $2
+         )::text AS day_unique_users
+       FROM music
+       WHERE user_id <> 0
+       GROUP BY 1`,
+      [dayStart, nowEpoch]
+    ),
   ])
 
+  const emptyBreakdown = (): StatsBreakdown => ({
+    chats: "0",
+    downloads: {
+      images: "0",
+      total: "0",
+      uniqueImageUsers: "0",
+      uniqueUsers: "0",
+    },
+    music: { total: "0", uniqueUsers: "0" },
+  })
+  const buckets = {
+    users: { all: emptyBreakdown(), last24Hours: emptyBreakdown() },
+    groups: { all: emptyBreakdown(), last24Hours: emptyBreakdown() },
+  }
+
+  for (const row of chatsResult.rows) {
+    buckets[row.scope].all.chats = row.all_count
+    buckets[row.scope].last24Hours.chats = row.day_count
+  }
+  for (const row of downloadsResult.rows) {
+    buckets[row.scope].all.downloads = {
+      total: row.all_total,
+      uniqueUsers: row.all_unique_users,
+      images: row.all_images ?? "0",
+      uniqueImageUsers: row.all_unique_image_users ?? "0",
+    }
+    buckets[row.scope].last24Hours.downloads = {
+      total: row.day_total,
+      uniqueUsers: row.day_unique_users,
+      images: row.day_images ?? "0",
+      uniqueImageUsers: row.day_unique_image_users ?? "0",
+    }
+  }
+  for (const row of musicResult.rows) {
+    buckets[row.scope].all.music = {
+      total: row.all_total,
+      uniqueUsers: row.all_unique_users,
+    }
+    buckets[row.scope].last24Hours.music = {
+      total: row.day_total,
+      uniqueUsers: row.day_unique_users,
+    }
+  }
+
   return {
-    users: { all: usersAll, last24Hours: usersDay },
-    groups: { all: groupsAll, last24Hours: groupsDay },
+    users: buckets.users,
+    groups: buckets.groups,
     generatedAt: nowEpoch,
   }
 }

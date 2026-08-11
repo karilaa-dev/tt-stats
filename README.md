@@ -7,7 +7,7 @@ The application is read-only: it does not create tables, run migrations, or writ
 ## Stack
 
 - Node.js 22+, TanStack Start, TanStack Router, React, TypeScript, Vite, and Nitro
-- TanStack Query for SSR hydration and five-minute client-side server-state caching
+- TanStack Query for non-blocking SSR hydration, background refreshes, and previous-data retention
 - TanStack Charts for accessible responsive SVG time series
 - TanStack Table for ranked data and pagination
 - TanStack Form for the Telegram chat lookup
@@ -44,7 +44,15 @@ Optional variables:
 ```dotenv
 DB_POOL_SIZE=5
 BOTSTAT_BASE_URL=https://www.botstat.io
+STATS_REFRESH_INTERVAL_SECONDS=300
+STATS_CACHE_IDLE_MINUTES=30
 ```
+
+Aggregate results are cached in each application-server process. Active cache
+entries refresh from PostgreSQL every five minutes by default, while browsers
+check the cached snapshot every minute. A failed background refresh keeps the
+last successful result available. This avoids schema changes and preserves the
+database role's read-only permissions.
 
 All configuration is server-only. The production build does not require runtime secrets, allowing an image to be built before secrets are injected.
 
@@ -120,7 +128,7 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 
 - The database connection should use the read-only PostgreSQL role described above.
 - Reverse-proxy authentication is required because every data route is public inside the application.
-- Browser server-state is considered fresh for five minutes unless an operator presses refresh.
+- Aggregate browser queries refresh cached server snapshots every minute without blocking navigation; user lookups remain fresh for one minute.
 - Botstat verification sends every stored `users.user_id`, including private users and negative group IDs, to the configured Botstat.io endpoint. The UI requires explicit confirmation.
 - Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, and the exported IDs as sensitive; they are never intentionally logged.
 

@@ -9,7 +9,9 @@ export function getRouter() {
     defaultOptions: {
       queries: {
         gcTime: 60 * 60 * 1000,
+        networkMode: "offlineFirst",
         refetchOnWindowFocus: false,
+        retry: 1,
       },
     },
   })

@@ -1,7 +1,8 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 import { Share2Icon } from "lucide-react"
 
+import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { RankedTable } from "@/components/dashboard/ranked-table"
@@ -23,45 +24,52 @@ import { referralStatsQueryOptions } from "@/lib/stats/query-options"
 
 export const Route = createFileRoute("/dashboard/referrals")({
   head: () => ({ meta: [{ title: "Referrals · TT Stats" }] }),
-  loader: ({ context }) =>
-    context.queryClient.ensureQueryData(referralStatsQueryOptions()),
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(referralStatsQueryOptions())
+  },
   component: ReferralsPage,
-  pendingComponent: DashboardLoading,
 })
 
 function ReferralsPage() {
-  const { data: rows } = useSuspenseQuery(referralStatsQueryOptions())
+  const referralsQuery = useQuery(referralStatsQueryOptions())
+  const rows = referralsQuery.data
   return (
     <>
       <PageHeading
         title="Referrals"
         description="The ten most common non-null referral values."
       />
-      <Card>
-        <CardHeader>
-          <CardTitle>Referral ranking</CardTitle>
-          <CardDescription>
-            Deterministic ordering when counts are equal.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {rows.length ? (
-            <RankedTable rows={rows} valueLabel="Referral" />
-          ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <Share2Icon />
-                </EmptyMedia>
-                <EmptyTitle>No referrals yet</EmptyTitle>
-                <EmptyDescription>
-                  The users table contains no referral values.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-        </CardContent>
-      </Card>
+      {referralsQuery.isError && !rows ? (
+        <DashboardError reset={() => void referralsQuery.refetch()} />
+      ) : !rows ? (
+        <DashboardLoading variant="table" />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Referral ranking</CardTitle>
+            <CardDescription>
+              Deterministic ordering when counts are equal.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {rows.length ? (
+              <RankedTable rows={rows} valueLabel="Referral" />
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Share2Icon />
+                  </EmptyMedia>
+                  <EmptyTitle>No referrals yet</EmptyTitle>
+                  <EmptyDescription>
+                    The users table contains no referral values.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   )
 }

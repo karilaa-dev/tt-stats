@@ -1,7 +1,12 @@
-import { useIsFetching, useQueryClient } from "@tanstack/react-query"
-import { useRouter, useRouterState } from "@tanstack/react-router"
+import {
+  useIsFetching,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
+import { useRouterState } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
 import { MonitorIcon, MoonIcon, RefreshCwIcon, SunIcon } from "lucide-react"
+import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,11 +27,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { refreshDashboardStats } from "@/lib/stats/functions"
 import { statsQueryKey } from "@/lib/stats/query-options"
 
 const labels: Record<string, string> = {
@@ -38,23 +45,31 @@ const labels: Record<string, string> = {
   "/dashboard/other": "Other stats",
 }
 
-export function DashboardHeader({
-  refreshedAt,
-  fakeMode = false,
-}: {
-  refreshedAt?: number
-  fakeMode?: boolean
-}) {
+export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
-  const router = useRouter()
   const queryClient = useQueryClient()
-  const refreshing = useIsFetching({ queryKey: statsQueryKey }) > 0
+  const fetching = useIsFetching({ queryKey: statsQueryKey }) > 0
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshDashboardStats(),
+    onError: () => {
+      toast.error("The refresh failed. Existing statistics remain available.")
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: statsQueryKey }),
+  })
+  const refreshing = fetching || refreshMutation.isPending
   const { setTheme } = useTheme()
   const label = labels[pathname] ?? "Dashboard"
-  const refreshed = refreshedAt
-    ? new Date(refreshedAt).toLocaleTimeString("en-GB", {
+  const latestUpdate = Math.max(
+    0,
+    ...queryClient
+      .getQueryCache()
+      .findAll({ queryKey: statsQueryKey })
+      .map((query) => query.state.dataUpdatedAt)
+  )
+  const refreshed = latestUpdate
+    ? new Date(latestUpdate).toLocaleTimeString("en-GB", {
         timeZone: "UTC",
         hour: "2-digit",
         minute: "2-digit",
@@ -77,9 +92,13 @@ export function DashboardHeader({
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
-      {refreshed ? (
+      {refreshing ? (
+        <Badge variant="outline" className="hidden sm:inline-flex">
+          <Spinner /> Refreshing in background
+        </Badge>
+      ) : refreshed ? (
         <span className="hidden text-xs text-muted-foreground lg:inline">
-          Refreshed {refreshed} UTC
+          Synced {refreshed} UTC
         </span>
       ) : null}
       {fakeMode ? <Badge variant="secondary">Fake data</Badge> : null}
@@ -90,11 +109,8 @@ export function DashboardHeader({
               type="button"
               variant="ghost"
               size="icon-sm"
-              disabled={refreshing}
-              onClick={async () => {
-                await queryClient.invalidateQueries({ queryKey: statsQueryKey })
-                await router.invalidate()
-              }}
+              disabled={refreshMutation.isPending}
+              onClick={() => refreshMutation.mutate()}
             />
           }
         >

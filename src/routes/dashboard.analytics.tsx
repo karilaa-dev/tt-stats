@@ -1,6 +1,7 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 
+import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
@@ -12,34 +13,29 @@ export const Route = createFileRoute("/dashboard/analytics")({
   head: () => ({ meta: [{ title: "Analytics · TT Stats" }] }),
   validateSearch: (search) => ({ range: parseStatsRange(search.range) }),
   loaderDeps: ({ search: { range } }) => ({ range }),
-  loader: ({ context, deps: { range } }) =>
-    Promise.all([
-      context.queryClient.ensureQueryData(
-        timeSeriesQueryOptions("users", range)
-      ),
-      context.queryClient.ensureQueryData(
-        timeSeriesQueryOptions("videos", range)
-      ),
-      context.queryClient.ensureQueryData(
-        timeSeriesQueryOptions("music", range)
-      ),
-    ]),
+  loader: ({ context, deps: { range } }) => {
+    void context.queryClient.prefetchQuery(
+      timeSeriesQueryOptions("users", range)
+    )
+    void context.queryClient.prefetchQuery(
+      timeSeriesQueryOptions("videos", range)
+    )
+    void context.queryClient.prefetchQuery(
+      timeSeriesQueryOptions("music", range)
+    )
+  },
   component: AnalyticsPage,
-  pendingComponent: DashboardLoading,
 })
 
 function AnalyticsPage() {
   const { range } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { data: users } = useSuspenseQuery(
-    timeSeriesQueryOptions("users", range)
-  )
-  const { data: videos } = useSuspenseQuery(
-    timeSeriesQueryOptions("videos", range)
-  )
-  const { data: music } = useSuspenseQuery(
-    timeSeriesQueryOptions("music", range)
-  )
+  const usersQuery = useQuery(timeSeriesQueryOptions("users", range))
+  const videosQuery = useQuery(timeSeriesQueryOptions("videos", range))
+  const musicQuery = useQuery(timeSeriesQueryOptions("music", range))
+  const queries = [usersQuery, videosQuery, musicQuery]
+  const failed = queries.some((query) => query.isError && !query.data)
+  const loading = queries.some((query) => !query.data)
 
   return (
     <>
@@ -54,29 +50,39 @@ function AnalyticsPage() {
           navigate({ search: { range: nextRange } })
         }
       />
-      <div className="grid gap-6 xl:grid-cols-2">
-        <TimeSeriesChart
-          title="Registrations"
-          description="New private users and groups"
-          points={users}
-          range={range}
-          color="var(--chart-1)"
+      {failed ? (
+        <DashboardError
+          reset={() => {
+            void Promise.all(queries.map((query) => query.refetch()))
+          }}
         />
-        <TimeSeriesChart
-          title="Video downloads"
-          description="Video and image deliveries"
-          points={videos}
-          range={range}
-          color="var(--chart-2)"
-        />
-        <TimeSeriesChart
-          title="Music downloads"
-          description="Music download history"
-          points={music}
-          range={range}
-          color="var(--chart-3)"
-        />
-      </div>
+      ) : loading ? (
+        <DashboardLoading variant="charts" />
+      ) : (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <TimeSeriesChart
+            title="Registrations"
+            description="New private users and groups"
+            points={usersQuery.data ?? []}
+            range={range}
+            color="var(--chart-1)"
+          />
+          <TimeSeriesChart
+            title="Video downloads"
+            description="Video and image deliveries"
+            points={videosQuery.data ?? []}
+            range={range}
+            color="var(--chart-2)"
+          />
+          <TimeSeriesChart
+            title="Music downloads"
+            description="Music download history"
+            points={musicQuery.data ?? []}
+            range={range}
+            color="var(--chart-3)"
+          />
+        </div>
+      )}
     </>
   )
 }

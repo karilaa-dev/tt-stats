@@ -1,17 +1,51 @@
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 
-export function DashboardLoading() {
+export function DashboardLoading({
+  variant = "cards",
+}: {
+  variant?: "cards" | "charts" | "table"
+}) {
+  const count = variant === "charts" ? 3 : variant === "table" ? 1 : 4
+
   return (
-    <div className="flex flex-col gap-6" aria-label="Loading dashboard">
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-4 w-full max-w-xl" />
-      </div>
-      <Skeleton className="h-16 w-full" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }, (_, index) => (
-          <Skeleton key={index} className="h-32 w-full" />
+    <div
+      className="flex flex-col gap-4"
+      aria-busy="true"
+      aria-label="Loading dashboard data"
+    >
+      <Alert>
+        <Spinner />
+        <AlertTitle>Loading the latest statistics</AlertTitle>
+        <AlertDescription>
+          Navigation and filters remain available while data refreshes in the
+          background.
+        </AlertDescription>
+      </Alert>
+      <div
+        className={cn(
+          "grid gap-4",
+          variant === "charts"
+            ? "xl:grid-cols-2"
+            : variant === "cards"
+              ? "sm:grid-cols-2 xl:grid-cols-4"
+              : undefined
+        )}
+      >
+        {Array.from({ length: count }, (_, index) => (
+          <Skeleton
+            key={index}
+            className={cn(
+              "w-full",
+              variant === "charts"
+                ? "h-[26rem]"
+                : variant === "table"
+                  ? "h-80"
+                  : "h-32"
+            )}
+          />
         ))}
       </div>
     </div>

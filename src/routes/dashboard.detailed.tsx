@@ -1,6 +1,7 @@
-import { useSuspenseQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { createFileRoute } from "@tanstack/react-router"
 
+import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsCards } from "@/components/dashboard/stats-cards"
@@ -15,20 +16,18 @@ export const Route = createFileRoute("/dashboard/detailed")({
     range: parseStatsRange(search.range),
   }),
   loaderDeps: ({ search: { scope, range } }) => ({ scope, range }),
-  loader: ({ context, deps: { scope, range } }) =>
-    context.queryClient.ensureQueryData(
+  loader: ({ context, deps: { scope, range } }) => {
+    void context.queryClient.prefetchQuery(
       statsBreakdownQueryOptions(scope, range)
-    ),
+    )
+  },
   component: DetailedPage,
-  pendingComponent: DashboardLoading,
 })
 
 function DetailedPage() {
   const { scope, range } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const { data: stats } = useSuspenseQuery(
-    statsBreakdownQueryOptions(scope, range)
-  )
+  const statsQuery = useQuery(statsBreakdownQueryOptions(scope, range))
   return (
     <>
       <PageHeading
@@ -49,7 +48,13 @@ function DetailedPage() {
           })
         }
       />
-      <StatsCards stats={stats} />
+      {statsQuery.isError && !statsQuery.data ? (
+        <DashboardError reset={() => void statsQuery.refetch()} />
+      ) : statsQuery.data ? (
+        <StatsCards stats={statsQuery.data} />
+      ) : (
+        <DashboardLoading />
+      )}
     </>
   )
 }
