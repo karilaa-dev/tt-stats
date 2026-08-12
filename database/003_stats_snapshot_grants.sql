@@ -1,9 +1,13 @@
 -- Usage: psql "$ADMIN_DATABASE_URL" -v app_role=tt_stats -f database/003_stats_snapshot_grants.sql
 \if :{?app_role}
 \else
-  \echo 'Set -v app_role=<existing-readonly-role>'
+  \echo 'Set -v app_role=<existing-application-role>'
   \quit
 \endif
+
+GRANT CONNECT, TEMPORARY ON DATABASE :"DBNAME" TO :"app_role";
+GRANT USAGE ON SCHEMA public, cron TO :"app_role";
+GRANT SELECT ON TABLE public.users, public.videos, public.music TO :"app_role";
 
 GRANT USAGE ON SCHEMA tt_stats_cache TO :"app_role";
 GRANT SELECT ON tt_stats_cache.refresh_metadata,

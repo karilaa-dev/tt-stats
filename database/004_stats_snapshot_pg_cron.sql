@@ -1,6 +1,6 @@
--- pg_cron must be preloaded and configured for this database by an administrator.
+-- pg_cron must be preloaded, configured, and created in this database by an
+-- administrator. See database/000_stats_snapshot_prerequisites.sql.
 -- Set cron.timezone = 'UTC' in PostgreSQL configuration before installing jobs.
-CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 CALL tt_stats_cache.refresh_rolling_24h();
 CALL tt_stats_cache.refresh_daily();

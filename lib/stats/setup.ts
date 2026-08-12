@@ -16,6 +16,9 @@ interface DatabaseIdentity {
 
 interface AppCapabilities extends DatabaseIdentity {
   can_create: boolean
+  can_create_temporary_tables: boolean
+  can_read_source_tables: boolean
+  can_use_cron: boolean
   superuser: boolean
   schema_installed: boolean
   tables_installed: boolean
@@ -40,7 +43,13 @@ const fixedJobs = {
 function emptyStatus(): DatabaseSetupStatus {
   return {
     appConnection: { ok: false, errorKind: null },
-    databaseRole: { canCreate: false, superuser: false },
+    databaseRole: {
+      canCreate: false,
+      canCreateTemporaryTables: false,
+      canReadSourceTables: false,
+      canUseCron: false,
+      superuser: false,
+    },
     snapshot: {
       schemaInstalled: false,
       tablesInstalled: false,
@@ -67,6 +76,15 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
            current_user AS role,
            has_database_privilege(current_user, current_database(), 'CREATE')
              AS can_create,
+           has_database_privilege(current_user, current_database(), 'TEMPORARY')
+             AS can_create_temporary_tables,
+           coalesce(has_schema_privilege(current_user, to_regnamespace('public'), 'USAGE'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.users'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.videos'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.music'), 'SELECT'), false)
+             AS can_read_source_tables,
+           coalesce(has_schema_privilege(current_user, to_regnamespace('cron'), 'USAGE'), false)
+             AS can_use_cron,
            (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
              AS superuser,
            to_regnamespace('tt_stats_cache') IS NOT NULL AS schema_installed,
@@ -125,6 +143,10 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     const app = await inspectApp(getPool())
     status.appConnection.ok = true
     status.databaseRole.canCreate = app.can_create
+    status.databaseRole.canCreateTemporaryTables =
+      app.can_create_temporary_tables
+    status.databaseRole.canReadSourceTables = app.can_read_source_tables
+    status.databaseRole.canUseCron = app.can_use_cron
     status.databaseRole.superuser = app.superuser
     status.snapshot.schemaInstalled = app.schema_installed
     status.snapshot.tablesInstalled = app.tables_installed
@@ -157,6 +179,10 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.snapshot.jobsApiInstalled &&
     status.snapshot.appCanRead &&
     status.snapshot.appCanManageJobs &&
+    !status.databaseRole.superuser &&
+    status.databaseRole.canCreateTemporaryTables &&
+    status.databaseRole.canReadSourceTables &&
+    status.databaseRole.canUseCron &&
     status.snapshot.rollingSeeded &&
     status.snapshot.dailySeeded &&
     status.scheduler.pgCronInstalled &&
@@ -208,12 +234,7 @@ function setupFailure(step: string, error: unknown): Error {
   }
   if (kind === "permission") {
     return new Error(
-      `Database setup stopped during ${step} because the DB_URL role lacks permission. Use a database-owner or superuser DB_URL for setup, then retry.`
-    )
-  }
-  if (step === "pg_cron installation") {
-    return new Error(
-      "pg_cron could not be enabled. Confirm it is installed on the PostgreSQL host, preloaded, and configured for this database."
+      `Database setup stopped during ${step} because DB_URL lacks a required limited grant. Follow the administrator guide on Database jobs, then retry.`
     )
   }
   if (step === "job scheduling") {
@@ -229,11 +250,11 @@ function setupFailure(step: string, error: unknown): Error {
 export async function configureDatabaseJobsRaw(input: {
   rollingSchedule: string
   dailySchedule: string
-  adminPrivilegesConfirmed: true
+  setupPrivilegesConfirmed: true
 }): Promise<ConfigureDatabaseJobsResult> {
-  if (input.adminPrivilegesConfirmed !== true) {
+  if (input.setupPrivilegesConfirmed !== true) {
     throw new Error(
-      "Confirm that DB_URL has administrative privileges before running database setup."
+      "Confirm that DB_URL has the listed non-superuser grants before running database setup."
     )
   }
 
@@ -243,16 +264,38 @@ export async function configureDatabaseJobsRaw(input: {
   } catch (error) {
     throw setupFailure("connection verification", error)
   }
-  let identity
+  let capabilities
   try {
-    identity = await pool.query<DatabaseIdentity>(
-      "SELECT current_database() AS database, current_user AS role"
-    )
+    capabilities = await inspectApp(pool)
   } catch (error) {
     throw setupFailure("connection verification", error)
   }
-  const app = identity.rows[0]
-  if (!app) throw new Error("DB_URL did not return a database identity.")
+  if (capabilities.superuser) {
+    throw new Error(
+      "DB_URL is a PostgreSQL superuser. Configure the dedicated non-superuser role described on Database jobs, then retry."
+    )
+  }
+  if (!capabilities.pg_cron_installed) {
+    throw new Error(
+      "pg_cron is not installed in this database. Complete the one-time PostgreSQL administrator steps shown on Database jobs, then retry."
+    )
+  }
+
+  const missingPrivileges = [
+    capabilities.can_create ? null : "CREATE on this database",
+    capabilities.can_create_temporary_tables
+      ? null
+      : "TEMPORARY on this database",
+    capabilities.can_read_source_tables
+      ? null
+      : "USAGE on public and SELECT on users, videos, and music",
+    capabilities.can_use_cron ? null : "USAGE on the cron schema",
+  ].filter((value): value is string => Boolean(value))
+  if (missingPrivileges.length) {
+    throw new Error(
+      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the limited grants from the administrator guide, then retry.`
+    )
+  }
 
   let client: PoolClient
   try {
@@ -261,12 +304,6 @@ export async function configureDatabaseJobsRaw(input: {
     throw setupFailure("DB_URL connection", error)
   }
   try {
-    try {
-      await client.query("CREATE EXTENSION IF NOT EXISTS pg_cron")
-    } catch (error) {
-      throw setupFailure("pg_cron installation", error)
-    }
-
     try {
       await client.query(snapshotSchemaSql)
     } catch (error) {
@@ -281,7 +318,7 @@ export async function configureDatabaseJobsRaw(input: {
     }
 
     try {
-      const role = quoteIdentifier(app.role)
+      const role = quoteIdentifier(capabilities.role)
       await client.query(`
         GRANT USAGE ON SCHEMA tt_stats_cache TO ${role};
         GRANT SELECT ON tt_stats_cache.refresh_metadata,

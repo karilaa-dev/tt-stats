@@ -73,7 +73,13 @@ function fakeWriteError(): never {
 function getFakeDatabaseSetupStatus(): DatabaseSetupStatus {
   return {
     appConnection: { ok: true, errorKind: null },
-    databaseRole: { canCreate: true, superuser: true },
+    databaseRole: {
+      canCreate: true,
+      canCreateTemporaryTables: true,
+      canReadSourceTables: true,
+      canUseCron: true,
+      superuser: false,
+    },
     snapshot: {
       schemaInstalled: true,
       tablesInstalled: true,
@@ -169,8 +175,8 @@ export const configureDatabaseJobs = createServerFn({ method: "POST" })
     z.object({
       rollingSchedule: cronSchedule,
       dailySchedule: cronSchedule,
-      adminPrivilegesConfirmed: z.literal(true, {
-        error: "Confirm that DB_URL has administrative privileges.",
+      setupPrivilegesConfirmed: z.literal(true, {
+        error: "Confirm that DB_URL has the listed non-superuser grants.",
       }),
     })
   )

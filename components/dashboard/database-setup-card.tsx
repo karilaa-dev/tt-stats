@@ -5,6 +5,7 @@ import {
   CircleDashedIcon,
   DatabaseIcon,
   ShieldAlertIcon,
+  ShieldCheckIcon,
   TriangleAlertIcon,
   WrenchIcon,
 } from "lucide-react"
@@ -80,6 +81,32 @@ function configurationInstalled(status: DatabaseSetupStatus): boolean {
   )
 }
 
+function missingRuntimePrivileges(status: DatabaseSetupStatus): string[] {
+  return [
+    status.databaseRole.canCreateTemporaryTables
+      ? null
+      : "TEMPORARY on this database",
+    status.databaseRole.canReadSourceTables
+      ? null
+      : "USAGE on public and SELECT on users, videos, and music",
+    status.databaseRole.canUseCron ? null : "USAGE on the cron schema",
+  ].filter((value): value is string => Boolean(value))
+}
+
+function missingSetupPrivileges(status: DatabaseSetupStatus): string[] {
+  return [
+    status.databaseRole.canCreate ? null : "CREATE on this database",
+    ...missingRuntimePrivileges(status),
+  ].filter((value): value is string => Boolean(value))
+}
+
+function hasLimitedSetupPrivileges(status: DatabaseSetupStatus): boolean {
+  return (
+    !status.databaseRole.superuser &&
+    missingSetupPrivileges(status).length === 0
+  )
+}
+
 export function DatabaseSetupCard({
   status,
   checking = false,
@@ -96,28 +123,36 @@ export function DatabaseSetupCard({
   const [dailySchedule, setDailySchedule] = useState<string>(
     RECOMMENDED_STATS_SCHEDULE.daily
   )
-  const [adminPrivilegesConfirmed, setAdminPrivilegesConfirmed] =
+  const [setupPrivilegesConfirmed, setSetupPrivilegesConfirmed] =
     useState(false)
   const [confirming, setConfirming] = useState(false)
   const rollingError = validateCronSchedule(rollingSchedule)
   const dailyError = validateCronSchedule(dailySchedule)
   const installed = status ? configurationInstalled(status) : false
+  const missingRolePrivileges = status
+    ? installed
+      ? missingRuntimePrivileges(status)
+      : missingSetupPrivileges(status)
+    : []
   const canConfigure = Boolean(
-    status?.appConnection.ok && adminPrivilegesConfirmed
+    status?.appConnection.ok &&
+    status.scheduler.pgCronInstalled &&
+    hasLimitedSetupPrivileges(status) &&
+    setupPrivilegesConfirmed
   )
 
   const configureMutation = useMutation({
     mutationFn: () => {
-      if (!adminPrivilegesConfirmed) {
+      if (!setupPrivilegesConfirmed) {
         throw new Error(
-          "Confirm that DB_URL has administrative privileges before running setup."
+          "Confirm that DB_URL has the listed non-superuser grants before running setup."
         )
       }
       return configureDatabaseJobs({
         data: {
           rollingSchedule: rollingSchedule.trim(),
           dailySchedule: dailySchedule.trim(),
-          adminPrivilegesConfirmed: true,
+          setupPrivilegesConfirmed: true,
         },
       })
     },
@@ -174,10 +209,9 @@ export function DatabaseSetupCard({
                 <ShieldAlertIcon />
                 <AlertTitle>pg_cron is not enabled</AlertTitle>
                 <AlertDescription>
-                  The setup action can enable the extension when DB_URL has
-                  sufficient privileges. The PostgreSQL host must already
-                  provide pg_cron through shared_preload_libraries and target
-                  this database with cron.database_name.
+                  The app deliberately cannot enable this extension. Complete
+                  the one-time administrator steps below, then retry the
+                  diagnostics. DB_URL does not need to be a superuser.
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -196,20 +230,22 @@ export function DatabaseSetupCard({
                 state={
                   !status.appConnection.ok
                     ? "waiting"
-                    : status.databaseRole.canCreate &&
-                        status.databaseRole.superuser
+                    : !status.databaseRole.superuser &&
+                        missingRolePrivileges.length === 0
                       ? "good"
                       : "bad"
                 }
-                title="DB_URL privileges"
+                title="DB_URL limited grants"
                 description={
                   !status.appConnection.ok
                     ? "Not checked until DB_URL connects successfully."
                     : status.databaseRole.superuser
-                      ? "PostgreSQL reports that the DB_URL role is a superuser."
-                      : status.databaseRole.canCreate
-                        ? "The DB_URL role can create database objects but is not a PostgreSQL superuser."
-                        : "The DB_URL role does not have CREATE privilege on this database."
+                      ? "This DB_URL role is a superuser. Replace it with the limited role described below."
+                      : missingRolePrivileges.length === 0
+                        ? installed && !status.databaseRole.canCreate
+                          ? "All runtime grants exist. Database CREATE is revoked and is needed only for a later repair."
+                          : "All required database-scoped grants exist. This role is not a superuser."
+                        : `Missing: ${missingRolePrivileges.join(", ")}.`
                 }
               />
               <DiagnosticRow
@@ -311,6 +347,8 @@ export function DatabaseSetupCard({
               />
             </div>
 
+            <PostgresAdministratorGuide />
+
             {installed ? (
               <Alert>
                 {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
@@ -327,15 +365,24 @@ export function DatabaseSetupCard({
               </Alert>
             ) : (
               <>
-                {!status.databaseRole.canCreate ||
-                !status.databaseRole.superuser ? (
+                {status.databaseRole.superuser ? (
+                  <Alert variant="destructive">
+                    <ShieldAlertIcon />
+                    <AlertTitle>DB_URL is too privileged</AlertTitle>
+                    <AlertDescription>
+                      Setup is blocked for PostgreSQL superusers. Create the
+                      limited login role shown below and update DB_URL before
+                      continuing.
+                    </AlertDescription>
+                  </Alert>
+                ) : !hasLimitedSetupPrivileges(status) ? (
                   <Alert>
                     <TriangleAlertIcon />
-                    <AlertTitle>DB_URL may lack setup privileges</AlertTitle>
+                    <AlertTitle>DB_URL needs limited grants</AlertTitle>
                     <AlertDescription>
-                      PostgreSQL reports that this role is not a superuser or
-                      cannot create database objects. Use a database-owner or
-                      superuser DB_URL before confirming the setup action.
+                      Grant only the missing database privileges listed above.
+                      Do not grant SUPERUSER, CREATEROLE, CREATEDB, REPLICATION,
+                      or BYPASSRLS.
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -346,28 +393,32 @@ export function DatabaseSetupCard({
                     data-disabled={
                       controlsDisabled ||
                       configureMutation.isPending ||
-                      !status.appConnection.ok
+                      !status.appConnection.ok ||
+                      !status.scheduler.pgCronInstalled ||
+                      !hasLimitedSetupPrivileges(status)
                     }
                   >
                     <FieldContent>
-                      <FieldLabel htmlFor="setup-admin-privileges">
-                        DB_URL has administrative privileges
+                      <FieldLabel htmlFor="setup-limited-privileges">
+                        DB_URL has the listed non-superuser grants
                       </FieldLabel>
                       <FieldDescription>
                         Confirm that this connection may install the additive TT
-                        Stats schema, enable pg_cron, grant access, and manage
-                        the two fixed jobs. Credentials remain server-side.
+                        Stats schema and own the two fixed jobs. It never
+                        installs pg_cron or changes PostgreSQL configuration.
                       </FieldDescription>
                     </FieldContent>
                     <Switch
-                      id="setup-admin-privileges"
-                      checked={adminPrivilegesConfirmed}
+                      id="setup-limited-privileges"
+                      checked={setupPrivilegesConfirmed}
                       disabled={
                         controlsDisabled ||
                         configureMutation.isPending ||
-                        !status.appConnection.ok
+                        !status.appConnection.ok ||
+                        !status.scheduler.pgCronInstalled ||
+                        !hasLimitedSetupPrivileges(status)
                       }
-                      onCheckedChange={setAdminPrivilegesConfirmed}
+                      onCheckedChange={setSetupPrivilegesConfirmed}
                     />
                   </Field>
                   <div className="grid gap-5 md:grid-cols-2">
@@ -427,10 +478,23 @@ export function DatabaseSetupCard({
                     Setup is disabled until DB_URL connects successfully. Review
                     the diagnostics above.
                   </p>
-                ) : !adminPrivilegesConfirmed ? (
+                ) : status.databaseRole.superuser ? (
+                  <p className="text-sm text-destructive">
+                    Setup is disabled while DB_URL uses a PostgreSQL superuser.
+                  </p>
+                ) : !status.scheduler.pgCronInstalled ? (
+                  <p className="text-sm text-destructive">
+                    Setup is disabled until a PostgreSQL administrator enables
+                    pg_cron using the guide above.
+                  </p>
+                ) : !hasLimitedSetupPrivileges(status) ? (
+                  <p className="text-sm text-destructive">
+                    Setup is disabled until the missing limited grants are
+                    applied.
+                  </p>
+                ) : !setupPrivilegesConfirmed ? (
                   <p className="text-sm text-muted-foreground">
-                    Turn on the DB_URL administrative privileges confirmation to
-                    enable setup.
+                    Confirm the limited DB_URL grants to enable setup.
                   </p>
                 ) : null}
                 <div>
@@ -479,10 +543,11 @@ export function DatabaseSetupCard({
               Configure TT Stats in PostgreSQL?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This applies the fixed additive snapshot schema, enables pg_cron,
-              installs only the two TT Stats schedules, grants the DB_URL role
-              the approved access, and queues both initial refreshes. Existing
-              snapshots and unrelated cron jobs are not deleted.
+              This uses the non-superuser DB_URL role to apply the fixed
+              additive snapshot schema, install only the two TT Stats schedules,
+              grant the approved access, and queue both initial refreshes. It
+              does not install extensions, change server configuration, delete
+              existing snapshots, or touch unrelated cron jobs.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -503,6 +568,100 @@ export function DatabaseSetupCard({
         </AlertDialogContent>
       </AlertDialog>
     </Card>
+  )
+}
+
+function PostgresAdministratorGuide() {
+  return (
+    <Alert>
+      <ShieldCheckIcon />
+      <AlertTitle>One-time administrator guide for PostgreSQL 17</AlertTitle>
+      <AlertDescription className="flex min-w-0 flex-col gap-3">
+        <p>
+          The <code>DB_URL</code> role does not need <code>SUPERUSER</code>,{" "}
+          <code>CREATEROLE</code>, <code>CREATEDB</code>,{" "}
+          <code>REPLICATION</code>, or <code>BYPASSRLS</code>. An administrator
+          only needs to prepare pg_cron and grant access to this one database.
+        </p>
+        <ol className="ml-4 flex list-decimal flex-col gap-3">
+          <li>
+            <p className="font-medium text-foreground">
+              Install and preload pg_cron on the PostgreSQL host
+            </p>
+            <p>
+              Install the PostgreSQL 17 package, edit the cluster configuration,
+              and restart PostgreSQL. If <code>shared_preload_libraries</code>{" "}
+              already contains real libraries, preserve them and append{" "}
+              <code>pg_cron</code>. Never paste placeholder names such as{" "}
+              <code>existing_library</code>.
+            </p>
+            <SetupCode>{`sudo apt install postgresql-17-cron
+sudoedit /etc/postgresql/17/main/postgresql.conf
+sudo systemctl restart postgresql@17-main`}</SetupCode>
+            <SetupCode>{`shared_preload_libraries = 'pg_cron'
+cron.database_name = '<database>'
+cron.timezone = 'UTC'`}</SetupCode>
+          </li>
+          <li>
+            <p className="font-medium text-foreground">
+              Run the one-time SQL as a PostgreSQL administrator
+            </p>
+            <p>
+              Replace every angle-bracket placeholder with the real database,
+              DB_URL role, and password values; do not paste placeholders
+              literally. Of these statements, only{" "}
+              <code>CREATE EXTENSION pg_cron</code> normally requires a
+              PostgreSQL superuser. <code>CREATE ROLE</code> requires{" "}
+              <code>CREATEROLE</code>; database and table owners can issue the
+              corresponding grants.
+            </p>
+            <SetupCode>{`-- Only if the DB_URL role does not exist yet:
+CREATE ROLE "<tt_stats_role>" LOGIN NOSUPERUSER NOCREATEDB
+  NOCREATEROLE NOREPLICATION NOBYPASSRLS
+  PASSWORD '<strong-generated-password>';
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+GRANT CONNECT, CREATE, TEMPORARY
+ON DATABASE "<database>" TO "<tt_stats_role>";
+
+GRANT USAGE ON SCHEMA public, cron TO "<tt_stats_role>";
+GRANT SELECT ON TABLE public.users, public.videos, public.music
+TO "<tt_stats_role>";`}</SetupCode>
+          </li>
+          <li>
+            Return here, refresh diagnostics, confirm the limited-grants switch,
+            and install the TT Stats schema and fixed jobs. After a successful
+            install, database <code>CREATE</code> may be revoked for normal
+            runtime and temporarily re-granted before an in-app repair.
+          </li>
+        </ol>
+        <p>
+          Scheduled refreshes still need <code>CONNECT</code>,{" "}
+          <code>TEMPORARY</code>, <code>USAGE</code> on <code>cron</code>, and{" "}
+          <code>SELECT</code> on the three source tables. If pg_cron uses local
+          libpq connections, its job role must also pass your{" "}
+          <code>pg_hba.conf</code> authentication; background-worker mode is an
+          alternative.
+        </p>
+        <a
+          className="w-fit underline underline-offset-4 hover:text-foreground"
+          href="https://github.com/citusdata/pg_cron#setting-up-pg_cron"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Official pg_cron setup reference
+        </a>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function SetupCode({ children }: { children: string }) {
+  return (
+    <pre className="mt-2 max-w-full overflow-x-auto rounded-md border bg-muted p-3 text-xs text-foreground">
+      <code>{children}</code>
+    </pre>
   )
 }
 

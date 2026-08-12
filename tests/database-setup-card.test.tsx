@@ -13,7 +13,13 @@ vi.mock("@/lib/stats/functions", () => ({
 
 const missingSetup: DatabaseSetupStatus = {
   appConnection: { ok: true, errorKind: null },
-  databaseRole: { canCreate: true, superuser: true },
+  databaseRole: {
+    canCreate: true,
+    canCreateTemporaryTables: true,
+    canReadSourceTables: true,
+    canUseCron: true,
+    superuser: false,
+  },
   snapshot: {
     schemaInstalled: false,
     tablesInstalled: false,
@@ -24,8 +30,8 @@ const missingSetup: DatabaseSetupStatus = {
     dailySeeded: false,
   },
   scheduler: {
-    pgCronInstalled: false,
-    pgCronVersion: null,
+    pgCronInstalled: true,
+    pgCronVersion: "1.6",
     inspectable: false,
     rollingJobInstalled: false,
     dailyJobInstalled: false,
@@ -47,13 +53,21 @@ function renderSetup(status: DatabaseSetupStatus) {
 describe("database setup diagnostics", () => {
   afterEach(cleanup)
 
-  it("requires confirmation before using DB_URL for database setup", () => {
+  it("allows a limited non-superuser role after confirmation", () => {
     renderSetup(missingSetup)
 
     expect(screen.getByText("Database connection verified")).toBeTruthy()
     expect(screen.getByText("DB_URL connected successfully.")).toBeTruthy()
     expect(
       screen.getByText("One or more TT Stats database objects are missing.")
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        "All required database-scoped grants exist. This role is not a superuser."
+      )
+    ).toBeTruthy()
+    expect(
+      screen.getByText("One-time administrator guide for PostgreSQL 17")
     ).toBeTruthy()
     const setupButton = screen.getByRole("button", {
       name: "Install or repair database jobs",
@@ -62,7 +76,7 @@ describe("database setup diagnostics", () => {
 
     fireEvent.click(
       screen.getByRole("switch", {
-        name: "DB_URL has administrative privileges",
+        name: "DB_URL has the listed non-superuser grants",
       })
     )
 
@@ -88,9 +102,56 @@ describe("database setup diagnostics", () => {
     expect(
       screen
         .getByRole("switch", {
-          name: "DB_URL has administrative privileges",
+          name: "DB_URL has the listed non-superuser grants",
         })
         .hasAttribute("data-disabled")
+    ).toBe(true)
+  })
+
+  it("keeps app setup disabled until an administrator installs pg_cron", () => {
+    renderSetup({
+      ...missingSetup,
+      databaseRole: { ...missingSetup.databaseRole, canUseCron: false },
+      scheduler: {
+        ...missingSetup.scheduler,
+        pgCronInstalled: false,
+        pgCronVersion: null,
+      },
+    })
+
+    expect(screen.getByText("pg_cron is not enabled")).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Setup is disabled until a PostgreSQL administrator enables pg_cron using the guide above."
+      )
+    ).toBeTruthy()
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Install or repair database jobs",
+        }) as HTMLButtonElement
+      ).disabled
+    ).toBe(true)
+  })
+
+  it("blocks guided setup when DB_URL is a PostgreSQL superuser", () => {
+    renderSetup({
+      ...missingSetup,
+      databaseRole: { ...missingSetup.databaseRole, superuser: true },
+    })
+
+    expect(screen.getByText("DB_URL is too privileged")).toBeTruthy()
+    expect(
+      screen.getByText(
+        "Setup is disabled while DB_URL uses a PostgreSQL superuser."
+      )
+    ).toBeTruthy()
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Install or repair database jobs",
+        }) as HTMLButtonElement
+      ).disabled
     ).toBe(true)
   })
 })

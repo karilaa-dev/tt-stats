@@ -7,6 +7,9 @@ export interface DatabaseSetupStatus {
   }
   databaseRole: {
     canCreate: boolean
+    canCreateTemporaryTables: boolean
+    canReadSourceTables: boolean
+    canUseCron: boolean
     superuser: boolean
   }
   snapshot: {

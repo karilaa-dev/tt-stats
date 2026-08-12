@@ -3,10 +3,10 @@
 An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/tt-bot) PostgreSQL schema. PostgreSQL builds complete-bucket statistics snapshots on a fixed cadence; the web application is a responsive, non-blocking read layer over those snapshots.
 
 The normal statistics read path is read-only. Guided setup can use the same
-`DB_URL` for fixed administrative SQL after an explicit confirmation. Narrow
-`SECURITY DEFINER` functions let authenticated operators manage only the two
-fixed TT Stats `pg_cron` jobs. The application intentionally has no login
-system; access control belongs at the reverse proxy.
+non-superuser `DB_URL` for the fixed TT Stats schema and schedules after an
+explicit confirmation. Narrow `SECURITY DEFINER` functions let authenticated
+operators manage only the two fixed TT Stats `pg_cron` jobs. The application
+intentionally has no login system; access control belongs at the reverse proxy.
 
 ## Stack
 
@@ -51,12 +51,10 @@ DB_POOL_SIZE=5
 BOTSTAT_BASE_URL=https://www.botstat.io
 ```
 
-The guided setup action on `/dashboard/jobs` uses `DB_URL`. Before it can run,
-an operator must explicitly turn on the **DB_URL has administrative
-privileges** confirmation. Use a database-owner or superuser connection while
-installing or repairing the schema and schedules. The URL is never sent to the
-browser. To change `DB_URL` to a different restricted role afterward, first
-apply `database/003_stats_snapshot_grants.sql` for that role.
+The guided setup action on `/dashboard/jobs` uses `DB_URL`, but the role must not
+be a PostgreSQL superuser. The page checks the limited grants below and requires
+an explicit confirmation before it creates or repairs TT Stats objects. The URL
+is never sent to the browser.
 
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
@@ -75,41 +73,57 @@ instructions for the PostgreSQL distribution in use.
 
 After the host-level pg_cron prerequisites are in place, the Database jobs page
 can diagnose and install the additive schema, fixed jobs, and runtime grants.
-It requires an explicit confirmation that `DB_URL` has administrative
-privileges and accepts only the two cron expressions; job names and SQL
-commands are fixed server-side. The page does not create source indexes because
-those use `CREATE INDEX CONCURRENTLY`; apply
+It never creates extensions or changes PostgreSQL configuration. It accepts
+only the two cron expressions; job names and SQL commands are fixed server-side.
+The page does not create source indexes because those use
+`CREATE INDEX CONCURRENTLY`; apply
 `database/002_stats_snapshot_indexes.sql` separately as an administrator.
 
-Create a dedicated application role and grant its live-read access as a database owner:
+Create a dedicated login role without cluster-wide attributes:
 
 ```sql
-CREATE ROLE tt_stats LOGIN PASSWORD 'use-a-strong-generated-password';
-GRANT CONNECT ON DATABASE "ttbot-db" TO tt_stats;
-GRANT USAGE ON SCHEMA public TO tt_stats;
-GRANT SELECT ON TABLE public.users, public.videos, public.music TO tt_stats;
+CREATE ROLE tt_stats LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+  NOREPLICATION NOBYPASSRLS PASSWORD 'use-a-strong-generated-password';
 ```
 
-Then back up the current schema and apply the additive installation files. The
-index file must run outside an explicit transaction because it uses
-`CREATE INDEX CONCURRENTLY`:
+The role needs only these database-scoped privileges:
+
+- `CONNECT` on the tt-bot database.
+- `TEMPORARY` because refresh procedures build transaction-local staging
+  tables.
+- `USAGE` on `public` and `SELECT` on `public.users`, `public.videos`, and
+  `public.music` for snapshots, live lookup, history, and CSV export.
+- `USAGE` on `cron` so its own fixed jobs can be scheduled and managed.
+- `CREATE` on the tt-bot database only while using in-app install/repair. It can
+  be revoked after installation and re-granted before a later repair.
+- Ownership of the additive `tt_stats_cache` objects created by guided setup.
+  Browser-facing code still exposes only snapshot reads and the fixed
+  management operations.
+
+It does not need `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`,
+`BYPASSRLS`, or privileges on any other database in the cluster.
+
+After configuring and restarting pg_cron, run the prerequisite file once as a
+PostgreSQL administrator. It creates only the pg_cron extension and grants the
+limited privileges above:
 
 ```bash
-psql "$ADMIN_DATABASE_URL" -f database/002_stats_snapshot_indexes.sql
-psql "$ADMIN_DATABASE_URL" -f database/001_stats_snapshot_schema.sql
 psql "$ADMIN_DATABASE_URL" -v app_role=tt_stats \
-  -f database/003_stats_snapshot_grants.sql
-psql "$ADMIN_DATABASE_URL" -f database/004_stats_snapshot_pg_cron.sql
+  -f database/000_stats_snapshot_prerequisites.sql
+psql "$ADMIN_DATABASE_URL" -f database/002_stats_snapshot_indexes.sql
 ```
+
+Then use `/dashboard/jobs` to install or repair the schema and fixed schedules.
+For a fully manual installation, apply `001` and `004` through `DB_URL`; use
+`003` when granting runtime access to a separate existing application role.
 
 The final file seeds both snapshots and installs only these named jobs:
 
 - `tt-stats-rolling-24h` — `*/5 * * * *`
 - `tt-stats-daily` — `7 0 * * *`
 
-Verify `tt_stats_cache.refresh_metadata` and `cron.job_run_details` before
-deploying the web application. Do not grant the application role writes to the
-snapshot tables or direct access to `cron.job` and `cron.job_run_details`.
+Verify `tt_stats_cache.refresh_metadata` and the sanitized run history on the
+Database jobs page before deploying the web application.
 
 For rollback, first redeploy the preceding web version and then run
 `database/rollback_stats_snapshots.sql` as an administrator. It unschedules TT
