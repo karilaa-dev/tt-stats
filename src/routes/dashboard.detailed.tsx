@@ -32,7 +32,7 @@ function DetailedPage() {
     <>
       <PageHeading
         title="Detailed statistics"
-        description="Choose a linkable chat scope and exact UTC reporting period."
+        description="Choose a linkable chat scope and completed reporting period."
       />
       <StatsFilters
         scope={scope}

@@ -26,18 +26,8 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { formatChartBucket, useBrowserTime } from "@/lib/browser-time"
 import type { StatsRange, TimeSeriesPoint } from "@/lib/stats/types"
-
-function label(epoch: number, range: StatsRange) {
-  return new Date(epoch * 1000).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    month: "short",
-    day: "2-digit",
-    ...(range === "24h" || range === "7d"
-      ? { hour: "2-digit", minute: "2-digit" }
-      : {}),
-  })
-}
 
 export function TimeSeriesChart({
   title,
@@ -53,13 +43,14 @@ export function TimeSeriesChart({
   color?: string
 }) {
   const [view, setView] = useState<"line" | "bars">("line")
+  const time = useBrowserTime()
   const data = useMemo(
     () =>
       points.map((point) => ({
         ...point,
-        label: label(point.bucketEpoch, range),
+        label: formatChartBucket(point.bucketEpoch, range, time, true),
       })),
-    [points, range]
+    [points, range, time]
   )
   const summary = useMemo(() => {
     const total = points.reduce((sum, point) => sum + point.count, 0)
@@ -147,7 +138,7 @@ export function TimeSeriesChart({
         sticky: true,
         placement: ["top", "right", "left", "bottom"],
         items: [
-          { field: "label", label: "UTC interval" },
+          { field: "label", label: "Local interval" },
           {
             channel: "y",
             label: title,
@@ -196,7 +187,7 @@ export function TimeSeriesChart({
           <Chart
             definition={definition}
             height={300}
-            ariaLabel={`${title}, UTC time series`}
+            ariaLabel={`${title}, ${time.timeZone} time series`}
             ariaDescription="Use the pointer or arrow keys to inspect intervals. Click or press Enter to pin a value."
           />
         ) : (

@@ -1,10 +1,50 @@
 export const CHAT_SCOPES = ["users", "groups", "all"] as const
 export const STATS_RANGES = ["24h", "7d", "31d", "all"] as const
 export const SERIES_METRICS = ["users", "videos", "music"] as const
+export const STATS_DATASETS = ["rolling_24h", "daily"] as const
 
 export type ChatScope = (typeof CHAT_SCOPES)[number]
 export type StatsRange = (typeof STATS_RANGES)[number]
 export type SeriesMetric = (typeof SERIES_METRICS)[number]
+export type StatsDataset = (typeof STATS_DATASETS)[number]
+export type StatsJobStatus = "queued" | "running" | "succeeded" | "failed"
+
+export interface SnapshotMetadata {
+  dataset: StatsDataset
+  refreshedAt: number
+  windowStartEpoch: number
+  windowEndEpoch: number
+}
+
+export interface StatsJob {
+  dataset: StatsDataset
+  jobName: string
+  schedule: string
+  active: boolean
+  lastStatus: string | null
+  lastStartedAt: number | null
+  lastFinishedAt: number | null
+  lastDurationMs: number | null
+  snapshot: SnapshotMetadata | null
+  pendingRequest: ManualRefreshRequest | null
+}
+
+export interface StatsJobRun {
+  id: string
+  status: string
+  startedAt: number | null
+  finishedAt: number | null
+  durationMs: number | null
+}
+
+export interface ManualRefreshRequest {
+  id: string
+  dataset: StatsDataset
+  status: StatsJobStatus
+  requestedAt: number
+  startedAt: number | null
+  finishedAt: number | null
+}
 
 export interface MetricCount {
   total: string

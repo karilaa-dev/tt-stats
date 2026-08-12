@@ -1,6 +1,7 @@
 import {
   useIsFetching,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
 import { useRouterState } from "@tanstack/react-router"
@@ -33,8 +34,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { refreshDashboardStats } from "@/lib/stats/functions"
-import { statsQueryKey } from "@/lib/stats/query-options"
+import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
+import {
+  snapshotMetadataQueryOptions,
+  statsQueryKey,
+} from "@/lib/stats/query-options"
+import { isSnapshotStale } from "@/lib/stats/staleness"
 
 const labels: Record<string, string> = {
   "/dashboard": "Overview",
@@ -43,6 +48,23 @@ const labels: Record<string, string> = {
   "/dashboard/users": "User lookup",
   "/dashboard/referrals": "Referrals",
   "/dashboard/other": "Other stats",
+  "/dashboard/jobs": "Database jobs",
+}
+
+const snapshotQuerySections = new Set([
+  "overview",
+  "breakdown",
+  "time-series",
+  "referrals",
+  "other",
+  "metadata",
+])
+
+function isSnapshotQuery(query: { queryKey: readonly unknown[] }) {
+  return (
+    query.queryKey[0] === statsQueryKey[0] &&
+    snapshotQuerySections.has(String(query.queryKey[1]))
+  )
 }
 
 export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
@@ -50,32 +72,31 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
     select: (state) => state.location.pathname,
   })
   const queryClient = useQueryClient()
-  const fetching = useIsFetching({ queryKey: statsQueryKey }) > 0
+  const time = useBrowserTime()
+  const metadataQuery = useQuery(snapshotMetadataQueryOptions())
+  const fetching = useIsFetching({ predicate: isSnapshotQuery }) > 0
   const refreshMutation = useMutation({
-    mutationFn: () => refreshDashboardStats(),
+    mutationFn: () =>
+      queryClient.refetchQueries({
+        predicate: isSnapshotQuery,
+        type: "active",
+      }),
     onError: () => {
       toast.error("The refresh failed. Existing statistics remain available.")
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: statsQueryKey }),
+    onSuccess: () => toast.success("Snapshot views are up to date."),
   })
   const refreshing = fetching || refreshMutation.isPending
   const { setTheme } = useTheme()
   const label = labels[pathname] ?? "Dashboard"
-  const latestUpdate = Math.max(
-    0,
-    ...queryClient
-      .getQueryCache()
-      .findAll({ queryKey: statsQueryKey })
-      .map((query) => query.state.dataUpdatedAt)
+  const latestSnapshot = metadataQuery.data?.length
+    ? metadataQuery.data.reduce((latest, snapshot) =>
+        snapshot.refreshedAt > latest.refreshedAt ? snapshot : latest
+      )
+    : undefined
+  const staleSnapshot = metadataQuery.data?.find((snapshot) =>
+    isSnapshotStale(snapshot)
   )
-  const refreshed = latestUpdate
-    ? new Date(latestUpdate).toLocaleTimeString("en-GB", {
-        timeZone: "UTC",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-    : null
 
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur sm:px-4">
@@ -96,10 +117,19 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
         <Badge variant="outline" className="hidden sm:inline-flex">
           <Spinner /> Refreshing in background
         </Badge>
-      ) : refreshed ? (
+      ) : latestSnapshot ? (
         <span className="hidden text-xs text-muted-foreground lg:inline">
-          Synced {refreshed} UTC
+          Snapshot {formatTimestamp(latestSnapshot.refreshedAt, time)}
         </span>
+      ) : null}
+      {staleSnapshot ? (
+        <Badge variant="destructive">
+          <span className="sm:hidden">Stale</span>
+          <span className="hidden sm:inline">
+            {staleSnapshot.dataset === "rolling_24h" ? "Rolling" : "Daily"}{" "}
+            stale
+          </span>
+        </Badge>
       ) : null}
       {fakeMode ? <Badge variant="secondary">Fake data</Badge> : null}
       <Tooltip>
@@ -117,7 +147,7 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
           <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
           <span className="sr-only">Refresh statistics</span>
         </TooltipTrigger>
-        <TooltipContent>Refresh statistics</TooltipContent>
+        <TooltipContent>Re-read database snapshots</TooltipContent>
       </Tooltip>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>

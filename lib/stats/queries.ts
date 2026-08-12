@@ -3,57 +3,47 @@ import "@tanstack/react-start/server-only"
 import type { Pool, QueryResult, QueryResultRow } from "pg"
 
 import { DataAccessError, getPool } from "@/lib/db/pool"
-import {
-  bucketSecondsForRange,
-  cutoffForRange,
-  fillTimeSeries,
-} from "@/lib/stats/time-series"
 import type {
   ChatScope,
   OtherStats,
   OverviewStats,
+  PaginatedUserDownloads,
   RankedValue,
   SeriesMetric,
+  SnapshotMetadata,
   StatsBreakdown,
+  StatsDataset,
+  StatsJob,
+  StatsJobRun,
   StatsRange,
   TimeSeriesPoint,
-  PaginatedUserDownloads,
+  ManualRefreshRequest,
   UserStats,
 } from "@/lib/stats/types"
-
-const scopeCondition: Record<ChatScope, string> = {
-  users: "user_id > 0",
-  groups: "user_id < 0",
-  all: "user_id <> 0",
-}
 
 interface CountRow {
   count: string
 }
 
-interface MetricRow {
-  total: string
-  unique_users: string
-  images?: string
-  unique_image_users?: string
+interface BreakdownRow {
+  scope: ChatScope
+  range: StatsRange
+  chats: string
+  downloads: string
+  download_users: string
+  images: string
+  image_users: string
+  music: string
+  music_users: string
+  generated_at?: string
+  metadata_count?: string
 }
 
-interface OverviewCountRow {
-  scope: "users" | "groups"
-  all_count: string
-  day_count: string
-}
-
-interface OverviewMetricRow {
-  scope: "users" | "groups"
-  all_total: string
-  all_unique_users: string
-  day_total: string
-  day_unique_users: string
-  all_images?: string
-  all_unique_image_users?: string
-  day_images?: string
-  day_unique_image_users?: string
+interface MetadataRow {
+  dataset: StatsDataset
+  refreshed_at: Date | string
+  window_start_epoch: string
+  window_end_epoch: string
 }
 
 async function safeQuery<Row extends QueryResultRow>(
@@ -69,253 +59,142 @@ async function safeQuery<Row extends QueryResultRow>(
   }
 }
 
-function period(
-  range: StatsRange,
-  nowEpoch: number
-): { clause: string; values: unknown[] } {
-  if (range === "all") return { clause: "", values: [] }
+function missingSnapshot(): never {
+  throw new DataAccessError(
+    new Error("Statistics snapshot has not been seeded")
+  )
+}
+
+function toEpoch(value: Date | string | null): number | null {
+  if (value === null) return null
+  return Math.floor(new Date(value).getTime() / 1000)
+}
+
+function mapMetadata(row: MetadataRow): SnapshotMetadata {
   return {
-    clause: "AND __TIME_COLUMN__ >= $1 AND __TIME_COLUMN__ <= $2",
-    values: [cutoffForRange(range, nowEpoch), nowEpoch],
+    dataset: row.dataset,
+    refreshedAt: toEpoch(row.refreshed_at) ?? 0,
+    windowStartEpoch: Number(row.window_start_epoch),
+    windowEndEpoch: Number(row.window_end_epoch),
   }
+}
+
+function mapBreakdown(row: BreakdownRow): StatsBreakdown {
+  return {
+    chats: row.chats,
+    downloads: {
+      total: row.downloads,
+      uniqueUsers: row.download_users,
+      images: row.images,
+      uniqueImageUsers: row.image_users,
+    },
+    music: { total: row.music, uniqueUsers: row.music_users },
+  }
+}
+
+export async function getSnapshotMetadataRaw(
+  pool: Pool = getPool()
+): Promise<SnapshotMetadata[]> {
+  const result = await safeQuery<MetadataRow>(
+    pool,
+    `SELECT dataset, refreshed_at, window_start_epoch::text, window_end_epoch::text
+     FROM tt_stats_cache.refresh_metadata
+     ORDER BY dataset DESC`
+  )
+  return result.rows.map(mapMetadata)
 }
 
 export async function getStatsBreakdownRaw(
   scope: ChatScope,
   range: StatsRange,
-  nowEpoch = Math.floor(Date.now() / 1000),
   pool: Pool = getPool()
 ): Promise<StatsBreakdown> {
-  const filter = scopeCondition[scope]
-  const rangePeriod = period(range, nowEpoch)
-  const userPeriod = rangePeriod.clause.replaceAll(
-    "__TIME_COLUMN__",
-    "registered_at"
+  const result = await safeQuery<BreakdownRow>(
+    pool,
+    `SELECT scope, range, chats::text, downloads::text,
+            download_users::text, images::text, image_users::text,
+            music::text, music_users::text
+     FROM tt_stats_cache.breakdown
+     WHERE scope = $1 AND range = $2`,
+    [scope, range]
   )
-  const videoPeriod = rangePeriod.clause.replaceAll(
-    "__TIME_COLUMN__",
-    "downloaded_at"
-  )
-  const musicPeriod = videoPeriod
-
-  const [chatsResult, downloadsResult, musicResult] = await Promise.all([
-    safeQuery<CountRow>(
-      pool,
-      `SELECT COUNT(user_id)::text AS count
-       FROM users
-       WHERE ${filter} ${userPeriod}`,
-      rangePeriod.values
-    ),
-    safeQuery<MetricRow>(
-      pool,
-      `SELECT
-         COUNT(*)::text AS total,
-         COUNT(DISTINCT user_id)::text AS unique_users,
-         COUNT(*) FILTER (WHERE media_kind = 'images')::text AS images,
-         COUNT(DISTINCT user_id) FILTER (WHERE media_kind = 'images')::text AS unique_image_users
-       FROM videos
-       WHERE ${filter} ${videoPeriod}`,
-      rangePeriod.values
-    ),
-    safeQuery<MetricRow>(
-      pool,
-      `SELECT
-         COUNT(*)::text AS total,
-         COUNT(DISTINCT user_id)::text AS unique_users
-       FROM music
-       WHERE ${filter} ${musicPeriod}`,
-      rangePeriod.values
-    ),
-  ])
-
-  const downloads = downloadsResult.rows[0]
-  const music = musicResult.rows[0]
-  return {
-    chats: chatsResult.rows[0]?.count ?? "0",
-    downloads: {
-      total: downloads?.total ?? "0",
-      uniqueUsers: downloads?.unique_users ?? "0",
-      images: downloads?.images ?? "0",
-      uniqueImageUsers: downloads?.unique_image_users ?? "0",
-    },
-    music: {
-      total: music?.total ?? "0",
-      uniqueUsers: music?.unique_users ?? "0",
-    },
-  }
+  const row = result.rows[0]
+  return row ? mapBreakdown(row) : missingSnapshot()
 }
 
 export async function getOverviewRaw(
-  nowEpoch = Math.floor(Date.now() / 1000),
   pool: Pool = getPool()
 ): Promise<OverviewStats> {
-  const dayStart = cutoffForRange("24h", nowEpoch)
-  const [chatsResult, downloadsResult, musicResult] = await Promise.all([
-    safeQuery<OverviewCountRow>(
-      pool,
-      `SELECT
-         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
-         COUNT(*)::text AS all_count,
-         COUNT(*) FILTER (
-           WHERE registered_at >= $1 AND registered_at <= $2
-         )::text AS day_count
-       FROM users
-       WHERE user_id <> 0
-       GROUP BY 1`,
-      [dayStart, nowEpoch]
-    ),
-    safeQuery<OverviewMetricRow>(
-      pool,
-      `SELECT
-         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
-         COUNT(*)::text AS all_total,
-         COUNT(DISTINCT user_id)::text AS all_unique_users,
-         COUNT(*) FILTER (
-           WHERE downloaded_at >= $1 AND downloaded_at <= $2
-         )::text AS day_total,
-         COUNT(DISTINCT user_id) FILTER (
-           WHERE downloaded_at >= $1 AND downloaded_at <= $2
-         )::text AS day_unique_users,
-         COUNT(*) FILTER (WHERE media_kind = 'images')::text AS all_images,
-         COUNT(DISTINCT user_id) FILTER (
-           WHERE media_kind = 'images'
-         )::text AS all_unique_image_users,
-         COUNT(*) FILTER (
-           WHERE media_kind = 'images'
-             AND downloaded_at >= $1
-             AND downloaded_at <= $2
-         )::text AS day_images,
-         COUNT(DISTINCT user_id) FILTER (
-           WHERE media_kind = 'images'
-             AND downloaded_at >= $1
-             AND downloaded_at <= $2
-         )::text AS day_unique_image_users
-       FROM videos
-       WHERE user_id <> 0
-       GROUP BY 1`,
-      [dayStart, nowEpoch]
-    ),
-    safeQuery<OverviewMetricRow>(
-      pool,
-      `SELECT
-         CASE WHEN user_id > 0 THEN 'users' ELSE 'groups' END AS scope,
-         COUNT(*)::text AS all_total,
-         COUNT(DISTINCT user_id)::text AS all_unique_users,
-         COUNT(*) FILTER (
-           WHERE downloaded_at >= $1 AND downloaded_at <= $2
-         )::text AS day_total,
-         COUNT(DISTINCT user_id) FILTER (
-           WHERE downloaded_at >= $1 AND downloaded_at <= $2
-         )::text AS day_unique_users
-       FROM music
-       WHERE user_id <> 0
-       GROUP BY 1`,
-      [dayStart, nowEpoch]
-    ),
-  ])
+  const breakdowns = await safeQuery<BreakdownRow>(
+    pool,
+    `WITH metadata AS (
+       SELECT count(*)::text AS metadata_count,
+              floor(extract(epoch FROM max(refreshed_at)))::bigint::text AS generated_at
+       FROM tt_stats_cache.refresh_metadata
+     )
+     SELECT breakdown.scope, breakdown.range, breakdown.chats::text,
+            breakdown.downloads::text, breakdown.download_users::text,
+            breakdown.images::text, breakdown.image_users::text,
+            breakdown.music::text, breakdown.music_users::text,
+            metadata.generated_at, metadata.metadata_count
+     FROM tt_stats_cache.breakdown breakdown
+     CROSS JOIN metadata
+     WHERE breakdown.scope IN ('users', 'groups')
+       AND breakdown.range IN ('24h', 'all')`
+  )
 
-  const emptyBreakdown = (): StatsBreakdown => ({
-    chats: "0",
-    downloads: {
-      images: "0",
-      total: "0",
-      uniqueImageUsers: "0",
-      uniqueUsers: "0",
-    },
-    music: { total: "0", uniqueUsers: "0" },
-  })
-  const buckets = {
-    users: { all: emptyBreakdown(), last24Hours: emptyBreakdown() },
-    groups: { all: emptyBreakdown(), last24Hours: emptyBreakdown() },
+  if (breakdowns.rowCount !== 4 || breakdowns.rows[0]?.metadata_count !== "2") {
+    missingSnapshot()
   }
-
-  for (const row of chatsResult.rows) {
-    buckets[row.scope].all.chats = row.all_count
-    buckets[row.scope].last24Hours.chats = row.day_count
-  }
-  for (const row of downloadsResult.rows) {
-    buckets[row.scope].all.downloads = {
-      total: row.all_total,
-      uniqueUsers: row.all_unique_users,
-      images: row.all_images ?? "0",
-      uniqueImageUsers: row.all_unique_image_users ?? "0",
-    }
-    buckets[row.scope].last24Hours.downloads = {
-      total: row.day_total,
-      uniqueUsers: row.day_unique_users,
-      images: row.day_images ?? "0",
-      uniqueImageUsers: row.day_unique_image_users ?? "0",
-    }
-  }
-  for (const row of musicResult.rows) {
-    buckets[row.scope].all.music = {
-      total: row.all_total,
-      uniqueUsers: row.all_unique_users,
-    }
-    buckets[row.scope].last24Hours.music = {
-      total: row.day_total,
-      uniqueUsers: row.day_unique_users,
-    }
+  const find = (scope: "users" | "groups", range: "24h" | "all") => {
+    const row = breakdowns.rows.find(
+      (candidate) => candidate.scope === scope && candidate.range === range
+    )
+    return row ? mapBreakdown(row) : missingSnapshot()
   }
 
   return {
-    users: buckets.users,
-    groups: buckets.groups,
-    generatedAt: nowEpoch,
+    users: { all: find("users", "all"), last24Hours: find("users", "24h") },
+    groups: {
+      all: find("groups", "all"),
+      last24Hours: find("groups", "24h"),
+    },
+    generatedAt: Number(breakdowns.rows[0]?.generated_at ?? 0),
   }
-}
-
-const seriesSource: Record<
-  SeriesMetric,
-  { table: string; timeColumn: string }
-> = {
-  users: { table: "users", timeColumn: "registered_at" },
-  videos: { table: "videos", timeColumn: "downloaded_at" },
-  music: { table: "music", timeColumn: "downloaded_at" },
 }
 
 export async function getTimeSeriesRaw(
   metric: SeriesMetric,
   range: StatsRange,
-  nowEpoch = Math.floor(Date.now() / 1000),
   pool: Pool = getPool()
 ): Promise<TimeSeriesPoint[]> {
-  const source = seriesSource[metric]
-  const bucketSeconds = bucketSecondsForRange(range)
-  let startEpoch: number
-
-  if (range === "all") {
-    const minimum = await safeQuery<{ minimum: string | null }>(
-      pool,
-      `SELECT MIN(${source.timeColumn})::text AS minimum
-       FROM ${source.table}
-       WHERE user_id <> 0
-         AND ${source.timeColumn} IS NOT NULL
-         AND ${source.timeColumn} <= $1`,
-      [nowEpoch]
-    )
-    if (!minimum.rows[0]?.minimum) return []
-    startEpoch = Number(minimum.rows[0].minimum)
-  } else {
-    startEpoch = cutoffForRange(range, nowEpoch)
-  }
-
-  const rows = await safeQuery<{ bucket: string; count: string }>(
+  const dataset: StatsDataset = range === "24h" ? "rolling_24h" : "daily"
+  const result = await safeQuery<{
+    bucket_epoch: string | null
+    count: string | null
+    snapshot_exists: boolean
+  }>(
     pool,
-    `SELECT
-       (FLOOR(${source.timeColumn}::numeric / $1) * $1)::bigint::text AS bucket,
-       COUNT(*)::text AS count
-     FROM ${source.table}
-     WHERE user_id <> 0
-       AND ${source.timeColumn} IS NOT NULL
-       AND ${source.timeColumn} >= $2
-       AND ${source.timeColumn} <= $3
-     GROUP BY 1
-     ORDER BY 1`,
-    [bucketSeconds, startEpoch, nowEpoch]
+    `WITH metadata AS (
+       SELECT EXISTS (
+         SELECT 1 FROM tt_stats_cache.refresh_metadata WHERE dataset = $3
+       ) AS snapshot_exists
+     )
+     SELECT series.bucket_epoch::text, series.count::text,
+            metadata.snapshot_exists
+     FROM metadata
+     LEFT JOIN tt_stats_cache.time_series series
+       ON series.metric = $1 AND series.range = $2
+     ORDER BY series.bucket_epoch`,
+    [metric, range, dataset]
   )
+  if (!result.rows[0]?.snapshot_exists) missingSnapshot()
 
-  return fillTimeSeries(rows.rows, startEpoch, nowEpoch, bucketSeconds)
+  return result.rows.flatMap((row) =>
+    row.bucket_epoch === null || row.count === null
+      ? []
+      : [{ bucketEpoch: Number(row.bucket_epoch), count: Number(row.count) }]
+  )
 }
 
 export async function getUserStatsRaw(
@@ -332,23 +211,17 @@ export async function getUserStatsRaw(
     images: string
   }>(
     pool,
-    `SELECT
-       u.user_id::text,
-       u.registered_at,
-       u.lang,
-       u.link,
-       u.file_mode,
-       COUNT(v.pk_id)::text AS downloads,
-       COUNT(v.pk_id) FILTER (WHERE v.media_kind = 'images')::text AS images
-     FROM users u
-     LEFT JOIN videos v ON v.user_id = u.user_id
+    `SELECT u.user_id::text, u.registered_at, u.lang, u.link, u.file_mode,
+            COUNT(v.pk_id)::text AS downloads,
+            COUNT(v.pk_id) FILTER (WHERE v.media_kind = 'images')::text AS images
+     FROM public.users u
+     LEFT JOIN public.videos v ON v.user_id = u.user_id
      WHERE u.user_id = $1::bigint
      GROUP BY u.user_id, u.registered_at, u.lang, u.link, u.file_mode`,
     [userId]
   )
   const row = result.rows[0]
   if (!row) return null
-
   return {
     userId: row.user_id,
     registeredAt: row.registered_at === null ? null : Number(row.registered_at),
@@ -368,15 +241,12 @@ export async function getUserDownloadsRaw(
 ): Promise<PaginatedUserDownloads> {
   const countResult = await safeQuery<CountRow>(
     pool,
-    `SELECT COUNT(*)::text AS count
-     FROM videos
-     WHERE user_id = $1::bigint`,
+    "SELECT COUNT(*)::text AS count FROM public.videos WHERE user_id = $1::bigint",
     [userId]
   )
   const total = countResult.rows[0]?.count ?? "0"
   const totalPages = Math.ceil(Number(total) / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
-  const offset = (page - 1) * pageSize
   const result = await safeQuery<{
     id: string
     downloaded_at: string | number | null
@@ -384,18 +254,13 @@ export async function getUserDownloadsRaw(
     media_kind: "video" | "images"
   }>(
     pool,
-    `SELECT
-       pk_id::text AS id,
-       downloaded_at,
-       shared_link,
-       media_kind
-     FROM videos
+    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind
+     FROM public.videos
      WHERE user_id = $1::bigint
      ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC
      LIMIT $2 OFFSET $3`,
-    [userId, pageSize, offset]
+    [userId, pageSize, (page - 1) * pageSize]
   )
-
   return {
     items: result.rows.map((row) => ({
       id: row.id,
@@ -414,48 +279,218 @@ export async function getUserDownloadsRaw(
 export async function getReferralStatsRaw(
   pool: Pool = getPool()
 ): Promise<RankedValue[]> {
-  const result = await safeQuery<{ value: string; count: string }>(
+  const result = await safeQuery<{
+    value: string | null
+    count: string | null
+    snapshot_exists: boolean
+  }>(
     pool,
-    `SELECT link AS value, COUNT(*)::text AS count
-     FROM users
-     WHERE link IS NOT NULL
-     GROUP BY link
-     ORDER BY COUNT(*) DESC, link ASC
-     LIMIT 10`
+    `WITH metadata AS (
+       SELECT EXISTS (
+         SELECT 1 FROM tt_stats_cache.refresh_metadata WHERE dataset = 'daily'
+       ) AS snapshot_exists
+     )
+     SELECT ranking.value, ranking.count::text, metadata.snapshot_exists
+     FROM metadata
+     LEFT JOIN tt_stats_cache.rankings ranking
+       ON ranking.category = 'referrals'
+     ORDER BY ranking.position`
   )
-  return result.rows
+  if (!result.rows[0]?.snapshot_exists) missingSnapshot()
+  return result.rows.flatMap((row) =>
+    row.value === null || row.count === null
+      ? []
+      : [{ value: row.value, count: row.count }]
+  )
 }
 
 export async function getOtherStatsRaw(
   pool: Pool = getPool()
 ): Promise<OtherStats> {
-  const [fileMode, languages, topDownloaders] = await Promise.all([
-    safeQuery<CountRow>(
-      pool,
-      "SELECT COUNT(user_id)::text AS count FROM users WHERE file_mode = TRUE"
-    ),
-    safeQuery<{ value: string; count: string }>(
-      pool,
-      `SELECT lang AS value, COUNT(*)::text AS count
-       FROM users
-       GROUP BY lang
-       ORDER BY COUNT(*) DESC, lang ASC`
-    ),
-    safeQuery<{ value: string; count: string }>(
-      pool,
-      `SELECT user_id::text AS value, COUNT(*)::text AS count
-       FROM videos
-       GROUP BY user_id
-       ORDER BY COUNT(*) DESC, user_id ASC
-       LIMIT 10`
-    ),
-  ])
-
+  const result = await safeQuery<{
+    file_mode_users: string | null
+    languages: RankedValue[]
+    top_downloaders: RankedValue[]
+    snapshot_exists: boolean
+  }>(
+    pool,
+    `WITH metadata AS (
+       SELECT EXISTS (
+         SELECT 1 FROM tt_stats_cache.refresh_metadata WHERE dataset = 'daily'
+       ) AS snapshot_exists
+     )
+     SELECT scalar.value::text AS file_mode_users,
+            coalesce(
+              jsonb_agg(jsonb_build_object('value', ranking.value, 'count', ranking.count::text)
+                ORDER BY ranking.position) FILTER (WHERE ranking.category = 'languages'),
+              '[]'::jsonb
+            ) AS languages,
+            coalesce(
+              jsonb_agg(jsonb_build_object('value', ranking.value, 'count', ranking.count::text)
+                ORDER BY ranking.position) FILTER (WHERE ranking.category = 'top_downloaders'),
+              '[]'::jsonb
+            ) AS top_downloaders,
+            metadata.snapshot_exists
+     FROM metadata
+     LEFT JOIN tt_stats_cache.scalars scalar ON scalar.name = 'file_mode_users'
+     LEFT JOIN tt_stats_cache.rankings ranking
+       ON ranking.category IN ('languages', 'top_downloaders')
+     GROUP BY scalar.value, metadata.snapshot_exists`
+  )
+  const row = result.rows[0]
+  if (!row?.snapshot_exists || row.file_mode_users === null) missingSnapshot()
   return {
-    fileModeUsers: fileMode.rows[0]?.count ?? "0",
-    languages: languages.rows,
-    topDownloaders: topDownloaders.rows,
+    fileModeUsers: row.file_mode_users,
+    languages: row.languages,
+    topDownloaders: row.top_downloaders,
   }
+}
+
+export async function getStatsJobsRaw(
+  pool: Pool = getPool()
+): Promise<StatsJob[]> {
+  const result = await safeQuery<{
+    dataset: StatsDataset
+    job_name: string
+    schedule: string | null
+    active: boolean
+    last_status: string | null
+    last_started_at: Date | string | null
+    last_finished_at: Date | string | null
+    last_duration_ms: string | null
+    refreshed_at: Date | string | null
+    window_start_epoch: string | null
+    window_end_epoch: string | null
+    manual_request_id: string | null
+    manual_status: ManualRefreshRequest["status"] | null
+    manual_requested_at: Date | string | null
+    manual_started_at: Date | string | null
+    manual_finished_at: Date | string | null
+  }>(pool, "SELECT * FROM tt_stats_cache.list_stats_jobs()")
+
+  return result.rows.map((row) => ({
+    dataset: row.dataset,
+    jobName: row.job_name,
+    schedule: row.schedule ?? "",
+    active: row.active,
+    lastStatus: row.last_status,
+    lastStartedAt: toEpoch(row.last_started_at),
+    lastFinishedAt: toEpoch(row.last_finished_at),
+    lastDurationMs:
+      row.last_duration_ms === null ? null : Number(row.last_duration_ms),
+    snapshot:
+      row.refreshed_at === null ||
+      row.window_start_epoch === null ||
+      row.window_end_epoch === null
+        ? null
+        : {
+            dataset: row.dataset,
+            refreshedAt: toEpoch(row.refreshed_at) ?? 0,
+            windowStartEpoch: Number(row.window_start_epoch),
+            windowEndEpoch: Number(row.window_end_epoch),
+          },
+    pendingRequest:
+      row.manual_request_id === null ||
+      row.manual_status === null ||
+      row.manual_requested_at === null
+        ? null
+        : {
+            id: row.manual_request_id,
+            dataset: row.dataset,
+            status: row.manual_status,
+            requestedAt: toEpoch(row.manual_requested_at) ?? 0,
+            startedAt: toEpoch(row.manual_started_at),
+            finishedAt: toEpoch(row.manual_finished_at),
+          },
+  }))
+}
+
+export async function getStatsJobRunsRaw(
+  dataset: StatsDataset,
+  limit: number,
+  pool: Pool = getPool()
+): Promise<StatsJobRun[]> {
+  const result = await safeQuery<{
+    run_id: string
+    status: string
+    started_at: Date | string | null
+    finished_at: Date | string | null
+    duration_ms: string | null
+  }>(pool, "SELECT * FROM tt_stats_cache.list_stats_job_runs($1, $2)", [
+    dataset,
+    limit,
+  ])
+  return result.rows.map((row) => ({
+    id: row.run_id,
+    status: row.status,
+    startedAt: toEpoch(row.started_at),
+    finishedAt: toEpoch(row.finished_at),
+    durationMs: row.duration_ms === null ? null : Number(row.duration_ms),
+  }))
+}
+
+export async function updateStatsJobScheduleRaw(
+  dataset: StatsDataset,
+  schedule: string,
+  pool: Pool = getPool()
+): Promise<void> {
+  await safeQuery(
+    pool,
+    "SELECT tt_stats_cache.update_stats_job_schedule($1, $2)",
+    [dataset, schedule]
+  )
+}
+
+export async function setStatsJobActiveRaw(
+  dataset: StatsDataset,
+  active: boolean,
+  pool: Pool = getPool()
+): Promise<void> {
+  await safeQuery(pool, "SELECT tt_stats_cache.set_stats_job_active($1, $2)", [
+    dataset,
+    active,
+  ])
+}
+
+export async function requestStatsJobRunRaw(
+  dataset: StatsDataset,
+  pool: Pool = getPool()
+): Promise<string> {
+  const result = await safeQuery<{ id: string }>(
+    pool,
+    "SELECT tt_stats_cache.request_stats_job_run($1)::text AS id",
+    [dataset]
+  )
+  return result.rows[0]?.id ?? missingSnapshot()
+}
+
+export async function getManualRefreshRequestRaw(
+  id: string,
+  pool: Pool = getPool()
+): Promise<ManualRefreshRequest | null> {
+  const result = await safeQuery<{
+    id: string
+    dataset: StatsDataset
+    status: ManualRefreshRequest["status"]
+    requested_at: Date | string
+    started_at: Date | string | null
+    finished_at: Date | string | null
+  }>(
+    pool,
+    "SELECT * FROM tt_stats_cache.get_manual_refresh_request($1::bigint)",
+    [id]
+  )
+  const row = result.rows[0]
+  return row
+    ? {
+        id: row.id,
+        dataset: row.dataset,
+        status: row.status,
+        requestedAt: toEpoch(row.requested_at) ?? 0,
+        startedAt: toEpoch(row.started_at),
+        finishedAt: toEpoch(row.finished_at),
+      }
+    : null
 }
 
 export async function getBotstatUserIdsRaw(
@@ -463,7 +498,7 @@ export async function getBotstatUserIdsRaw(
 ): Promise<string[]> {
   const result = await safeQuery<{ user_id: string }>(
     pool,
-    "SELECT user_id::text FROM users ORDER BY users.user_id ASC"
+    "SELECT user_id::text FROM public.users ORDER BY users.user_id ASC"
   )
   return result.rows.map((row) => row.user_id)
 }

@@ -33,19 +33,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import type { PaginatedUserDownloads } from "@/lib/stats/types"
-
-function timestamp(epoch: number | null): string {
-  if (epoch === null) return "Unknown"
-  return new Date(epoch * 1000).toLocaleString("en-GB", {
-    timeZone: "UTC",
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
 
 function linkLabel(link: string): string {
   try {
@@ -65,6 +54,7 @@ export function UserDownloadsTable({
   loading: boolean
   onPageChange: (page: number) => void
 }) {
+  const time = useBrowserTime()
   const total = data ? BigInt(data.total).toLocaleString("en-US") : ""
   const firstItem = data?.items.length ? (data.page - 1) * data.pageSize + 1 : 0
   const lastItem = data?.items.length ? firstItem + data.items.length - 1 : 0
@@ -102,7 +92,9 @@ export function UserDownloadsTable({
               {data.items.map((download) => (
                 <TableRow key={download.id}>
                   <TableCell className="text-muted-foreground tabular-nums">
-                    {timestamp(download.downloadedAt)} UTC
+                    {download.downloadedAt === null
+                      ? "Unknown"
+                      : formatTimestamp(download.downloadedAt, time)}
                   </TableCell>
                   <TableCell>
                     <Badge

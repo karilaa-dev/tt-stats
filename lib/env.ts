@@ -21,21 +21,6 @@ const dbEnvSchema = z.object({
   DB_POOL_SIZE: z.coerce.number().int().min(1).max(50).default(5),
 })
 
-const statsCacheEnvSchema = z.object({
-  STATS_CACHE_IDLE_MINUTES: z.coerce
-    .number()
-    .int()
-    .min(5)
-    .max(1440)
-    .default(30),
-  STATS_REFRESH_INTERVAL_SECONDS: z.coerce
-    .number()
-    .int()
-    .min(15)
-    .max(3600)
-    .default(300),
-})
-
 const botstatEnvSchema = z.object({
   BOT_TOKEN: z.string().min(1),
   BOTSTAT_ACCESS_KEY: z.string().min(1),
@@ -49,7 +34,6 @@ const botstatEnvSchema = z.object({
 
 export type DbEnv = z.output<typeof dbEnvSchema>
 export type BotstatEnv = z.output<typeof botstatEnvSchema>
-export type StatsCacheEnv = z.output<typeof statsCacheEnvSchema>
 
 export function getDbEnv(source: NodeJS.ProcessEnv = process.env): DbEnv {
   return dbEnvSchema.parse(source)
@@ -63,12 +47,6 @@ export function getBotstatEnv(
     ...parsed,
     BOTSTAT_BASE_URL: parsed.BOTSTAT_BASE_URL.replace(/\/+$/u, ""),
   }
-}
-
-export function getStatsCacheEnv(
-  source: NodeJS.ProcessEnv = process.env
-): StatsCacheEnv {
-  return statsCacheEnvSchema.parse(source)
 }
 
 export function validateRuntimeConfiguration(): void {

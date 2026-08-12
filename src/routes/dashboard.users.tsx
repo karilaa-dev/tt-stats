@@ -37,6 +37,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import {
   userDownloadsQueryOptions,
   userStatsQueryOptions,
@@ -164,6 +165,7 @@ function UsersPage() {
 
 function UserResult({ user }: { user: UserStats }) {
   const group = user.userId.startsWith("-")
+  const time = useBrowserTime()
   return (
     <Card>
       <CardHeader>
@@ -187,14 +189,7 @@ function UserResult({ user }: { user: UserStats }) {
           value={
             user.registeredAt === null
               ? "Unknown"
-              : `${new Date(user.registeredAt * 1000).toLocaleString("en-GB", {
-                  timeZone: "UTC",
-                  year: "numeric",
-                  month: "short",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })} UTC`
+              : formatTimestamp(user.registeredAt, time)
           }
         />
         <Detail

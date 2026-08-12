@@ -15,6 +15,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
 import { Route as DashboardAnalyticsRouteImport } from './routes/dashboard.analytics'
 import { Route as DashboardDetailedRouteImport } from './routes/dashboard.detailed'
+import { Route as DashboardJobsRouteImport } from './routes/dashboard.jobs'
 import { Route as DashboardOtherRouteImport } from './routes/dashboard.other'
 import { Route as DashboardReferralsRouteImport } from './routes/dashboard.referrals'
 import { Route as DashboardUsersRouteImport } from './routes/dashboard.users'
@@ -50,6 +51,11 @@ const DashboardDetailedRoute = DashboardDetailedRouteImport.update({
   path: '/detailed',
   getParentRoute: () => DashboardRoute,
 } as any)
+const DashboardJobsRoute = DashboardJobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => DashboardRoute,
+} as any)
 const DashboardOtherRoute = DashboardOtherRouteImport.update({
   id: '/other',
   path: '/other',
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/detailed': typeof DashboardDetailedRoute
+  '/dashboard/jobs': typeof DashboardJobsRoute
   '/dashboard/other': typeof DashboardOtherRoute
   '/dashboard/referrals': typeof DashboardReferralsRoute
   '/dashboard/users': typeof DashboardUsersRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/detailed': typeof DashboardDetailedRoute
+  '/dashboard/jobs': typeof DashboardJobsRoute
   '/dashboard/other': typeof DashboardOtherRoute
   '/dashboard/referrals': typeof DashboardReferralsRoute
   '/dashboard/users': typeof DashboardUsersRoute
@@ -102,6 +110,7 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/dashboard/analytics': typeof DashboardAnalyticsRoute
   '/dashboard/detailed': typeof DashboardDetailedRoute
+  '/dashboard/jobs': typeof DashboardJobsRoute
   '/dashboard/other': typeof DashboardOtherRoute
   '/dashboard/referrals': typeof DashboardReferralsRoute
   '/dashboard/users': typeof DashboardUsersRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/dashboard/analytics'
     | '/dashboard/detailed'
+    | '/dashboard/jobs'
     | '/dashboard/other'
     | '/dashboard/referrals'
     | '/dashboard/users'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/dashboard/analytics'
     | '/dashboard/detailed'
+    | '/dashboard/jobs'
     | '/dashboard/other'
     | '/dashboard/referrals'
     | '/dashboard/users'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/dashboard/analytics'
     | '/dashboard/detailed'
+    | '/dashboard/jobs'
     | '/dashboard/other'
     | '/dashboard/referrals'
     | '/dashboard/users'
@@ -197,6 +209,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDetailedRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/jobs': {
+      id: '/dashboard/jobs'
+      path: '/jobs'
+      fullPath: '/dashboard/jobs'
+      preLoaderRoute: typeof DashboardJobsRouteImport
+      parentRoute: typeof DashboardRoute
+    }
     '/dashboard/other': {
       id: '/dashboard/other'
       path: '/other'
@@ -231,6 +250,7 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteChildren {
   DashboardAnalyticsRoute: typeof DashboardAnalyticsRoute
   DashboardDetailedRoute: typeof DashboardDetailedRoute
+  DashboardJobsRoute: typeof DashboardJobsRoute
   DashboardOtherRoute: typeof DashboardOtherRoute
   DashboardReferralsRoute: typeof DashboardReferralsRoute
   DashboardUsersRoute: typeof DashboardUsersRoute
@@ -240,6 +260,7 @@ interface DashboardRouteChildren {
 const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardAnalyticsRoute: DashboardAnalyticsRoute,
   DashboardDetailedRoute: DashboardDetailedRoute,
+  DashboardJobsRoute: DashboardJobsRoute,
   DashboardOtherRoute: DashboardOtherRoute,
   DashboardReferralsRoute: DashboardReferralsRoute,
   DashboardUsersRoute: DashboardUsersRoute,

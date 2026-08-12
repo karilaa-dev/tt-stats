@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router"
 import {
   BarChart3Icon,
   ChartNoAxesCombinedIcon,
+  DatabaseZapIcon,
   LayoutDashboardIcon,
   ListFilterIcon,
   SearchIcon,
@@ -32,6 +33,7 @@ const navigation = [
   { href: "/dashboard/users", label: "User lookup", icon: SearchIcon },
   { href: "/dashboard/referrals", label: "Referrals", icon: Share2Icon },
   { href: "/dashboard/other", label: "Other stats", icon: BarChart3Icon },
+  { href: "/dashboard/jobs", label: "Database jobs", icon: DatabaseZapIcon },
 ]
 
 export function AppSidebar() {

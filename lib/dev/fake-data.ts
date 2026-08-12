@@ -9,7 +9,9 @@ import type {
   PaginatedUserDownloads,
   RankedValue,
   SeriesMetric,
+  SnapshotMetadata,
   StatsBreakdown,
+  StatsJob,
   StatsRange,
   TimeSeriesPoint,
   UserDownload,
@@ -145,17 +147,18 @@ export function getFakeTimeSeries(
 ): TimeSeriesPoint[] {
   const bucketSeconds = bucketSecondsForRange(range)
   const pointCount: Record<StatsRange, number> = {
-    "24h": 25,
-    "7d": 169,
-    "31d": 32,
-    all: 181,
+    "24h": 24,
+    "7d": 168,
+    "31d": 31,
+    all: 180,
   }
   const hourlyBase: Record<SeriesMetric, number> = {
     users: 13,
     videos: 192,
     music: 61,
   }
-  const endBucket = Math.floor(FAKE_NOW_EPOCH / bucketSeconds) * bucketSeconds
+  const endBucket =
+    Math.floor(FAKE_NOW_EPOCH / bucketSeconds) * bucketSeconds - bucketSeconds
   const length = pointCount[range]
   const dailyScale = bucketSeconds === 86_400 ? 21 : 1
 
@@ -169,6 +172,55 @@ export function getFakeTimeSeries(
           : Math.max(0, Math.round(hourlyBase[metric] * dailyScale * cycle)),
     }
   })
+}
+
+export function getFakeSnapshotMetadata(): SnapshotMetadata[] {
+  const hourEnd = Math.floor(FAKE_NOW_EPOCH / 3600) * 3600
+  const dayEnd = Math.floor(FAKE_NOW_EPOCH / 86_400) * 86_400
+  return [
+    {
+      dataset: "rolling_24h",
+      refreshedAt: FAKE_NOW_EPOCH,
+      windowStartEpoch: hourEnd - 86_400,
+      windowEndEpoch: hourEnd,
+    },
+    {
+      dataset: "daily",
+      refreshedAt: FAKE_NOW_EPOCH - 18_000,
+      windowStartEpoch: dayEnd - 180 * 86_400,
+      windowEndEpoch: dayEnd,
+    },
+  ]
+}
+
+export function getFakeStatsJobs(): StatsJob[] {
+  const snapshots = getFakeSnapshotMetadata()
+  return [
+    {
+      dataset: "rolling_24h",
+      jobName: "tt-stats-rolling-24h",
+      schedule: "*/5 * * * *",
+      active: true,
+      lastStatus: "succeeded",
+      lastStartedAt: FAKE_NOW_EPOCH - 8,
+      lastFinishedAt: FAKE_NOW_EPOCH - 4,
+      lastDurationMs: 4_200,
+      snapshot: snapshots[0],
+      pendingRequest: null,
+    },
+    {
+      dataset: "daily",
+      jobName: "tt-stats-daily",
+      schedule: "7 0 * * *",
+      active: true,
+      lastStatus: "succeeded",
+      lastStartedAt: FAKE_NOW_EPOCH - 18_060,
+      lastFinishedAt: FAKE_NOW_EPOCH - 18_000,
+      lastDurationMs: 60_000,
+      snapshot: snapshots[1],
+      pendingRequest: null,
+    },
+  ]
 }
 
 export function getFakeUserStats(userId: string): UserStats | null {

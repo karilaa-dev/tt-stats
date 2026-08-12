@@ -1,8 +1,8 @@
 # TT Stats
 
-An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/tt-bot) PostgreSQL schema. It recreates the database-backed statistics from the bot's v5.4.6 stats module in a responsive dashboard and adds its manual Botstat.io verification action.
+An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/tt-bot) PostgreSQL schema. PostgreSQL builds complete-bucket statistics snapshots on a fixed cadence; the web application is a responsive, non-blocking read layer over those snapshots.
 
-The application is read-only: it does not create tables, run migrations, or write to the bot database. It intentionally has no application-level authentication; access control belongs at the reverse proxy.
+The normal application connection remains read-only. Narrow `SECURITY DEFINER` functions let authenticated operators manage only the two fixed TT Stats `pg_cron` jobs. The application intentionally has no login system; access control belongs at the reverse proxy.
 
 ## Stack
 
@@ -21,6 +21,7 @@ TanStack Charts is currently pre-alpha. The lockfile pins the tested release use
 - Node.js 22.12 or newer
 - npm
 - A current tt-bot v6 PostgreSQL database
+- PostgreSQL 11+ with [`pg_cron`](https://github.com/citusdata/pg_cron) 1.5+ available
 - A reverse proxy that authenticates every application request except the health check
 
 Copy the example environment file and replace every placeholder:
@@ -44,21 +45,24 @@ Optional variables:
 ```dotenv
 DB_POOL_SIZE=5
 BOTSTAT_BASE_URL=https://www.botstat.io
-STATS_REFRESH_INTERVAL_SECONDS=300
-STATS_CACHE_IDLE_MINUTES=30
 ```
 
-Aggregate results are cached in each application-server process. Active cache
-entries refresh from PostgreSQL every five minutes by default, while browsers
-check the cached snapshot every minute. A failed background refresh keeps the
-last successful result available. This avoids schema changes and preserves the
-database role's read-only permissions.
+PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
+and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
+tables every minute or every 15 minutes, depending on the dataset, while keeping
+the previous result visible. User lookup, paginated history, CSV export, and
+Botstat remain live operations.
 
 All configuration is server-only. The production build does not require runtime secrets, allowing an image to be built before secrets are injected.
 
-## Read-only PostgreSQL role
+## PostgreSQL installation and application role
 
-Use a dedicated login that can only connect and read the three required tables. Run equivalent grants as a database owner, substituting the actual database and role names:
+`pg_cron` must be present in `shared_preload_libraries` and configured for the
+application database before installing the schedules. Set `cron.timezone` to
+`UTC` so the daily expression runs at 00:07 UTC. Follow the upstream setup
+instructions for the PostgreSQL distribution in use.
+
+Create a dedicated application role and grant its live-read access as a database owner:
 
 ```sql
 CREATE ROLE tt_stats LOGIN PASSWORD 'use-a-strong-generated-password';
@@ -67,7 +71,30 @@ GRANT USAGE ON SCHEMA public TO tt_stats;
 GRANT SELECT ON TABLE public.users, public.videos, public.music TO tt_stats;
 ```
 
-If the bot uses a schema other than `public`, update the role's `search_path` and grants accordingly. Do not grant `INSERT`, `UPDATE`, `DELETE`, `CREATE`, or ownership.
+Then back up the current schema and apply the additive installation files. The
+index file must run outside an explicit transaction because it uses
+`CREATE INDEX CONCURRENTLY`:
+
+```bash
+psql "$ADMIN_DATABASE_URL" -f database/002_stats_snapshot_indexes.sql
+psql "$ADMIN_DATABASE_URL" -f database/001_stats_snapshot_schema.sql
+psql "$ADMIN_DATABASE_URL" -v app_role=tt_stats \
+  -f database/003_stats_snapshot_grants.sql
+psql "$ADMIN_DATABASE_URL" -f database/004_stats_snapshot_pg_cron.sql
+```
+
+The final file seeds both snapshots and installs only these named jobs:
+
+- `tt-stats-rolling-24h` — `*/5 * * * *`
+- `tt-stats-daily` — `7 0 * * *`
+
+Verify `tt_stats_cache.refresh_metadata` and `cron.job_run_details` before
+deploying the web application. Do not grant the application role writes to the
+snapshot tables or direct access to `cron.job` and `cron.job_run_details`.
+
+For rollback, first redeploy the preceding web version and then run
+`database/rollback_stats_snapshots.sql` as an administrator. It unschedules TT
+Stats jobs and drops only the additive cache schema; source indexes are retained.
 
 ## Local development
 
@@ -98,6 +125,9 @@ TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:5432/tt_stats_test \
 npm test
 ```
 
+Full job-management integration tests additionally require a pg_cron-enabled
+test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
+
 ## Routes
 
 - `/dashboard` — private-user and group overview
@@ -106,6 +136,7 @@ npm test
 - `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, top downloaders, and Botstat
+- `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
 - `/api/health` — detail-free database/configuration health check
 
 The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"unavailable"}` with HTTP 503.
@@ -126,14 +157,15 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 
 ## Security and privacy
 
-- The database connection should use the read-only PostgreSQL role described above.
+- The database connection should use the constrained PostgreSQL role described above.
 - Reverse-proxy authentication is required because every data route is public inside the application.
-- Aggregate browser queries refresh cached server snapshots every minute without blocking navigation; user lookups remain fresh for one minute.
+- Aggregate browser queries read database snapshots without blocking navigation; user lookups remain live and fresh for one minute.
+- Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two TT Stats jobs.
 - Botstat verification sends every stored `users.user_id`, including private users and negative group IDs, to the configured Botstat.io endpoint. The UI requires explicit confirmation.
 - Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, and the exported IDs as sensitive; they are never intentionally logged.
 
 ## Attribution and license
 
-TT Stats is adapted from the database-backed statistics in [`tt-bot` v5.4.6](https://github.com/karilaa-dev/tt-bot/tree/v5.4.6/stats), created by Kyryl Andreiev. Changes include a web interface, current v6 schema mapping, exact UTC ranges, zero-filled time buckets, streaming CSV, and server-side query orchestration.
+TT Stats is adapted from the database-backed statistics in [`tt-bot` v5.4.6](https://github.com/karilaa-dev/tt-bot/tree/v5.4.6/stats), created by Kyryl Andreiev. Changes include a web interface, current v6 schema mapping, completed UTC-duration buckets displayed in each visitor's timezone, PostgreSQL-managed snapshots, streaming CSV, and constrained job controls.
 
 This repository follows tt-bot's Creative Commons Attribution-NonCommercial 4.0 International licensing posture. See [LICENSE.md](LICENSE.md).

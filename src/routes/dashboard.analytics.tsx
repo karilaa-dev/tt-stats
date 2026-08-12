@@ -6,6 +6,7 @@ import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
 import { TimeSeriesChart } from "@/components/dashboard/time-series-chart"
+import { useBrowserTime } from "@/lib/browser-time"
 import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
 import { parseStatsRange } from "@/lib/stats/validation"
 
@@ -28,6 +29,7 @@ export const Route = createFileRoute("/dashboard/analytics")({
 })
 
 function AnalyticsPage() {
+  const time = useBrowserTime()
   const { range } = Route.useSearch()
   const navigate = Route.useNavigate()
   const usersQuery = useQuery(timeSeriesQueryOptions("users", range))
@@ -41,7 +43,7 @@ function AnalyticsPage() {
     <>
       <PageHeading
         title="Analytics"
-        description="UTC time series with exact range boundaries and zero-filled intervals."
+        description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
       />
       <StatsFilters
         range={range}

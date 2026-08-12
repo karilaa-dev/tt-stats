@@ -23,7 +23,7 @@ function OverviewPage() {
     <>
       <PageHeading
         title="Overview"
-        description="Private users and groups, all time and over the exact last 24 hours."
+        description="Private users and groups through the latest completed database windows."
       />
       {overviewQuery.isError && !overview ? (
         <DashboardError reset={() => void overviewQuery.refetch()} />
@@ -43,14 +43,14 @@ function OverviewPage() {
             <section>
               <SectionHeading
                 title="All time"
-                description="Complete private-user history"
+                description="Private-user history through the last completed UTC day"
               />
               <StatsCards stats={overview.users.all} />
             </section>
             <section>
               <SectionHeading
                 title="Last 24 hours"
-                description="Rolling 24-hour activity window"
+                description="Latest 24 completed hourly buckets"
               />
               <StatsCards stats={overview.users.last24Hours} />
             </section>
@@ -59,14 +59,14 @@ function OverviewPage() {
             <section>
               <SectionHeading
                 title="All time"
-                description="Complete group history"
+                description="Group history through the last completed UTC day"
               />
               <StatsCards stats={overview.groups.all} />
             </section>
             <section>
               <SectionHeading
                 title="Last 24 hours"
-                description="Rolling 24-hour activity window"
+                description="Latest 24 completed hourly buckets"
               />
               <StatsCards stats={overview.groups.last24Hours} />
             </section>
