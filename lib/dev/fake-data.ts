@@ -147,15 +147,15 @@ export function getFakeTimeSeries(
 ): TimeSeriesPoint[] {
   const bucketSeconds = bucketSecondsForRange(range)
   const pointCount: Record<StatsRange, number> = {
-    "24h": 24,
+    "24h": 48,
     "7d": 168,
     "31d": 31,
     all: 180,
   }
-  const hourlyBase: Record<SeriesMetric, number> = {
-    users: 13,
-    videos: 192,
-    music: 61,
+  const halfHourlyBase: Record<SeriesMetric, number> = {
+    users: 7,
+    videos: 96,
+    music: 31,
   }
   const endBucket =
     Math.floor(FAKE_NOW_EPOCH / bucketSeconds) * bucketSeconds - bucketSeconds
@@ -169,20 +169,23 @@ export function getFakeTimeSeries(
       count:
         index % 37 === 0
           ? 0
-          : Math.max(0, Math.round(hourlyBase[metric] * dailyScale * cycle)),
+          : Math.max(
+              0,
+              Math.round(halfHourlyBase[metric] * dailyScale * cycle)
+            ),
     }
   })
 }
 
 export function getFakeSnapshotMetadata(): SnapshotMetadata[] {
-  const hourEnd = Math.floor(FAKE_NOW_EPOCH / 3600) * 3600
+  const rollingEnd = Math.floor(FAKE_NOW_EPOCH / 1800) * 1800
   const dayEnd = Math.floor(FAKE_NOW_EPOCH / 86_400) * 86_400
   return [
     {
       dataset: "rolling_24h",
       refreshedAt: FAKE_NOW_EPOCH,
-      windowStartEpoch: hourEnd - 86_400,
-      windowEndEpoch: hourEnd,
+      windowStartEpoch: rollingEnd - 86_400,
+      windowEndEpoch: rollingEnd,
     },
     {
       dataset: "daily",

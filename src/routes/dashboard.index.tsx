@@ -53,7 +53,7 @@ function OverviewPage() {
             <section>
               <SectionHeading
                 title="Last 24 hours"
-                description="Latest 24 completed hourly buckets"
+                description="Latest 48 completed half-hour buckets"
               />
               <StatsCards stats={overview.users.last24Hours} />
             </section>
@@ -69,7 +69,7 @@ function OverviewPage() {
             <section>
               <SectionHeading
                 title="Last 24 hours"
-                description="Latest 24 completed hourly buckets"
+                description="Latest 48 completed half-hour buckets"
               />
               <StatsCards stats={overview.groups.last24Hours} />
             </section>

@@ -9,6 +9,7 @@ import type { DatabaseSetupStatus } from "@/lib/stats/setup-types"
 
 vi.mock("@/lib/stats/functions", () => ({
   configureDatabaseJobs: vi.fn(),
+  updateDatabaseDefinitions: vi.fn(),
 }))
 
 const missingSetup: DatabaseSetupStatus = {
@@ -24,6 +25,7 @@ const missingSetup: DatabaseSetupStatus = {
     schemaInstalled: false,
     tablesInstalled: false,
     jobsApiInstalled: false,
+    definitionsCurrent: false,
     appCanRead: false,
     appCanManageJobs: false,
     rollingSeeded: false,
@@ -153,5 +155,56 @@ describe("database setup diagnostics", () => {
         }) as HTMLButtonElement
       ).disabled
     ).toBe(true)
+  })
+
+  it("offers a schedule-safe database definition update after installation", () => {
+    renderSetup({
+      ...missingSetup,
+      snapshot: {
+        schemaInstalled: true,
+        tablesInstalled: true,
+        jobsApiInstalled: true,
+        definitionsCurrent: false,
+        appCanRead: true,
+        appCanManageJobs: true,
+        rollingSeeded: true,
+        dailySeeded: true,
+      },
+      scheduler: {
+        ...missingSetup.scheduler,
+        inspectable: true,
+        rollingJobInstalled: true,
+        dailyJobInstalled: true,
+      },
+    })
+
+    expect(
+      screen.getByText("Database definition update available")
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        "An update is available. Existing schedules will be preserved."
+      )
+    ).toBeTruthy()
+    const updateButton = screen.getByRole("button", {
+      name: "Update database definitions",
+    }) as HTMLButtonElement
+    expect(updateButton.disabled).toBe(true)
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "DB_URL owns the installed TT Stats schema",
+      })
+    )
+    expect(updateButton.disabled).toBe(false)
+    fireEvent.click(updateButton)
+    expect(
+      screen.getByRole("heading", {
+        name: "Update TT Stats database definitions?",
+      })
+    ).toBeTruthy()
+    expect(
+      screen.getByRole("button", { name: "Update and rebuild" })
+    ).toBeTruthy()
   })
 })

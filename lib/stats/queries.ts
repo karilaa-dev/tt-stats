@@ -46,6 +46,8 @@ interface MetadataRow {
   window_end_epoch: string
 }
 
+const MAX_ALL_TIME_CHART_POINTS = 720
+
 async function safeQuery<Row extends QueryResultRow>(
   pool: Pool,
   text: string,
@@ -177,22 +179,40 @@ export async function getTimeSeriesRaw(
        SELECT EXISTS (
          SELECT 1 FROM tt_stats_cache.refresh_metadata WHERE dataset = $3
        ) AS snapshot_exists
+     ), numbered AS (
+       SELECT series.bucket_epoch, series.count,
+              row_number() OVER (ORDER BY series.bucket_epoch) AS ordinal,
+              count(*) OVER () AS point_count
+       FROM tt_stats_cache.time_series series
+       WHERE series.metric = $1 AND series.range = $2
+     ), aggregated AS (
+       SELECT min(bucket_epoch)::bigint AS bucket_epoch,
+              sum(count)::bigint AS count
+       FROM numbered
+       GROUP BY CASE
+         WHEN $2 = 'all' THEN
+           (ordinal - 1) / greatest(1, (point_count + $4 - 1) / $4)
+         ELSE ordinal - 1
+       END
      )
-     SELECT series.bucket_epoch::text, series.count::text,
+     SELECT aggregated.bucket_epoch::text, aggregated.count::text,
             metadata.snapshot_exists
      FROM metadata
-     LEFT JOIN tt_stats_cache.time_series series
-       ON series.metric = $1 AND series.range = $2
-     ORDER BY series.bucket_epoch`,
-    [metric, range, dataset]
+     LEFT JOIN aggregated ON true
+     ORDER BY aggregated.bucket_epoch`,
+    [metric, range, dataset, MAX_ALL_TIME_CHART_POINTS]
   )
   if (!result.rows[0]?.snapshot_exists) missingSnapshot()
 
-  return result.rows.flatMap((row) =>
-    row.bucket_epoch === null || row.count === null
-      ? []
-      : [{ bucketEpoch: Number(row.bucket_epoch), count: Number(row.count) }]
-  )
+  return result.rows.flatMap((row) => {
+    if (row.bucket_epoch === null || row.count === null) return []
+    const bucketEpoch = Number(row.bucket_epoch)
+    const count = Number(row.count)
+    if (!Number.isSafeInteger(bucketEpoch) || !Number.isSafeInteger(count)) {
+      throw new DataAccessError(undefined, "snapshotData")
+    }
+    return [{ bucketEpoch, count }]
+  })
 }
 
 export async function getUserStatsRaw(

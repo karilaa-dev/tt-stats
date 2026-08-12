@@ -36,6 +36,7 @@ export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
   }
   if (["ETIMEDOUT", "57014"].includes(code)) return "timeout"
   if (["42P01", "3F000", "42883"].includes(code)) return "snapshotSchema"
+  if (["22003", "22008"].includes(code)) return "snapshotData"
   if (code === "42501") return "permission"
   if (error && typeof error === "object" && "issues" in error) {
     return "configuration"

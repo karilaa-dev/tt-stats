@@ -42,6 +42,15 @@ describe("visitor timezone formatting", () => {
     expect(formatChartBucket(second, "24h", settings, true)).toContain("EST")
   })
 
+  it("includes years on all-time labels", () => {
+    expect(
+      formatChartBucket(epoch, "all", {
+        locale: "en-US",
+        timeZone: "UTC",
+      })
+    ).toContain("2026")
+  })
+
   it("formats full timestamps without a hardcoded UTC suffix", () => {
     expect(
       formatTimestamp(epoch, {

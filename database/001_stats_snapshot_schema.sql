@@ -133,6 +133,9 @@ BEGIN
         FROM public.%2$I
         WHERE user_id <> 0
           AND %1$I IS NOT NULL
+          -- Epoch values before 2000 are invalid for Telegram bot activity and
+          -- can otherwise expand an all-time series back to 1970.
+          AND %1$I >= 946684800
           AND %1$I >= $1
           AND %1$I < $2
         GROUP BY 1
@@ -155,7 +158,7 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog, tt_stats_cache
 AS $$
 DECLARE
-  v_end_epoch BIGINT := floor(extract(epoch FROM p_now) / 3600)::bigint * 3600;
+  v_end_epoch BIGINT := floor(extract(epoch FROM p_now) / 1800)::bigint * 1800;
   v_start_epoch BIGINT := v_end_epoch - 86400;
 BEGIN
   PERFORM pg_advisory_xact_lock(20260812, 1);
@@ -256,15 +259,15 @@ BEGIN
 
   INSERT INTO tt_stats_series_stage
   SELECT * FROM tt_stats_cache._series_rows(
-    'users', '24h', v_start_epoch, v_end_epoch, 3600
+    'users', '24h', v_start_epoch, v_end_epoch, 1800
   );
   INSERT INTO tt_stats_series_stage
   SELECT * FROM tt_stats_cache._series_rows(
-    'videos', '24h', v_start_epoch, v_end_epoch, 3600
+    'videos', '24h', v_start_epoch, v_end_epoch, 1800
   );
   INSERT INTO tt_stats_series_stage
   SELECT * FROM tt_stats_cache._series_rows(
-    'music', '24h', v_start_epoch, v_end_epoch, 3600
+    'music', '24h', v_start_epoch, v_end_epoch, 1800
   );
 
   DELETE FROM tt_stats_cache.breakdown WHERE range = '24h';
@@ -334,6 +337,7 @@ BEGIN
       JOIN public.users
         ON users.user_id <> 0
        AND users.registered_at IS NOT NULL
+       AND users.registered_at >= 946684800
        AND users.registered_at < v_end_epoch
        AND (ranges.start_epoch IS NULL OR users.registered_at >= ranges.start_epoch)
     ) source
@@ -365,6 +369,7 @@ BEGIN
       JOIN public.videos
         ON videos.user_id <> 0
        AND videos.downloaded_at IS NOT NULL
+       AND videos.downloaded_at >= 946684800
        AND videos.downloaded_at < v_end_epoch
        AND (ranges.start_epoch IS NULL OR videos.downloaded_at >= ranges.start_epoch)
     ) source
@@ -394,6 +399,7 @@ BEGIN
       JOIN public.music
         ON music.user_id <> 0
        AND music.downloaded_at IS NOT NULL
+       AND music.downloaded_at >= 946684800
        AND music.downloaded_at < v_end_epoch
        AND (ranges.start_epoch IS NULL OR music.downloaded_at >= ranges.start_epoch)
     ) source
@@ -425,18 +431,21 @@ BEGIN
         INTO v_minimum
         FROM public.users
         WHERE user_id <> 0 AND registered_at IS NOT NULL
+          AND registered_at >= 946684800
           AND registered_at < v_end_epoch;
       WHEN 'videos' THEN
         SELECT (floor(min(downloaded_at)::numeric / 86400) * 86400)::bigint
         INTO v_minimum
         FROM public.videos
         WHERE user_id <> 0 AND downloaded_at IS NOT NULL
+          AND downloaded_at >= 946684800
           AND downloaded_at < v_end_epoch;
       WHEN 'music' THEN
         SELECT (floor(min(downloaded_at)::numeric / 86400) * 86400)::bigint
         INTO v_minimum
         FROM public.music
         WHERE user_id <> 0 AND downloaded_at IS NOT NULL
+          AND downloaded_at >= 946684800
           AND downloaded_at < v_end_epoch;
     END CASE;
 
@@ -459,6 +468,7 @@ BEGIN
   FROM public.users
   WHERE user_id <> 0
     AND registered_at IS NOT NULL
+    AND registered_at >= 946684800
     AND registered_at < v_end_epoch
     AND link IS NOT NULL
   GROUP BY link
@@ -471,6 +481,7 @@ BEGIN
   FROM public.users
   WHERE user_id <> 0
     AND registered_at IS NOT NULL
+    AND registered_at >= 946684800
     AND registered_at < v_end_epoch
   GROUP BY lang
   ORDER BY count(*) DESC, lang ASC;
@@ -482,6 +493,7 @@ BEGIN
   FROM public.videos
   WHERE user_id <> 0
     AND downloaded_at IS NOT NULL
+    AND downloaded_at >= 946684800
     AND downloaded_at < v_end_epoch
   GROUP BY user_id
   ORDER BY count(*) DESC, user_id ASC
@@ -495,6 +507,7 @@ BEGIN
   FROM public.users
   WHERE user_id <> 0
     AND registered_at IS NOT NULL
+    AND registered_at >= 946684800
     AND registered_at < v_end_epoch
     AND file_mode = TRUE;
 
@@ -819,5 +832,8 @@ REVOKE ALL ON ALL FUNCTIONS IN SCHEMA tt_stats_cache FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
+
+COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
+  IS 'tt-stats-schema-version:2';
 
 COMMIT;

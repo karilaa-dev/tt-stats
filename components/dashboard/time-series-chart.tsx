@@ -65,13 +65,26 @@ export function TimeSeriesChart({
       peak,
     }
   }, [points])
+  const resolution = useMemo(() => {
+    const fallback = range === "24h" ? 1800 : range === "7d" ? 3600 : 86_400
+    const seconds =
+      points.length > 1
+        ? points[1]!.bucketEpoch - points[0]!.bucketEpoch
+        : fallback
+    if (seconds === 1800) return "30-minute completed intervals"
+    if (seconds === 3600) return "Hourly completed intervals"
+    const days = Math.max(1, Math.round(seconds / 86_400))
+    return days === 1
+      ? "Daily completed intervals"
+      : `${days}-day grouped intervals`
+  }, [points, range])
   const definition = useMemo(() => {
     const marks =
       view === "bars"
         ? [
             barY(data, {
               id: "interval-counts",
-              x: "label",
+              x: "bucketEpoch",
               y: "count",
               fill: color,
               fillOpacity: 0.82,
@@ -82,25 +95,25 @@ export function TimeSeriesChart({
         : [
             areaY(data, {
               id: "interval-area",
-              x: "label",
+              x: "bucketEpoch",
               y: "count",
               fill: color,
               fillOpacity: 0.12,
             }),
             lineY(data, {
               id: "interval-line",
-              x: "label",
+              x: "bucketEpoch",
               y: "count",
               stroke: color,
               strokeWidth: 2.5,
-              points: true,
+              points: data.length <= 200,
             }),
           ]
 
     return defineChart({
       marks: [
         ...marks,
-        crosshair<string, number>({
+        crosshair<number, number>({
           x: {
             stroke: "var(--muted-foreground)",
             strokeOpacity: 0.4,
@@ -116,9 +129,12 @@ export function TimeSeriesChart({
         }),
       ],
       x: {
-        scale: () => scaleBand<string>().padding(view === "bars" ? 0.16 : 0.08),
+        scale: () => scaleBand<number>().padding(view === "bars" ? 0.16 : 0.08),
         axis: {
-          ticks: { spacing: 72 },
+          ticks: {
+            spacing: 72,
+            format: (value) => formatChartBucket(value, range, time),
+          },
           tickLabels: { thin: { minGap: 12, priority: "ends" } },
         },
       },
@@ -146,15 +162,17 @@ export function TimeSeriesChart({
           },
         ],
       },
-      svgAnimation: true,
+      svgAnimation: data.length <= 240,
     })
-  }, [color, data, title, view])
+  }, [color, data, range, time, title, view])
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription>
+          {description} · {resolution}
+        </CardDescription>
         <CardAction>
           <ToggleGroup
             value={[view]}

@@ -16,6 +16,7 @@ import {
 import {
   configureDatabaseJobsRaw,
   getDatabaseSetupStatusRaw,
+  updateDatabaseDefinitionsRaw,
 } from "@/lib/stats/setup"
 import type { DatabaseSetupStatus } from "@/lib/stats/setup-types"
 import {
@@ -84,6 +85,7 @@ function getFakeDatabaseSetupStatus(): DatabaseSetupStatus {
       schemaInstalled: true,
       tablesInstalled: true,
       jobsApiInstalled: true,
+      definitionsCurrent: true,
       appCanRead: true,
       appCanManageJobs: true,
       rollingSeeded: true,
@@ -188,6 +190,26 @@ export const configureDatabaseJobs = createServerFn({ method: "POST" })
       if (error instanceof Error) throw error
       throw new Error(
         "Database setup failed safely. No existing snapshots or schedules were deleted."
+      )
+    }
+  })
+
+export const updateDatabaseDefinitions = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      setupPrivilegesConfirmed: z.literal(true, {
+        error: "Confirm that DB_URL owns the installed TT Stats schema.",
+      }),
+    })
+  )
+  .handler(async ({ data }) => {
+    if (isFakeDataEnabled()) fakeWriteError()
+    try {
+      return await updateDatabaseDefinitionsRaw(data)
+    } catch (error) {
+      if (error instanceof Error) throw error
+      throw new Error(
+        "Database definitions could not be updated. Existing snapshots and schedules were left unchanged."
       )
     }
   })

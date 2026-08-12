@@ -9,6 +9,11 @@ import type {
   DatabaseSetupStatus,
 } from "@/lib/stats/setup-types"
 
+const snapshotDefinitionUpdateSql = snapshotSchemaSql.replace(
+  "CREATE SCHEMA IF NOT EXISTS tt_stats_cache;",
+  "-- Existing tt_stats_cache schema ownership was verified by the app."
+)
+
 interface DatabaseIdentity {
   database: string
   role: string
@@ -23,6 +28,8 @@ interface AppCapabilities extends DatabaseIdentity {
   schema_installed: boolean
   tables_installed: boolean
   jobs_api_installed: boolean
+  definitions_current: boolean
+  owns_snapshot_schema: boolean
   app_can_read: boolean
   app_can_manage: boolean
   pg_cron_installed: boolean
@@ -54,6 +61,7 @@ function emptyStatus(): DatabaseSetupStatus {
       schemaInstalled: false,
       tablesInstalled: false,
       jobsApiInstalled: false,
+      definitionsCurrent: false,
       appCanRead: false,
       appCanManageJobs: false,
       rollingSeeded: false,
@@ -96,6 +104,21 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AS tables_installed,
            to_regprocedure('tt_stats_cache.list_stats_jobs()') IS NOT NULL
              AS jobs_api_installed,
+           coalesce(
+             obj_description(
+               to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
+               'pg_proc'
+             ) = 'tt-stats-schema-version:2',
+             false
+           ) AS definitions_current,
+           coalesce(
+             (
+               SELECT pg_get_userbyid(namespace.nspowner) = current_user
+               FROM pg_namespace namespace
+               WHERE namespace.oid = to_regnamespace('tt_stats_cache')
+             ),
+             false
+           ) AS owns_snapshot_schema,
            coalesce(has_schema_privilege(current_user, to_regnamespace('tt_stats_cache'), 'USAGE'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.refresh_metadata'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.breakdown'), 'SELECT'), false)
@@ -151,6 +174,7 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.snapshot.schemaInstalled = app.schema_installed
     status.snapshot.tablesInstalled = app.tables_installed
     status.snapshot.jobsApiInstalled = app.jobs_api_installed
+    status.snapshot.definitionsCurrent = app.definitions_current
     status.snapshot.appCanRead = app.app_can_read
     status.snapshot.appCanManageJobs = app.app_can_manage
     status.scheduler.pgCronInstalled = app.pg_cron_installed
@@ -177,6 +201,7 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.appConnection.ok &&
     status.snapshot.tablesInstalled &&
     status.snapshot.jobsApiInstalled &&
+    status.snapshot.definitionsCurrent &&
     status.snapshot.appCanRead &&
     status.snapshot.appCanManageJobs &&
     !status.databaseRole.superuser &&
@@ -341,6 +366,12 @@ export async function configureDatabaseJobsRaw(input: {
     client.release()
   }
 
+  return queueSnapshotRefreshes(pool)
+}
+
+async function queueSnapshotRefreshes(
+  pool: Pool
+): Promise<ConfigureDatabaseJobsResult> {
   const queuedDatasets: ConfigureDatabaseJobsResult["queuedDatasets"] = []
   const warnings: string[] = []
   for (const dataset of ["rolling_24h", "daily"] as const) {
@@ -357,4 +388,70 @@ export async function configureDatabaseJobsRaw(input: {
   }
 
   return { queuedDatasets, warnings }
+}
+
+export async function updateDatabaseDefinitionsRaw(input: {
+  setupPrivilegesConfirmed: true
+}): Promise<ConfigureDatabaseJobsResult> {
+  if (input.setupPrivilegesConfirmed !== true) {
+    throw new Error(
+      "Confirm that DB_URL owns the installed TT Stats schema before updating it."
+    )
+  }
+
+  const pool = getPool()
+  let capabilities
+  try {
+    capabilities = await inspectApp(pool)
+  } catch (error) {
+    throw setupFailure("connection verification", error)
+  }
+  if (capabilities.superuser) {
+    throw new Error(
+      "DB_URL is a PostgreSQL superuser. Use the dedicated non-superuser TT Stats role instead."
+    )
+  }
+  if (!capabilities.schema_installed || !capabilities.owns_snapshot_schema) {
+    throw new Error(
+      "DB_URL does not own the installed TT Stats schema. Use the role that installed it, or transfer ownership before retrying."
+    )
+  }
+
+  const missingPrivileges = [
+    capabilities.can_create_temporary_tables
+      ? null
+      : "TEMPORARY on this database",
+    capabilities.can_read_source_tables
+      ? null
+      : "USAGE on public and SELECT on users, videos, and music",
+    capabilities.can_use_cron ? null : "USAGE on the cron schema",
+  ].filter((value): value is string => Boolean(value))
+  if (missingPrivileges.length) {
+    throw new Error(
+      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the limited runtime grants from the administrator guide, then retry.`
+    )
+  }
+
+  let client: PoolClient
+  try {
+    client = await pool.connect()
+  } catch (error) {
+    throw setupFailure("DB_URL connection", error)
+  }
+  try {
+    try {
+      await client.query(snapshotDefinitionUpdateSql)
+    } catch (error) {
+      try {
+        await client.query("ROLLBACK")
+      } catch {
+        // The original sanitized setup error is more useful than rollback state.
+      }
+      throw setupFailure("database definition update", error)
+    }
+  } finally {
+    client.release()
+  }
+
+  return queueSnapshotRefreshes(pool)
 }

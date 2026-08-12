@@ -19,6 +19,11 @@ export const DATABASE_ERROR_COPY = {
     description:
       "The TT Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
   },
+  snapshotData: {
+    title: "Statistics snapshot needs repair",
+    description:
+      "The stored chart snapshot is invalid. Open Database jobs, update the database definitions, then run the affected snapshot job.",
+  },
   permission: {
     title: "Database permissions are incomplete",
     description:

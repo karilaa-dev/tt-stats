@@ -55,6 +55,7 @@ export function formatChartBucket(
   return formatEpoch(epoch, settings, {
     month: "short",
     day: "2-digit",
+    ...(range === "all" ? { year: "numeric" } : {}),
     ...(range === "24h" || range === "7d"
       ? { hour: "2-digit", minute: "2-digit" }
       : {}),

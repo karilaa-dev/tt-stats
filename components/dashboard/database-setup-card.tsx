@@ -44,7 +44,10 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Switch } from "@/components/ui/switch"
 import { DATABASE_ERROR_COPY } from "@/lib/db/errors"
-import { configureDatabaseJobs } from "@/lib/stats/functions"
+import {
+  configureDatabaseJobs,
+  updateDatabaseDefinitions,
+} from "@/lib/stats/functions"
 import { statsQueryKey } from "@/lib/stats/query-options"
 import {
   RECOMMENDED_STATS_SCHEDULE,
@@ -125,7 +128,9 @@ export function DatabaseSetupCard({
   )
   const [setupPrivilegesConfirmed, setSetupPrivilegesConfirmed] =
     useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [confirming, setConfirming] = useState<"configure" | "update" | null>(
+    null
+  )
   const rollingError = validateCronSchedule(rollingSchedule)
   const dailyError = validateCronSchedule(dailySchedule)
   const installed = status ? configurationInstalled(status) : false
@@ -138,6 +143,13 @@ export function DatabaseSetupCard({
     status?.appConnection.ok &&
     status.scheduler.pgCronInstalled &&
     hasLimitedSetupPrivileges(status) &&
+    setupPrivilegesConfirmed
+  )
+  const canUpdate = Boolean(
+    status?.appConnection.ok &&
+    status.scheduler.pgCronInstalled &&
+    !status.databaseRole.superuser &&
+    missingRuntimePrivileges(status).length === 0 &&
     setupPrivilegesConfirmed
   )
 
@@ -158,12 +170,34 @@ export function DatabaseSetupCard({
     },
     onError: (error) => toast.error(safeActionError(error)),
     onSuccess: async (result) => {
-      setConfirming(false)
+      setConfirming(null)
       toast.success("TT Stats database jobs are configured.")
       for (const warning of result.warnings) toast.warning(warning)
       await queryClient.invalidateQueries({ queryKey: statsQueryKey })
     },
   })
+
+  const updateMutation = useMutation({
+    mutationFn: () => {
+      if (!setupPrivilegesConfirmed) {
+        throw new Error(
+          "Confirm that DB_URL owns the installed TT Stats schema before updating it."
+        )
+      }
+      return updateDatabaseDefinitions({
+        data: { setupPrivilegesConfirmed: true },
+      })
+    },
+    onError: (error) => toast.error(safeActionError(error)),
+    onSuccess: async (result) => {
+      setConfirming(null)
+      toast.success("Database definitions updated; snapshot rebuilds queued.")
+      for (const warning of result.warnings) toast.warning(warning)
+      await queryClient.invalidateQueries({ queryKey: statsQueryKey })
+    },
+  })
+
+  const actionPending = configureMutation.isPending || updateMutation.isPending
 
   return (
     <Card className="mb-6 min-w-0">
@@ -228,6 +262,23 @@ export function DatabaseSetupCard({
               />
               <DiagnosticRow
                 state={
+                  !status.snapshot.jobsApiInstalled
+                    ? "waiting"
+                    : status.snapshot.definitionsCurrent
+                      ? "good"
+                      : "bad"
+                }
+                title="Database definitions"
+                description={
+                  !status.snapshot.jobsApiInstalled
+                    ? "Not checked until the snapshot API is installed."
+                    : status.snapshot.definitionsCurrent
+                      ? "The installed refresh procedures match this web app version."
+                      : "An update is available. Existing schedules will be preserved."
+                }
+              />
+              <DiagnosticRow
+                state={
                   !status.appConnection.ok
                     ? "waiting"
                     : !status.databaseRole.superuser &&
@@ -243,7 +294,7 @@ export function DatabaseSetupCard({
                       ? "This DB_URL role is a superuser. Replace it with the limited role described below."
                       : missingRolePrivileges.length === 0
                         ? installed && !status.databaseRole.canCreate
-                          ? "All runtime grants exist. Database CREATE is revoked and is needed only for a later repair."
+                          ? "All runtime grants exist. Database CREATE is revoked and is needed only to reinstall a missing schema."
                           : "All required database-scoped grants exist. This role is not a superuser."
                         : `Missing: ${missingRolePrivileges.join(", ")}.`
                 }
@@ -350,19 +401,78 @@ export function DatabaseSetupCard({
             <PostgresAdministratorGuide />
 
             {installed ? (
-              <Alert>
-                {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
-                <AlertTitle>
-                  {status.ready
-                    ? "Database jobs are ready"
-                    : "Configuration is ready; snapshots are pending"}
-                </AlertTitle>
-                <AlertDescription>
-                  {status.ready
-                    ? "Use the job cards below to edit schedules, pause or resume a job, inspect runs, or queue a refresh."
-                    : "PostgreSQL will populate the dashboard asynchronously. This page checks progress every minute."}
-                </AlertDescription>
-              </Alert>
+              <>
+                <Alert>
+                  {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
+                  <AlertTitle>
+                    {status.ready
+                      ? "Database jobs are ready"
+                      : status.snapshot.definitionsCurrent
+                        ? "Configuration is ready; snapshots are pending"
+                        : "Database definition update available"}
+                  </AlertTitle>
+                  <AlertDescription>
+                    {status.ready
+                      ? "Use the job cards below to edit schedules, pause or resume a job, inspect runs, or queue a refresh."
+                      : status.snapshot.definitionsCurrent
+                        ? "PostgreSQL will populate the dashboard asynchronously. This page checks progress every minute."
+                        : "Update the procedures below to repair all-time charts and use completed half-hour buckets. Your cron schedules are not changed."}
+                  </AlertDescription>
+                </Alert>
+                <Field
+                  orientation="horizontal"
+                  data-disabled={
+                    controlsDisabled ||
+                    actionPending ||
+                    status.databaseRole.superuser ||
+                    missingRuntimePrivileges(status).length > 0
+                  }
+                >
+                  <FieldContent>
+                    <FieldLabel htmlFor="update-database-definitions">
+                      DB_URL owns the installed TT Stats schema
+                    </FieldLabel>
+                    <FieldDescription>
+                      Confirm this to replace only TT Stats function and
+                      procedure definitions, then queue both snapshot rebuilds.
+                    </FieldDescription>
+                  </FieldContent>
+                  <Switch
+                    id="update-database-definitions"
+                    checked={setupPrivilegesConfirmed}
+                    disabled={
+                      controlsDisabled ||
+                      actionPending ||
+                      status.databaseRole.superuser ||
+                      missingRuntimePrivileges(status).length > 0
+                    }
+                    onCheckedChange={setSetupPrivilegesConfirmed}
+                  />
+                </Field>
+                {!status.snapshot.definitionsCurrent ? (
+                  <p className="text-sm text-destructive">
+                    Update the database definitions before relying on the next
+                    scheduled snapshots.
+                  </p>
+                ) : null}
+                <div>
+                  <Button
+                    type="button"
+                    variant={
+                      status.snapshot.definitionsCurrent ? "outline" : "default"
+                    }
+                    disabled={controlsDisabled || !canUpdate || actionPending}
+                    onClick={() => setConfirming("update")}
+                  >
+                    {updateMutation.isPending ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : (
+                      <WrenchIcon data-icon="inline-start" />
+                    )}
+                    Update database definitions
+                  </Button>
+                </div>
+              </>
             ) : (
               <>
                 {status.databaseRole.superuser ? (
@@ -392,7 +502,7 @@ export function DatabaseSetupCard({
                     orientation="horizontal"
                     data-disabled={
                       controlsDisabled ||
-                      configureMutation.isPending ||
+                      actionPending ||
                       !status.appConnection.ok ||
                       !status.scheduler.pgCronInstalled ||
                       !hasLimitedSetupPrivileges(status)
@@ -413,7 +523,7 @@ export function DatabaseSetupCard({
                       checked={setupPrivilegesConfirmed}
                       disabled={
                         controlsDisabled ||
-                        configureMutation.isPending ||
+                        actionPending ||
                         !status.appConnection.ok ||
                         !status.scheduler.pgCronInstalled ||
                         !hasLimitedSetupPrivileges(status)
@@ -432,9 +542,7 @@ export function DatabaseSetupCard({
                         maxLength={101}
                         spellCheck={false}
                         aria-invalid={Boolean(rollingError)}
-                        disabled={
-                          controlsDisabled || configureMutation.isPending
-                        }
+                        disabled={controlsDisabled || actionPending}
                         onChange={(event) =>
                           setRollingSchedule(event.target.value)
                         }
@@ -456,9 +564,7 @@ export function DatabaseSetupCard({
                         maxLength={101}
                         spellCheck={false}
                         aria-invalid={Boolean(dailyError)}
-                        disabled={
-                          controlsDisabled || configureMutation.isPending
-                        }
+                        disabled={controlsDisabled || actionPending}
                         onChange={(event) =>
                           setDailySchedule(event.target.value)
                         }
@@ -504,9 +610,9 @@ export function DatabaseSetupCard({
                       controlsDisabled ||
                       !canConfigure ||
                       Boolean(rollingError || dailyError) ||
-                      configureMutation.isPending
+                      actionPending
                     }
-                    onClick={() => setConfirming(true)}
+                    onClick={() => setConfirming("configure")}
                   >
                     {configureMutation.isPending ? (
                       <Spinner data-icon="inline-start" />
@@ -531,8 +637,8 @@ export function DatabaseSetupCard({
       </CardContent>
 
       <AlertDialog
-        open={confirming}
-        onOpenChange={(open) => !open && setConfirming(false)}
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -540,29 +646,37 @@ export function DatabaseSetupCard({
               <DatabaseIcon />
             </AlertDialogMedia>
             <AlertDialogTitle>
-              Configure TT Stats in PostgreSQL?
+              {confirming === "update"
+                ? "Update TT Stats database definitions?"
+                : "Configure TT Stats in PostgreSQL?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This uses the non-superuser DB_URL role to apply the fixed
-              additive snapshot schema, install only the two TT Stats schedules,
-              grant the approved access, and queue both initial refreshes. It
-              does not install extensions, change server configuration, delete
-              existing snapshots, or touch unrelated cron jobs.
+              {confirming === "update"
+                ? "This replaces only TT Stats database definitions and queues rolling and daily rebuilds. Existing snapshots remain readable until each rebuild succeeds. Cron expressions, job states, extensions, and unrelated jobs are unchanged."
+                : "This uses the non-superuser DB_URL role to apply the fixed additive snapshot schema, install only the two TT Stats schedules, grant the approved access, and queue both initial refreshes. It does not install extensions, change server configuration, delete existing snapshots, or touch unrelated cron jobs."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={configureMutation.isPending}>
+            <AlertDialogCancel disabled={actionPending}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
-              disabled={configureMutation.isPending}
-              onClick={() => configureMutation.mutate()}
+              disabled={actionPending}
+              onClick={() =>
+                confirming === "update"
+                  ? updateMutation.mutate()
+                  : configureMutation.mutate()
+              }
             >
-              {configureMutation.isPending ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
-              {configureMutation.isPending ? "Configuring…" : "Configure"}
+              {actionPending ? <Spinner data-icon="inline-start" /> : null}
+              {actionPending
+                ? confirming === "update"
+                  ? "Updating…"
+                  : "Configuring…"
+                : confirming === "update"
+                  ? "Update and rebuild"
+                  : "Configure"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -633,7 +747,8 @@ TO "<tt_stats_role>";`}</SetupCode>
             Return here, refresh diagnostics, confirm the limited-grants switch,
             and install the TT Stats schema and fixed jobs. After a successful
             install, database <code>CREATE</code> may be revoked for normal
-            runtime and temporarily re-granted before an in-app repair.
+            runtime. It is needed again only when recreating a missing schema,
+            not when updating definitions in the schema owned by DB_URL.
           </li>
         </ol>
         <p>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 
 import { getLanguagePresentation } from "@/lib/language"
 import {
+  bucketSecondsForRange,
   cutoffForRange,
   fillTimeSeries,
   RANGE_SECONDS,
@@ -51,6 +52,11 @@ describe("exact ranges and UTC buckets", () => {
     expect(cutoffForRange("24h", now)).toBe(now - RANGE_SECONDS["24h"])
     expect(cutoffForRange("7d", now)).toBe(now - RANGE_SECONDS["7d"])
     expect(cutoffForRange("31d", now)).toBe(now - RANGE_SECONDS["31d"])
+  })
+
+  it("uses completed half-hour buckets for the rolling day", () => {
+    expect(bucketSecondsForRange("24h")).toBe(30 * 60)
+    expect(bucketSecondsForRange("7d")).toBe(60 * 60)
   })
 
   it("fills every covered UTC bucket with zeroes", () => {

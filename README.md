@@ -62,6 +62,11 @@ tables every minute or every 15 minutes, depending on the dataset, while keeping
 the previous result visible. User lookup, paginated history, CSV export, and
 Botstat remain live operations.
 
+The rolling charts use 48 completed 30-minute buckets. All-time snapshots keep
+daily history, while the read API groups unusually long histories to at most 720
+lossless chart intervals. Invalid pre-2000 event epochs are excluded from shared
+statistics so sentinel values cannot expand a graph back to 1970.
+
 All configuration is server-only. The production build does not require runtime secrets, allowing an image to be built before secrets are injected.
 
 ## PostgreSQL installation and application role
@@ -94,8 +99,9 @@ The role needs only these database-scoped privileges:
 - `USAGE` on `public` and `SELECT` on `public.users`, `public.videos`, and
   `public.music` for snapshots, live lookup, history, and CSV export.
 - `USAGE` on `cron` so its own fixed jobs can be scheduled and managed.
-- `CREATE` on the tt-bot database only while using in-app install/repair. It can
-  be revoked after installation and re-granted before a later repair.
+- `CREATE` on the tt-bot database only for the initial guided install or to
+  recreate a missing schema. It can be revoked after installation; updating
+  definitions in an owned schema does not change schedules.
 - Ownership of the additive `tt_stats_cache` objects created by guided setup.
   Browser-facing code still exposes only snapshot reads and the fixed
   management operations.

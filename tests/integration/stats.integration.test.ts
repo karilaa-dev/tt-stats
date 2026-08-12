@@ -69,7 +69,8 @@ integration("PostgreSQL statistics queries", () => {
        (0, $5, 'zz', 'zero', TRUE),
        (3, NULL, 'fr', 'null-time', TRUE),
        (4, $6, 'es', 'unfinished', TRUE),
-       (5, $7, 'it', 'future', TRUE)`,
+       (5, $7, 'it', 'future', TRUE),
+       (6, 0, 'pt', 'invalid-epoch', TRUE)`,
       [
         windowEnd - 10,
         windowEnd - 86_400,
@@ -91,7 +92,8 @@ integration("PostgreSQL statistics queries", () => {
        (0, $7, 'https://example.test/zero', 'video', 'chat', 'media'),
        (3, NULL, 'https://example.test/null-time', 'video', 'chat', 'media'),
        (4, $8, 'https://example.test/unfinished', 'video', 'chat', 'media'),
-       (5, $9, 'https://example.test/future', 'video', 'chat', 'media')`,
+       (5, $9, 'https://example.test/future', 'video', 'chat', 'media'),
+       (6, 0, 'https://example.test/invalid-epoch', 'video', 'chat', 'media')`,
       [
         windowEnd - 10,
         windowEnd - 20,
@@ -106,7 +108,8 @@ integration("PostgreSQL statistics queries", () => {
     )
     await pool.query(
       `INSERT INTO music (user_id, downloaded_at, video_id) VALUES
-       (1, $1, 101), (2, $2, 102), (-10, $3, 103), (0, $4, 104)`,
+       (1, $1, 101), (2, $2, 102), (-10, $3, 103), (0, $4, 104),
+       (6, 0, 105)`,
       [windowEnd - 10, windowEnd - 86_400, windowEnd - 20, windowEnd - 1]
     )
     const schema = await readFile(
@@ -143,8 +146,8 @@ integration("PostgreSQL statistics queries", () => {
 
   it("zero-fills analytics and excludes the zero ID", async () => {
     const points = await getTimeSeriesRaw("videos", "24h", pool)
-    expect(points).toHaveLength(24)
-    expect(points.at(-1)?.bucketEpoch).toBe(windowEnd - 3600)
+    expect(points).toHaveLength(48)
+    expect(points.at(-1)?.bucketEpoch).toBe(windowEnd - 1800)
     expect(points.reduce((sum, point) => sum + point.count, 0)).toBe(4)
     expect(points.some((point) => point.count === 0)).toBe(true)
     expect(
@@ -153,6 +156,9 @@ integration("PostgreSQL statistics queries", () => {
         0
       )
     ).toBe(4)
+    expect(
+      (await getTimeSeriesRaw("users", "all", pool))[0]?.bucketEpoch
+    ).toBeGreaterThanOrEqual(946_684_800)
     expect(
       (await getTimeSeriesRaw("music", "24h", pool)).reduce(
         (sum, point) => sum + point.count,
@@ -182,6 +188,27 @@ integration("PostgreSQL statistics queries", () => {
       expect(Number(cards.downloads.total)).toBe(total(videos))
       expect(Number(cards.music.total)).toBe(total(music))
     }
+  })
+
+  it("bounds an unusually long all-time chart without losing counts", async () => {
+    await pool.query(
+      "DELETE FROM tt_stats_cache.time_series WHERE metric = 'videos' AND range = 'all'"
+    )
+    await pool.query(`
+      INSERT INTO tt_stats_cache.time_series (
+        metric, range, bucket_epoch, count
+      )
+      SELECT 'videos', 'all', 946684800 + day * 86400, 1
+      FROM generate_series(0, 1499) AS days(day)
+    `)
+
+    const points = await getTimeSeriesRaw("videos", "all", pool)
+    expect(points.length).toBeLessThanOrEqual(720)
+    expect(points.reduce((total, point) => total + point.count, 0)).toBe(1500)
+
+    await pool.query("CALL tt_stats_cache.refresh_daily(to_timestamp($1))", [
+      now,
+    ])
   })
 
   it("preserves the preceding snapshot when a refresh fails", async () => {
@@ -287,6 +314,7 @@ integration("PostgreSQL statistics queries", () => {
       "3",
       "4",
       "5",
+      "6",
     ])
   })
 

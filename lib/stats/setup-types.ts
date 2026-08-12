@@ -16,6 +16,7 @@ export interface DatabaseSetupStatus {
     schemaInstalled: boolean
     tablesInstalled: boolean
     jobsApiInstalled: boolean
+    definitionsCurrent: boolean
     appCanRead: boolean
     appCanManageJobs: boolean
     rollingSeeded: boolean

@@ -7,7 +7,8 @@ export const RANGE_SECONDS: Record<Exclude<StatsRange, "all">, number> = {
 }
 
 export function bucketSecondsForRange(range: StatsRange): number {
-  return range === "24h" || range === "7d" ? 60 * 60 : 24 * 60 * 60
+  if (range === "24h") return 30 * 60
+  return range === "7d" ? 60 * 60 : 24 * 60 * 60
 }
 
 export function cutoffForRange(

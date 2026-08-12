@@ -10,7 +10,7 @@
 
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
--- DB_URL stays non-superuser. CREATE is needed only for guided install/repair;
+-- DB_URL stays non-superuser. CREATE is needed for the initial guided install;
 -- TEMPORARY is also needed at runtime by the snapshot refresh procedures.
 GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO :"app_role";
 GRANT USAGE ON SCHEMA public, cron TO :"app_role";
