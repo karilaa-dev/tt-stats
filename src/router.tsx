@@ -2,11 +2,19 @@ import { QueryClient } from "@tanstack/react-query"
 import { createRouter } from "@tanstack/react-router"
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query"
 
+import { isSafeDatabaseError } from "@/lib/db/errors"
+
 import { routeTree } from "./routeTree.gen"
 
 export function getRouter() {
   const queryClient = new QueryClient({
     defaultOptions: {
+      dehydrate: {
+        // These messages are deliberately allowlisted and contain no database
+        // identifiers. Keep them through pending SSR hydration so production
+        // can explain a missing schema or grant; redact every other error.
+        shouldRedactErrors: (error) => !isSafeDatabaseError(error),
+      },
       queries: {
         gcTime: 60 * 60 * 1000,
         networkMode: "offlineFirst",

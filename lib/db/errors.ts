@@ -38,18 +38,25 @@ export const DATABASE_ERROR_COPY = {
 
 export type DatabaseErrorKind = keyof typeof DATABASE_ERROR_COPY
 
+function findSafeDatabaseError(error: unknown) {
+  const message = error instanceof Error ? error.message : ""
+  return Object.entries(DATABASE_ERROR_COPY).find(
+    ([, copy]) => copy.description === message
+  ) as
+    | [DatabaseErrorKind, (typeof DATABASE_ERROR_COPY)[DatabaseErrorKind]]
+    | undefined
+}
+
+export function isSafeDatabaseError(error: unknown): boolean {
+  return Boolean(findSafeDatabaseError(error))
+}
+
 export function getSafeDatabaseError(error: unknown): {
   kind: DatabaseErrorKind
   title: string
   description: string
 } {
-  const message = error instanceof Error ? error.message : ""
-  const entry = Object.entries(DATABASE_ERROR_COPY).find(
-    ([, copy]) => copy.description === message
-  ) as
-    | [DatabaseErrorKind, (typeof DATABASE_ERROR_COPY)[DatabaseErrorKind]]
-    | undefined
-
+  const entry = findSafeDatabaseError(error)
   const [kind, copy] = entry ?? ["unavailable", DATABASE_ERROR_COPY.unavailable]
   return { kind, ...copy }
 }

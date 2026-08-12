@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
-import { DATABASE_ERROR_COPY } from "@/lib/db/errors"
+import { DATABASE_ERROR_COPY, isSafeDatabaseError } from "@/lib/db/errors"
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, ...props }: { to: string; children?: React.ReactNode }) => (
@@ -33,12 +33,12 @@ describe("dashboard infrastructure failures", () => {
   })
 
   it("shows a specific safe message for a recognized database failure", () => {
-    render(
-      <DashboardError
-        error={new Error(DATABASE_ERROR_COPY.snapshotSchema.description)}
-        reset={vi.fn()}
-      />
+    const safeError = new Error(DATABASE_ERROR_COPY.snapshotSchema.description)
+    expect(isSafeDatabaseError(safeError)).toBe(true)
+    expect(isSafeDatabaseError(new Error("postgresql://secret@host/db"))).toBe(
+      false
     )
+    render(<DashboardError error={safeError} reset={vi.fn()} />)
 
     expect(
       screen.getByText("TT Stats database objects are not installed")
