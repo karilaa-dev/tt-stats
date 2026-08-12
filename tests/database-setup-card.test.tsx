@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { DatabaseSetupCard } from "@/components/dashboard/database-setup-card"
@@ -13,14 +13,7 @@ vi.mock("@/lib/stats/functions", () => ({
 
 const missingSetup: DatabaseSetupStatus = {
   appConnection: { ok: true, errorKind: null },
-  installerConnection: {
-    configured: true,
-    ok: true,
-    sameDatabase: true,
-    canCreate: true,
-    superuser: true,
-    errorKind: null,
-  },
+  databaseRole: { canCreate: true, superuser: true },
   snapshot: {
     schemaInstalled: false,
     tablesInstalled: false,
@@ -54,7 +47,7 @@ function renderSetup(status: DatabaseSetupStatus) {
 describe("database setup diagnostics", () => {
   afterEach(cleanup)
 
-  it("distinguishes a healthy connection from missing TT Stats objects", () => {
+  it("requires confirmation before using DB_URL for database setup", () => {
     renderSetup(missingSetup)
 
     expect(screen.getByText("Database connection verified")).toBeTruthy()
@@ -62,25 +55,24 @@ describe("database setup diagnostics", () => {
     expect(
       screen.getByText("One or more TT Stats database objects are missing.")
     ).toBeTruthy()
-    expect(
-      (
-        screen.getByRole("button", {
-          name: "Install or repair database jobs",
-        }) as HTMLButtonElement
-      ).disabled
-    ).toBe(false)
+    const setupButton = screen.getByRole("button", {
+      name: "Install or repair database jobs",
+    }) as HTMLButtonElement
+    expect(setupButton.disabled).toBe(true)
+
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "DB_URL has administrative privileges",
+      })
+    )
+
+    expect(setupButton.disabled).toBe(false)
   })
 
   it("keeps setup disabled and marks dependent checks as pending offline", () => {
     renderSetup({
       ...missingSetup,
       appConnection: { ok: false, errorKind: "connection" },
-      installerConnection: {
-        ...missingSetup.installerConnection,
-        ok: false,
-        sameDatabase: false,
-        errorKind: "connection",
-      },
     })
 
     expect(
@@ -92,6 +84,13 @@ describe("database setup diagnostics", () => {
           name: "Install or repair database jobs",
         }) as HTMLButtonElement
       ).disabled
+    ).toBe(true)
+    expect(
+      screen
+        .getByRole("switch", {
+          name: "DB_URL has administrative privileges",
+        })
+        .hasAttribute("data-disabled")
     ).toBe(true)
   })
 })

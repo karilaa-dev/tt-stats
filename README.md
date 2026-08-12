@@ -2,7 +2,11 @@
 
 An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/tt-bot) PostgreSQL schema. PostgreSQL builds complete-bucket statistics snapshots on a fixed cadence; the web application is a responsive, non-blocking read layer over those snapshots.
 
-The normal application connection remains read-only. Narrow `SECURITY DEFINER` functions let authenticated operators manage only the two fixed TT Stats `pg_cron` jobs. The application intentionally has no login system; access control belongs at the reverse proxy.
+The normal statistics read path is read-only. Guided setup can use the same
+`DB_URL` for fixed administrative SQL after an explicit confirmation. Narrow
+`SECURITY DEFINER` functions let authenticated operators manage only the two
+fixed TT Stats `pg_cron` jobs. The application intentionally has no login
+system; access control belongs at the reverse proxy.
 
 ## Stack
 
@@ -33,7 +37,7 @@ cp .env.example .env.local
 Required runtime variables:
 
 ```dotenv
-DB_URL=postgresql://readonly-user:password@host:5432/ttbot-db
+DB_URL=postgresql://database-user:password@host:5432/ttbot-db
 
 BOT_TOKEN=12345:telegram-bot-token
 BOTSTAT_ACCESS_KEY=botstat-access-key
@@ -44,16 +48,15 @@ Optional variables:
 
 ```dotenv
 DB_POOL_SIZE=5
-# Server-only database-owner connection for guided setup/repair.
-DB_ADMIN_URL=postgresql://database-owner:password@host:5432/ttbot-db
 BOTSTAT_BASE_URL=https://www.botstat.io
 ```
 
-`DB_ADMIN_URL` is used only by the confirmed setup action on
-`/dashboard/jobs`. It must target the same database as `DB_URL` and is never
-sent to the browser. You can omit it when the runtime role can install the
-objects itself, or remove it after setup if future in-app repairs are not
-needed.
+The guided setup action on `/dashboard/jobs` uses `DB_URL`. Before it can run,
+an operator must explicitly turn on the **DB_URL has administrative
+privileges** confirmation. Use a database-owner or superuser connection while
+installing or repairing the schema and schedules. The URL is never sent to the
+browser. To change `DB_URL` to a different restricted role afterward, first
+apply `database/003_stats_snapshot_grants.sql` for that role.
 
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
@@ -72,10 +75,11 @@ instructions for the PostgreSQL distribution in use.
 
 After the host-level pg_cron prerequisites are in place, the Database jobs page
 can diagnose and install the additive schema, fixed jobs, and runtime grants.
-It accepts only the two cron expressions; job names and SQL commands are fixed
-server-side. The page does not create source indexes because those use
-`CREATE INDEX CONCURRENTLY`; apply `database/002_stats_snapshot_indexes.sql`
-separately as an administrator.
+It requires an explicit confirmation that `DB_URL` has administrative
+privileges and accepts only the two cron expressions; job names and SQL
+commands are fixed server-side. The page does not create source indexes because
+those use `CREATE INDEX CONCURRENTLY`; apply
+`database/002_stats_snapshot_indexes.sql` separately as an administrator.
 
 Create a dedicated application role and grant its live-read access as a database owner:
 

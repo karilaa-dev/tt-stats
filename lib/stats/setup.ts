@@ -4,10 +4,6 @@ import type { Pool, PoolClient } from "pg"
 
 import snapshotSchemaSql from "@/database/001_stats_snapshot_schema.sql?raw"
 import { classifyDatabaseError, getPool } from "@/lib/db/pool"
-import {
-  getInstallerPool,
-  hasDedicatedInstallerConnection,
-} from "@/lib/db/installer"
 import type {
   ConfigureDatabaseJobsResult,
   DatabaseSetupStatus,
@@ -19,18 +15,13 @@ interface DatabaseIdentity {
 }
 
 interface AppCapabilities extends DatabaseIdentity {
+  can_create: boolean
+  superuser: boolean
   schema_installed: boolean
   tables_installed: boolean
   jobs_api_installed: boolean
   app_can_read: boolean
   app_can_manage: boolean
-  pg_cron_installed: boolean
-  pg_cron_version: string | null
-}
-
-interface InstallerCapabilities extends DatabaseIdentity {
-  can_create: boolean
-  superuser: boolean
   pg_cron_installed: boolean
   pg_cron_version: string | null
 }
@@ -49,14 +40,7 @@ const fixedJobs = {
 function emptyStatus(): DatabaseSetupStatus {
   return {
     appConnection: { ok: false, errorKind: null },
-    installerConnection: {
-      configured: false,
-      ok: false,
-      sameDatabase: false,
-      canCreate: false,
-      superuser: false,
-      errorKind: null,
-    },
+    databaseRole: { canCreate: false, superuser: false },
     snapshot: {
       schemaInstalled: false,
       tablesInstalled: false,
@@ -81,6 +65,10 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
   const result = await pool.query<AppCapabilities>(`
     SELECT current_database() AS database,
            current_user AS role,
+           has_database_privilege(current_user, current_database(), 'CREATE')
+             AS can_create,
+           (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
+             AS superuser,
            to_regnamespace('tt_stats_cache') IS NOT NULL AS schema_installed,
            to_regclass('tt_stats_cache.refresh_metadata') IS NOT NULL
              AND to_regclass('tt_stats_cache.breakdown') IS NOT NULL
@@ -113,25 +101,6 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
   return row
 }
 
-async function inspectInstaller(pool: Pool): Promise<InstallerCapabilities> {
-  const result = await pool.query<InstallerCapabilities>(`
-    SELECT current_database() AS database,
-           current_user AS role,
-           has_database_privilege(current_user, current_database(), 'CREATE')
-             AS can_create,
-           rolsuper AS superuser,
-           EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
-             AS pg_cron_installed,
-           (SELECT extversion FROM pg_extension WHERE extname = 'pg_cron')
-             AS pg_cron_version
-    FROM pg_roles
-    WHERE rolname = current_user
-  `)
-  const row = result.rows[0]
-  if (!row) throw new Error("installer capability query returned no rows")
-  return row
-}
-
 async function inspectSnapshots(pool: Pool): Promise<Set<string>> {
   const result = await pool.query<{ dataset: string }>(
     "SELECT dataset FROM tt_stats_cache.refresh_metadata"
@@ -151,12 +120,12 @@ async function inspectJobs(pool: Pool): Promise<Set<string>> {
 
 export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> {
   const status = emptyStatus()
-  let app: AppCapabilities | null = null
-  let installer: InstallerCapabilities | null = null
 
   try {
-    app = await inspectApp(getPool())
+    const app = await inspectApp(getPool())
     status.appConnection.ok = true
+    status.databaseRole.canCreate = app.can_create
+    status.databaseRole.superuser = app.superuser
     status.snapshot.schemaInstalled = app.schema_installed
     status.snapshot.tablesInstalled = app.tables_installed
     status.snapshot.jobsApiInstalled = app.jobs_api_installed
@@ -180,21 +149,6 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     }
   } catch (error) {
     status.appConnection.errorKind = classifyDatabaseError(error)
-  }
-
-  status.installerConnection.configured = hasDedicatedInstallerConnection()
-  try {
-    installer = await inspectInstaller(getInstallerPool())
-    status.installerConnection.ok = true
-    status.installerConnection.canCreate = installer.can_create
-    status.installerConnection.superuser = installer.superuser
-    status.installerConnection.sameDatabase = Boolean(
-      app && app.database === installer.database
-    )
-    status.scheduler.pgCronInstalled = installer.pg_cron_installed
-    status.scheduler.pgCronVersion = installer.pg_cron_version
-  } catch (error) {
-    status.installerConnection.errorKind = classifyDatabaseError(error)
   }
 
   status.ready =
@@ -244,17 +198,17 @@ function setupFailure(step: string, error: unknown): Error {
   const kind = classifyDatabaseError(error)
   if (kind === "configuration") {
     return new Error(
-      "DB_URL or DB_ADMIN_URL is missing or malformed. Correct the server environment and restart the web process."
+      "DB_URL is missing or malformed. Correct the server environment and restart the web process."
     )
   }
   if (kind === "connection") {
     return new Error(
-      "The installer connection could not reach PostgreSQL. Check DB_ADMIN_URL and network access."
+      "DB_URL could not reach PostgreSQL. Check the database address, port, and network access."
     )
   }
   if (kind === "permission") {
     return new Error(
-      `Database setup stopped during ${step} because the installer role lacks permission. Configure DB_ADMIN_URL with a database-owner connection.`
+      `Database setup stopped during ${step} because the DB_URL role lacks permission. Use a database-owner or superuser DB_URL for setup, then retry.`
     )
   }
   if (step === "pg_cron installation") {
@@ -275,54 +229,48 @@ function setupFailure(step: string, error: unknown): Error {
 export async function configureDatabaseJobsRaw(input: {
   rollingSchedule: string
   dailySchedule: string
+  adminPrivilegesConfirmed: true
 }): Promise<ConfigureDatabaseJobsResult> {
-  let appPool: Pool
-  let installerPool: Pool
-  try {
-    appPool = getPool()
-    installerPool = getInstallerPool()
-  } catch (error) {
-    throw setupFailure("connection verification", error)
-  }
-  let appIdentity
-  let installerIdentity
-  try {
-    ;[appIdentity, installerIdentity] = await Promise.all([
-      appPool.query<DatabaseIdentity>(
-        "SELECT current_database() AS database, current_user AS role"
-      ),
-      installerPool.query<DatabaseIdentity>(
-        "SELECT current_database() AS database, current_user AS role"
-      ),
-    ])
-  } catch (error) {
-    throw setupFailure("connection verification", error)
-  }
-  const app = appIdentity.rows[0]
-  const installer = installerIdentity.rows[0]
-  if (!app || !installer || app.database !== installer.database) {
+  if (input.adminPrivilegesConfirmed !== true) {
     throw new Error(
-      "DB_URL and DB_ADMIN_URL must connect to the same PostgreSQL database."
+      "Confirm that DB_URL has administrative privileges before running database setup."
     )
   }
 
+  let pool: Pool
+  try {
+    pool = getPool()
+  } catch (error) {
+    throw setupFailure("connection verification", error)
+  }
+  let identity
+  try {
+    identity = await pool.query<DatabaseIdentity>(
+      "SELECT current_database() AS database, current_user AS role"
+    )
+  } catch (error) {
+    throw setupFailure("connection verification", error)
+  }
+  const app = identity.rows[0]
+  if (!app) throw new Error("DB_URL did not return a database identity.")
+
   let client: PoolClient
   try {
-    client = await installerPool.connect()
+    client = await pool.connect()
   } catch (error) {
-    throw setupFailure("installer connection", error)
+    throw setupFailure("DB_URL connection", error)
   }
   try {
-    try {
-      await client.query(snapshotSchemaSql)
-    } catch (error) {
-      throw setupFailure("snapshot schema installation", error)
-    }
-
     try {
       await client.query("CREATE EXTENSION IF NOT EXISTS pg_cron")
     } catch (error) {
       throw setupFailure("pg_cron installation", error)
+    }
+
+    try {
+      await client.query(snapshotSchemaSql)
+    } catch (error) {
+      throw setupFailure("snapshot schema installation", error)
     }
 
     try {
@@ -360,7 +308,7 @@ export async function configureDatabaseJobsRaw(input: {
   const warnings: string[] = []
   for (const dataset of ["rolling_24h", "daily"] as const) {
     try {
-      await appPool.query("SELECT tt_stats_cache.request_stats_job_run($1)", [
+      await pool.query("SELECT tt_stats_cache.request_stats_job_run($1)", [
         dataset,
       ])
       queuedDatasets.push(dataset)

@@ -5,13 +5,9 @@ export interface DatabaseSetupStatus {
     ok: boolean
     errorKind: DatabaseErrorKind | null
   }
-  installerConnection: {
-    configured: boolean
-    ok: boolean
-    sameDatabase: boolean
+  databaseRole: {
     canCreate: boolean
     superuser: boolean
-    errorKind: DatabaseErrorKind | null
   }
   snapshot: {
     schemaInstalled: boolean

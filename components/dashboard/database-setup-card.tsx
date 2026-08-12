@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/card"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -40,6 +41,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
+import { Switch } from "@/components/ui/switch"
 import { DATABASE_ERROR_COPY } from "@/lib/db/errors"
 import { configureDatabaseJobs } from "@/lib/stats/functions"
 import { statsQueryKey } from "@/lib/stats/query-options"
@@ -94,24 +96,31 @@ export function DatabaseSetupCard({
   const [dailySchedule, setDailySchedule] = useState<string>(
     RECOMMENDED_STATS_SCHEDULE.daily
   )
+  const [adminPrivilegesConfirmed, setAdminPrivilegesConfirmed] =
+    useState(false)
   const [confirming, setConfirming] = useState(false)
   const rollingError = validateCronSchedule(rollingSchedule)
   const dailyError = validateCronSchedule(dailySchedule)
   const installed = status ? configurationInstalled(status) : false
   const canConfigure = Boolean(
-    status?.appConnection.ok &&
-    status.installerConnection.ok &&
-    status.installerConnection.sameDatabase
+    status?.appConnection.ok && adminPrivilegesConfirmed
   )
 
   const configureMutation = useMutation({
-    mutationFn: () =>
-      configureDatabaseJobs({
+    mutationFn: () => {
+      if (!adminPrivilegesConfirmed) {
+        throw new Error(
+          "Confirm that DB_URL has administrative privileges before running setup."
+        )
+      }
+      return configureDatabaseJobs({
         data: {
           rollingSchedule: rollingSchedule.trim(),
           dailySchedule: dailySchedule.trim(),
+          adminPrivilegesConfirmed: true,
         },
-      }),
+      })
+    },
     onError: (error) => toast.error(safeActionError(error)),
     onSuccess: async (result) => {
       setConfirming(false)
@@ -160,16 +169,15 @@ export function DatabaseSetupCard({
               </Alert>
             ) : null}
 
-            {!status.scheduler.pgCronInstalled &&
-            status.installerConnection.ok ? (
+            {!status.scheduler.pgCronInstalled && status.appConnection.ok ? (
               <Alert variant="destructive">
                 <ShieldAlertIcon />
                 <AlertTitle>pg_cron is not enabled</AlertTitle>
                 <AlertDescription>
-                  The setup action can enable the extension when the installer
-                  role is allowed. The PostgreSQL host must already provide
-                  pg_cron through shared_preload_libraries and target this
-                  database with cron.database_name.
+                  The setup action can enable the extension when DB_URL has
+                  sufficient privileges. The PostgreSQL host must already
+                  provide pg_cron through shared_preload_libraries and target
+                  this database with cron.database_name.
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -185,14 +193,23 @@ export function DatabaseSetupCard({
                 }
               />
               <DiagnosticRow
-                state={status.installerConnection.ok ? "good" : "bad"}
-                title="Setup connection"
+                state={
+                  !status.appConnection.ok
+                    ? "waiting"
+                    : status.databaseRole.canCreate &&
+                        status.databaseRole.superuser
+                      ? "good"
+                      : "bad"
+                }
+                title="DB_URL privileges"
                 description={
-                  status.installerConnection.ok
-                    ? status.installerConnection.configured
-                      ? "DB_ADMIN_URL connected; credentials stay server-side."
-                      : "Using DB_URL. Add DB_ADMIN_URL only if this role cannot install or grant objects."
-                    : errorDescription(status.installerConnection.errorKind)
+                  !status.appConnection.ok
+                    ? "Not checked until DB_URL connects successfully."
+                    : status.databaseRole.superuser
+                      ? "PostgreSQL reports that the DB_URL role is a superuser."
+                      : status.databaseRole.canCreate
+                        ? "The DB_URL role can create database objects but is not a PostgreSQL superuser."
+                        : "The DB_URL role does not have CREATE privilege on this database."
                 }
               />
               <DiagnosticRow
@@ -237,7 +254,7 @@ export function DatabaseSetupCard({
               />
               <DiagnosticRow
                 state={
-                  !status.appConnection.ok && !status.installerConnection.ok
+                  !status.appConnection.ok
                     ? "waiting"
                     : status.scheduler.pgCronInstalled
                       ? "good"
@@ -245,7 +262,7 @@ export function DatabaseSetupCard({
                 }
                 title="PostgreSQL scheduler"
                 description={
-                  !status.appConnection.ok && !status.installerConnection.ok
+                  !status.appConnection.ok
                     ? "Not checked until a server-side connection succeeds."
                     : status.scheduler.pgCronInstalled
                       ? `pg_cron ${status.scheduler.pgCronVersion ?? "(version unavailable)"} is enabled.`
@@ -310,23 +327,49 @@ export function DatabaseSetupCard({
               </Alert>
             ) : (
               <>
-                {!status.installerConnection.configured &&
-                (!status.installerConnection.canCreate ||
-                  !status.installerConnection.superuser) ? (
+                {!status.databaseRole.canCreate ||
+                !status.databaseRole.superuser ? (
                   <Alert>
                     <TriangleAlertIcon />
-                    <AlertTitle>
-                      An installer connection may be required
-                    </AlertTitle>
+                    <AlertTitle>DB_URL may lack setup privileges</AlertTitle>
                     <AlertDescription>
-                      If setup is rejected, set the server-only DB_ADMIN_URL to
-                      a database-owner connection, restart the app, and retry.
-                      The normal DB_URL remains the runtime connection.
+                      PostgreSQL reports that this role is not a superuser or
+                      cannot create database objects. Use a database-owner or
+                      superuser DB_URL before confirming the setup action.
                     </AlertDescription>
                   </Alert>
                 ) : null}
 
                 <FieldGroup>
+                  <Field
+                    orientation="horizontal"
+                    data-disabled={
+                      controlsDisabled ||
+                      configureMutation.isPending ||
+                      !status.appConnection.ok
+                    }
+                  >
+                    <FieldContent>
+                      <FieldLabel htmlFor="setup-admin-privileges">
+                        DB_URL has administrative privileges
+                      </FieldLabel>
+                      <FieldDescription>
+                        Confirm that this connection may install the additive TT
+                        Stats schema, enable pg_cron, grant access, and manage
+                        the two fixed jobs. Credentials remain server-side.
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id="setup-admin-privileges"
+                      checked={adminPrivilegesConfirmed}
+                      disabled={
+                        controlsDisabled ||
+                        configureMutation.isPending ||
+                        !status.appConnection.ok
+                      }
+                      onCheckedChange={setAdminPrivilegesConfirmed}
+                    />
+                  </Field>
                   <div className="grid gap-5 md:grid-cols-2">
                     <Field data-invalid={Boolean(rollingError)}>
                       <FieldLabel htmlFor="setup-rolling-schedule">
@@ -379,10 +422,15 @@ export function DatabaseSetupCard({
                   </div>
                 </FieldGroup>
 
-                {!canConfigure ? (
+                {!status.appConnection.ok ? (
                   <p className="text-sm text-destructive">
-                    Setup is disabled until both server-side connections reach
-                    the same database. Review the diagnostics above.
+                    Setup is disabled until DB_URL connects successfully. Review
+                    the diagnostics above.
+                  </p>
+                ) : !adminPrivilegesConfirmed ? (
+                  <p className="text-sm text-muted-foreground">
+                    Turn on the DB_URL administrative privileges confirmation to
+                    enable setup.
                   </p>
                 ) : null}
                 <div>
@@ -432,7 +480,7 @@ export function DatabaseSetupCard({
             </AlertDialogTitle>
             <AlertDialogDescription>
               This applies the fixed additive snapshot schema, enables pg_cron,
-              installs only the two TT Stats schedules, grants the runtime role
+              installs only the two TT Stats schedules, grants the DB_URL role
               the approved access, and queues both initial refreshes. Existing
               snapshots and unrelated cron jobs are not deleted.
             </AlertDialogDescription>

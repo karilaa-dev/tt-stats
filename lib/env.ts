@@ -19,7 +19,6 @@ const postgresUrl = z
 const dbEnvSchema = z.object({
   DB_URL: postgresUrl,
   DB_POOL_SIZE: z.coerce.number().int().min(1).max(50).default(5),
-  DB_ADMIN_URL: postgresUrl.optional(),
 })
 
 const botstatEnvSchema = z.object({
