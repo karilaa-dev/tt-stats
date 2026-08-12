@@ -1,6 +1,7 @@
 import { keepPreviousData, queryOptions } from "@tanstack/react-query"
 
 import {
+  getDatabaseSetupStatus,
   getOtherStats,
   getOverview,
   getReferralStats,
@@ -95,6 +96,16 @@ export function statsJobsQueryOptions() {
   return queryOptions({
     queryKey: [...statsQueryKey, "jobs"],
     queryFn: () => getStatsJobs(),
+    placeholderData: keepPreviousData,
+    refetchInterval: ROLLING_REFRESH_INTERVAL,
+    staleTime: AGGREGATE_STALE_TIME,
+  })
+}
+
+export function databaseSetupQueryOptions() {
+  return queryOptions({
+    queryKey: [...statsQueryKey, "database-setup"],
+    queryFn: () => getDatabaseSetupStatus(),
     placeholderData: keepPreviousData,
     refetchInterval: ROLLING_REFRESH_INTERVAL,
     staleTime: AGGREGATE_STALE_TIME,

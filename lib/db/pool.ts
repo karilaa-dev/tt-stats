@@ -3,12 +3,44 @@ import "@tanstack/react-start/server-only"
 import { Pool, type PoolClient, type QueryResultRow } from "pg"
 
 import { getDbEnv } from "@/lib/env"
+import { DATABASE_ERROR_COPY, type DatabaseErrorKind } from "@/lib/db/errors"
 
 export class DataAccessError extends Error {
-  constructor(cause?: unknown) {
-    super("The statistics database is unavailable", { cause })
+  readonly kind: DatabaseErrorKind
+
+  constructor(cause?: unknown, kind = classifyDatabaseError(cause)) {
+    super(DATABASE_ERROR_COPY[kind].description, { cause })
     this.name = "DataAccessError"
+    this.kind = kind
   }
+}
+
+function nestedCode(error: unknown): string {
+  if (!error || typeof error !== "object") return ""
+  const candidate = error as { code?: unknown; cause?: unknown; name?: unknown }
+  if (typeof candidate.code === "string") return candidate.code
+  return candidate.cause ? nestedCode(candidate.cause) : ""
+}
+
+export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
+  if (error instanceof DataAccessError) return error.kind
+  const code = nestedCode(error)
+
+  if (
+    ["ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ENETUNREACH"].includes(
+      code
+    ) ||
+    code.startsWith("08")
+  ) {
+    return "connection"
+  }
+  if (["ETIMEDOUT", "57014"].includes(code)) return "timeout"
+  if (["42P01", "3F000", "42883"].includes(code)) return "snapshotSchema"
+  if (code === "42501") return "permission"
+  if (error && typeof error === "object" && "issues" in error) {
+    return "configuration"
+  }
+  return "unavailable"
 }
 
 const globalForDatabase = globalThis as typeof globalThis & {
@@ -18,7 +50,12 @@ const globalForDatabase = globalThis as typeof globalThis & {
 export function getPool(): Pool {
   if (globalForDatabase.ttStatsPool) return globalForDatabase.ttStatsPool
 
-  const env = getDbEnv()
+  let env
+  try {
+    env = getDbEnv()
+  } catch (error) {
+    throw new DataAccessError(error, "configuration")
+  }
   const pool = new Pool({
     connectionString: env.DB_URL,
     max: env.DB_POOL_SIZE,

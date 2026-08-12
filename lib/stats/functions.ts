@@ -14,6 +14,11 @@ import {
   isFakeDataEnabled,
 } from "@/lib/dev/fake-data"
 import {
+  configureDatabaseJobsRaw,
+  getDatabaseSetupStatusRaw,
+} from "@/lib/stats/setup"
+import type { DatabaseSetupStatus } from "@/lib/stats/setup-types"
+import {
   getManualRefreshRequestRaw,
   getOtherStatsRaw,
   getOverviewRaw,
@@ -63,6 +68,37 @@ function fakeWriteError(): never {
   throw new Error(
     "Database job controls are disabled while fake data is active."
   )
+}
+
+function getFakeDatabaseSetupStatus(): DatabaseSetupStatus {
+  return {
+    appConnection: { ok: true, errorKind: null },
+    installerConnection: {
+      configured: false,
+      ok: true,
+      sameDatabase: true,
+      canCreate: true,
+      superuser: false,
+      errorKind: null,
+    },
+    snapshot: {
+      schemaInstalled: true,
+      tablesInstalled: true,
+      jobsApiInstalled: true,
+      appCanRead: true,
+      appCanManageJobs: true,
+      rollingSeeded: true,
+      dailySeeded: true,
+    },
+    scheduler: {
+      pgCronInstalled: true,
+      pgCronVersion: "demo",
+      inspectable: true,
+      rollingJobInstalled: true,
+      dailyJobInstalled: true,
+    },
+    ready: true,
+  }
 }
 
 export const getDashboardMeta = createServerFn({ method: "GET" }).handler(
@@ -128,6 +164,32 @@ export const getStatsJobs = createServerFn({ method: "GET" }).handler(() =>
   isFakeDataEnabled() ? getFakeStatsJobs() : getStatsJobsRaw()
 )
 
+export const getDatabaseSetupStatus = createServerFn({ method: "GET" }).handler(
+  () =>
+    isFakeDataEnabled()
+      ? getFakeDatabaseSetupStatus()
+      : getDatabaseSetupStatusRaw()
+)
+
+export const configureDatabaseJobs = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      rollingSchedule: cronSchedule,
+      dailySchedule: cronSchedule,
+    })
+  )
+  .handler(async ({ data }) => {
+    if (isFakeDataEnabled()) fakeWriteError()
+    try {
+      return await configureDatabaseJobsRaw(data)
+    } catch (error) {
+      if (error instanceof Error) throw error
+      throw new Error(
+        "Database setup failed safely. No existing snapshots or schedules were deleted."
+      )
+    }
+  })
+
 export const getStatsJobRuns = createServerFn({ method: "GET" })
   .validator(
     z.object({ dataset: statsDataset, limit: z.number().int().min(1).max(50) })
@@ -154,15 +216,27 @@ export const setStatsJobActive = createServerFn({ method: "POST" })
   .validator(z.object({ dataset: statsDataset, active: z.boolean() }))
   .handler(async ({ data }) => {
     if (isFakeDataEnabled()) fakeWriteError()
-    await setStatsJobActiveRaw(data.dataset, data.active)
-    return { active: data.active }
+    try {
+      await setStatsJobActiveRaw(data.dataset, data.active)
+      return { active: data.active }
+    } catch {
+      throw new Error(
+        `PostgreSQL could not ${data.active ? "resume" : "pause"} this fixed job. Its previous state is unchanged.`
+      )
+    }
   })
 
 export const requestStatsJobRun = createServerFn({ method: "POST" })
   .validator(z.object({ dataset: statsDataset }))
   .handler(async ({ data }) => {
     if (isFakeDataEnabled()) fakeWriteError()
-    return { requestId: await requestStatsJobRunRaw(data.dataset) }
+    try {
+      return { requestId: await requestStatsJobRunRaw(data.dataset) }
+    } catch {
+      throw new Error(
+        "PostgreSQL could not queue the refresh. Check that pg_cron is active and the job-management grants are installed."
+      )
+    }
   })
 
 export const getManualRefreshRequest = createServerFn({ method: "GET" })

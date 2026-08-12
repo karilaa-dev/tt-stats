@@ -715,6 +715,18 @@ DECLARE
 BEGIN
   PERFORM tt_stats_cache._job_name(p_dataset);
 
+  SELECT request.id INTO v_request_id
+  FROM tt_stats_cache.manual_refresh_requests request
+  WHERE request.dataset = p_dataset
+    AND request.status IN ('queued', 'running')
+  ORDER BY request.requested_at DESC, request.id DESC
+  LIMIT 1;
+
+  -- Repeated clicks and setup retries share the request already in flight.
+  IF v_request_id IS NOT NULL THEN
+    RETURN v_request_id;
+  END IF;
+
   INSERT INTO tt_stats_cache.manual_refresh_requests (dataset, status)
   VALUES (p_dataset, 'queued')
   RETURNING id INTO v_request_id;

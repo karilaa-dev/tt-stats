@@ -49,7 +49,10 @@ function DetailedPage() {
         }
       />
       {statsQuery.isError && !statsQuery.data ? (
-        <DashboardError reset={() => void statsQuery.refetch()} />
+        <DashboardError
+          error={statsQuery.error}
+          reset={() => void statsQuery.refetch()}
+        />
       ) : statsQuery.data ? (
         <StatsCards stats={statsQuery.data} />
       ) : (

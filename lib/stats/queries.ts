@@ -60,9 +60,7 @@ async function safeQuery<Row extends QueryResultRow>(
 }
 
 function missingSnapshot(): never {
-  throw new DataAccessError(
-    new Error("Statistics snapshot has not been seeded")
-  )
+  throw new DataAccessError(undefined, "snapshotsMissing")
 }
 
 function toEpoch(value: Date | string | null): number | null {

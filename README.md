@@ -44,8 +44,16 @@ Optional variables:
 
 ```dotenv
 DB_POOL_SIZE=5
+# Server-only database-owner connection for guided setup/repair.
+DB_ADMIN_URL=postgresql://database-owner:password@host:5432/ttbot-db
 BOTSTAT_BASE_URL=https://www.botstat.io
 ```
+
+`DB_ADMIN_URL` is used only by the confirmed setup action on
+`/dashboard/jobs`. It must target the same database as `DB_URL` and is never
+sent to the browser. You can omit it when the runtime role can install the
+objects itself, or remove it after setup if future in-app repairs are not
+needed.
 
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
@@ -61,6 +69,13 @@ All configuration is server-only. The production build does not require runtime 
 application database before installing the schedules. Set `cron.timezone` to
 `UTC` so the daily expression runs at 00:07 UTC. Follow the upstream setup
 instructions for the PostgreSQL distribution in use.
+
+After the host-level pg_cron prerequisites are in place, the Database jobs page
+can diagnose and install the additive schema, fixed jobs, and runtime grants.
+It accepts only the two cron expressions; job names and SQL commands are fixed
+server-side. The page does not create source indexes because those use
+`CREATE INDEX CONCURRENTLY`; apply `database/002_stats_snapshot_indexes.sql`
+separately as an administrator.
 
 Create a dedicated application role and grant its live-read access as a database owner:
 

@@ -52,7 +52,10 @@ function OtherPage() {
         description="File mode, language distribution, top downloaders, and manual Botstat verification."
       />
       {statsQuery.isError && !stats ? (
-        <DashboardError reset={() => void statsQuery.refetch()} />
+        <DashboardError
+          error={statsQuery.error}
+          reset={() => void statsQuery.refetch()}
+        />
       ) : !stats ? (
         <DashboardLoading />
       ) : (

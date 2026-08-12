@@ -60,28 +60,13 @@ import {
   statsJobRunsQueryOptions,
   statsQueryKey,
 } from "@/lib/stats/query-options"
+import {
+  RECOMMENDED_STATS_SCHEDULE,
+  validateCronSchedule,
+} from "@/lib/stats/schedule"
 import type { StatsJob } from "@/lib/stats/types"
 
 type Confirmation = "pause" | "schedule" | "run" | null
-
-const recommendedSchedule = {
-  rolling_24h: "*/5 * * * *",
-  daily: "7 0 * * *",
-} as const
-
-function scheduleError(value: string): string | null {
-  if (!value.trim()) return "Enter a cron schedule."
-  if (value.length > 100) return "Cron schedules cannot exceed 100 characters."
-  if (
-    Array.from(value).some((character) => {
-      const code = character.charCodeAt(0)
-      return code < 32 || code === 127
-    })
-  ) {
-    return "Cron schedules cannot contain control characters."
-  }
-  return null
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "The database action failed."
@@ -112,9 +97,9 @@ export function StatsJobCard({
       return status === "succeeded" || status === "failed" ? false : 5_000
     },
   })
-  const validationError = scheduleError(schedule)
+  const validationError = validateCronSchedule(schedule)
   const changed = schedule.trim() !== job.schedule
-  const isRecommended = job.schedule === recommendedSchedule[job.dataset]
+  const isRecommended = job.schedule === RECOMMENDED_STATS_SCHEDULE[job.dataset]
 
   useEffect(() => {
     setSchedule(job.schedule)
@@ -202,7 +187,8 @@ export function StatsJobCard({
             <TriangleAlertIcon />
             <AlertTitle>Custom cadence</AlertTitle>
             <AlertDescription>
-              Recommended: <code>{recommendedSchedule[job.dataset]}</code>. The
+              Recommended:{" "}
+              <code>{RECOMMENDED_STATS_SCHEDULE[job.dataset]}</code>. The
               current schedule can make snapshots refresh less predictably.
             </AlertDescription>
           </Alert>
@@ -249,6 +235,16 @@ export function StatsJobCard({
               {manual.finishedAt
                 ? ` · Finished ${formatTimestamp(manual.finishedAt, time)}`
                 : ""}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {manualQuery.isError ? (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Refresh status could not be checked</AlertTitle>
+            <AlertDescription>
+              The PostgreSQL request may still be running. Reload this page or
+              check the recent job runs before queuing another refresh.
             </AlertDescription>
           </Alert>
         ) : null}
@@ -391,7 +387,7 @@ export function StatsJobCard({
                     className="text-center text-muted-foreground"
                   >
                     {runsQuery.isError
-                      ? "Run history unavailable."
+                      ? "Run history unavailable. Check pg_cron diagnostics above."
                       : "No recorded runs."}
                   </TableCell>
                 </TableRow>

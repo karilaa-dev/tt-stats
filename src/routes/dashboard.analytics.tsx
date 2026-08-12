@@ -54,6 +54,7 @@ function AnalyticsPage() {
       />
       {failed ? (
         <DashboardError
+          error={queries.find((query) => query.isError)?.error}
           reset={() => {
             void Promise.all(queries.map((query) => query.refetch()))
           }}

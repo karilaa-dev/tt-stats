@@ -40,7 +40,10 @@ function ReferralsPage() {
         description="The ten most common non-null referral values."
       />
       {referralsQuery.isError && !rows ? (
-        <DashboardError reset={() => void referralsQuery.refetch()} />
+        <DashboardError
+          error={referralsQuery.error}
+          reset={() => void referralsQuery.refetch()}
+        />
       ) : !rows ? (
         <DashboardLoading variant="table" />
       ) : (

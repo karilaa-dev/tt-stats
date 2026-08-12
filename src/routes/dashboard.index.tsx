@@ -26,7 +26,10 @@ function OverviewPage() {
         description="Private users and groups through the latest completed database windows."
       />
       {overviewQuery.isError && !overview ? (
-        <DashboardError reset={() => void overviewQuery.refetch()} />
+        <DashboardError
+          error={overviewQuery.error}
+          reset={() => void overviewQuery.refetch()}
+        />
       ) : !overview ? (
         <DashboardLoading />
       ) : (
