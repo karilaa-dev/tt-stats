@@ -5,7 +5,6 @@ import {
   CircleDashedIcon,
   DatabaseIcon,
   ShieldAlertIcon,
-  ShieldCheckIcon,
   TriangleAlertIcon,
   WrenchIcon,
 } from "lucide-react"
@@ -238,18 +237,6 @@ export function DatabaseSetupCard({
               </Alert>
             ) : null}
 
-            {!status.scheduler.pgCronInstalled && status.appConnection.ok ? (
-              <Alert variant="destructive">
-                <ShieldAlertIcon />
-                <AlertTitle>pg_cron is not enabled</AlertTitle>
-                <AlertDescription>
-                  The app deliberately cannot enable this extension. Complete
-                  the one-time administrator steps below, then retry the
-                  diagnostics. DB_URL does not need to be a superuser.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-
             <div className="grid gap-3 lg:grid-cols-2">
               <DiagnosticRow
                 state={status.appConnection.ok ? "good" : "bad"}
@@ -397,8 +384,6 @@ export function DatabaseSetupCard({
                 }
               />
             </div>
-
-            <PostgresAdministratorGuide />
 
             {installed ? (
               <>
@@ -591,7 +576,7 @@ export function DatabaseSetupCard({
                 ) : !status.scheduler.pgCronInstalled ? (
                   <p className="text-sm text-destructive">
                     Setup is disabled until a PostgreSQL administrator enables
-                    pg_cron using the guide above.
+                    pg_cron.
                   </p>
                 ) : !hasLimitedSetupPrivileges(status) ? (
                   <p className="text-sm text-destructive">
@@ -635,6 +620,10 @@ export function DatabaseSetupCard({
           </Alert>
         )}
       </CardContent>
+
+      {status?.appConnection.ok && !status.scheduler.pgCronInstalled ? (
+        <PgCronInstallationDialog />
+      ) : null}
 
       <AlertDialog
         open={confirming !== null}
@@ -685,98 +674,38 @@ export function DatabaseSetupCard({
   )
 }
 
-function PostgresAdministratorGuide() {
+function PgCronInstallationDialog() {
+  const [open, setOpen] = useState(true)
+
   return (
-    <Alert>
-      <ShieldCheckIcon />
-      <AlertTitle>One-time administrator guide for PostgreSQL 17</AlertTitle>
-      <AlertDescription className="flex min-w-0 flex-col gap-3">
-        <p>
-          The <code>DB_URL</code> role does not need <code>SUPERUSER</code>,{" "}
-          <code>CREATEROLE</code>, <code>CREATEDB</code>,{" "}
-          <code>REPLICATION</code>, or <code>BYPASSRLS</code>. An administrator
-          only needs to prepare pg_cron and grant access to this one database.
-        </p>
-        <ol className="ml-4 flex list-decimal flex-col gap-3">
-          <li>
-            <p className="font-medium text-foreground">
-              Install and preload pg_cron on the PostgreSQL host
-            </p>
-            <p>
-              Install the PostgreSQL 17 package, edit the cluster configuration,
-              and restart PostgreSQL. If <code>shared_preload_libraries</code>{" "}
-              already contains real libraries, preserve them and append{" "}
-              <code>pg_cron</code>. Never paste placeholder names such as{" "}
-              <code>existing_library</code>.
-            </p>
-            <SetupCode>{`sudo apt install postgresql-17-cron
-sudoedit /etc/postgresql/17/main/postgresql.conf
-sudo systemctl restart postgresql@17-main`}</SetupCode>
-            <SetupCode>{`shared_preload_libraries = 'pg_cron'
-cron.database_name = '<database>'
-cron.timezone = 'UTC'`}</SetupCode>
-          </li>
-          <li>
-            <p className="font-medium text-foreground">
-              Run the one-time SQL as a PostgreSQL administrator
-            </p>
-            <p>
-              Replace every angle-bracket placeholder with the real database,
-              DB_URL role, and password values; do not paste placeholders
-              literally. Of these statements, only{" "}
-              <code>CREATE EXTENSION pg_cron</code> normally requires a
-              PostgreSQL superuser. <code>CREATE ROLE</code> requires{" "}
-              <code>CREATEROLE</code>; database and table owners can issue the
-              corresponding grants.
-            </p>
-            <SetupCode>{`-- Only if the DB_URL role does not exist yet:
-CREATE ROLE "<tt_stats_role>" LOGIN NOSUPERUSER NOCREATEDB
-  NOCREATEROLE NOREPLICATION NOBYPASSRLS
-  PASSWORD '<strong-generated-password>';
-
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-
-GRANT CONNECT, CREATE, TEMPORARY
-ON DATABASE "<database>" TO "<tt_stats_role>";
-
-GRANT USAGE ON SCHEMA public, cron TO "<tt_stats_role>";
-GRANT SELECT ON TABLE public.users, public.videos, public.music
-TO "<tt_stats_role>";`}</SetupCode>
-          </li>
-          <li>
-            Return here, refresh diagnostics, confirm the limited-grants switch,
-            and install the TT Stats schema and fixed jobs. After a successful
-            install, database <code>CREATE</code> may be revoked for normal
-            runtime. It is needed again only when recreating a missing schema,
-            not when updating definitions in the schema owned by DB_URL.
-          </li>
-        </ol>
-        <p>
-          Scheduled refreshes still need <code>CONNECT</code>,{" "}
-          <code>TEMPORARY</code>, <code>USAGE</code> on <code>cron</code>, and{" "}
-          <code>SELECT</code> on the three source tables. If pg_cron uses local
-          libpq connections, its job role must also pass your{" "}
-          <code>pg_hba.conf</code> authentication; background-worker mode is an
-          alternative.
-        </p>
-        <a
-          className="w-fit underline underline-offset-4 hover:text-foreground"
-          href="https://github.com/citusdata/pg_cron#setting-up-pg_cron"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Official pg_cron setup reference
-        </a>
-      </AlertDescription>
-    </Alert>
-  )
-}
-
-function SetupCode({ children }: { children: string }) {
-  return (
-    <pre className="mt-2 max-w-full overflow-x-auto rounded-md border bg-muted p-3 text-xs text-foreground">
-      <code>{children}</code>
-    </pre>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogMedia>
+            <ShieldAlertIcon />
+          </AlertDialogMedia>
+          <AlertDialogTitle>pg_cron installation required</AlertDialogTitle>
+          <AlertDialogDescription>
+            pg_cron is not installed or enabled in this database. A PostgreSQL
+            administrator must install and enable it before database jobs can be
+            configured.{" "}
+            <a
+              href="https://github.com/citusdata/pg_cron#setting-up-pg_cron"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open installation guide (opens in a new tab)"
+              onClick={() => setOpen(false)}
+            >
+              Open installation guide
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Close</AlertDialogCancel>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }
 

@@ -69,8 +69,10 @@ describe("database setup diagnostics", () => {
       )
     ).toBeTruthy()
     expect(
-      screen.getByText("One-time administrator guide for PostgreSQL 17")
-    ).toBeTruthy()
+      screen.queryByRole("heading", {
+        name: "pg_cron installation required",
+      })
+    ).toBeNull()
     const setupButton = screen.getByRole("button", {
       name: "Install or repair database jobs",
     }) as HTMLButtonElement
@@ -121,12 +123,24 @@ describe("database setup diagnostics", () => {
       },
     })
 
-    expect(screen.getByText("pg_cron is not enabled")).toBeTruthy()
+    expect(
+      screen.getByRole("heading", {
+        name: "pg_cron installation required",
+      })
+    ).toBeTruthy()
     expect(
       screen.getByText(
-        "Setup is disabled until a PostgreSQL administrator enables pg_cron using the guide above."
+        "Setup is disabled until a PostgreSQL administrator enables pg_cron."
       )
     ).toBeTruthy()
+    const installationGuide = screen.getByRole("link", {
+      name: "Open installation guide (opens in a new tab)",
+    })
+    expect(installationGuide.getAttribute("href")).toBe(
+      "https://github.com/citusdata/pg_cron#setting-up-pg_cron"
+    )
+    expect(installationGuide.getAttribute("target")).toBe("_blank")
+    fireEvent.click(screen.getByRole("button", { name: "Close" }))
     expect(
       (
         screen.getByRole("button", {
