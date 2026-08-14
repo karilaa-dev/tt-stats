@@ -108,7 +108,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              obj_description(
                to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
                'pg_proc'
-             ) = 'tt-stats-schema-version:2',
+             ) = 'tt-stats-schema-version:3',
              false
            ) AS definitions_current,
            coalesce(
@@ -351,6 +351,8 @@ export async function configureDatabaseJobsRaw(input: {
                         tt_stats_cache.time_series,
                         tt_stats_cache.rankings,
                         tt_stats_cache.scalars
+        TO ${role};
+        GRANT SELECT, UPDATE ON tt_stats_cache.video_inactivity_monitor
         TO ${role};
         GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_jobs() TO ${role};
         GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_job_runs(TEXT, INTEGER) TO ${role};
