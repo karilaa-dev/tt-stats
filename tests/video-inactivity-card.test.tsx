@@ -82,4 +82,42 @@ describe("video inactivity notification card", () => {
     expect(screen.getByText("Monitor state grants required")).toBeTruthy()
     expect(screen.getByText(/003_stats_snapshot_grants\.sql/u)).toBeTruthy()
   })
+
+  it("does not claim definitions are missing while diagnostics load", () => {
+    const client = new QueryClient()
+    render(
+      <QueryClientProvider client={client}>
+        <VideoInactivityCard
+          status={{
+            configured: true,
+            provider: "webhook",
+            configurationError: false,
+          }}
+          monitorDatabaseStatus="checking"
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByText("Checking monitor prerequisites")).toBeTruthy()
+    expect(screen.queryByText("Database update required")).toBeNull()
+  })
+
+  it("reports failed diagnostics without guessing monitor readiness", () => {
+    const client = new QueryClient()
+    render(
+      <QueryClientProvider client={client}>
+        <VideoInactivityCard
+          status={{
+            configured: true,
+            provider: "webhook",
+            configurationError: false,
+          }}
+          monitorDatabaseStatus="unavailable"
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByText("Monitor status unavailable")).toBeTruthy()
+    expect(screen.queryByText("Database update required")).toBeNull()
+  })
 })

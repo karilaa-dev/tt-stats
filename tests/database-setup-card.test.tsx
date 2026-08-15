@@ -172,7 +172,7 @@ describe("database setup diagnostics", () => {
     ).toBe(true)
   })
 
-  it("offers a schedule-safe database definition update after installation", () => {
+  it("offers a definition update before the new monitor grants exist", () => {
     renderSetup({
       ...missingSetup,
       snapshot: {
@@ -182,7 +182,7 @@ describe("database setup diagnostics", () => {
         definitionsCurrent: false,
         appCanRead: true,
         appCanManageJobs: true,
-        appCanMonitorDownloads: true,
+        appCanMonitorDownloads: false,
         rollingSeeded: true,
         dailySeeded: true,
       },

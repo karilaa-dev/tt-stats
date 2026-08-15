@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query"
 import {
   BellRingIcon,
   CheckCircle2Icon,
+  CircleDashedIcon,
   SendIcon,
   TriangleAlertIcon,
 } from "lucide-react"
@@ -29,7 +30,12 @@ export function VideoInactivityCard({
   fakeMode = false,
 }: {
   status: VideoNotificationStatus
-  monitorDatabaseStatus: "ready" | "definitions" | "permissions"
+  monitorDatabaseStatus:
+    | "checking"
+    | "unavailable"
+    | "ready"
+    | "definitions"
+    | "permissions"
   fakeMode?: boolean
 }) {
   const mutation = useMutation({
@@ -76,6 +82,24 @@ export function VideoInactivityCard({
             <AlertDescription>
               Automatic database checks are disabled, but the test button still
               sends through the configured destination.
+            </AlertDescription>
+          </Alert>
+        ) : status.configured && monitorDatabaseStatus === "checking" ? (
+          <Alert>
+            <CircleDashedIcon />
+            <AlertTitle>Checking monitor prerequisites</AlertTitle>
+            <AlertDescription>
+              Checking the database definitions and runtime grants. The test
+              button is available while this finishes.
+            </AlertDescription>
+          </Alert>
+        ) : status.configured && monitorDatabaseStatus === "unavailable" ? (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Monitor status unavailable</AlertTitle>
+            <AlertDescription>
+              Database diagnostics failed, so automatic monitor readiness could
+              not be verified. The test button remains available.
             </AlertDescription>
           </Alert>
         ) : status.configured && monitorDatabaseStatus === "definitions" ? (

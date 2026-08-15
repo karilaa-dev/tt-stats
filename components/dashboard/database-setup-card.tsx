@@ -77,7 +77,6 @@ function configurationInstalled(status: DatabaseSetupStatus): boolean {
     status.snapshot.jobsApiInstalled &&
     status.snapshot.appCanRead &&
     status.snapshot.appCanManageJobs &&
-    status.snapshot.appCanMonitorDownloads &&
     status.scheduler.pgCronInstalled &&
     status.scheduler.rollingJobInstalled &&
     status.scheduler.dailyJobInstalled
