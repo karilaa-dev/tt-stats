@@ -32,6 +32,7 @@ interface AppCapabilities extends DatabaseIdentity {
   owns_snapshot_schema: boolean
   app_can_read: boolean
   app_can_manage: boolean
+  app_can_monitor_downloads: boolean
   pg_cron_installed: boolean
   pg_cron_version: string | null
 }
@@ -64,6 +65,7 @@ function emptyStatus(): DatabaseSetupStatus {
       definitionsCurrent: false,
       appCanRead: false,
       appCanManageJobs: false,
+      appCanMonitorDownloads: false,
       rollingSeeded: false,
       dailySeeded: false,
     },
@@ -108,7 +110,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              obj_description(
                to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
                'pg_proc'
-             ) = 'tt-stats-schema-version:2',
+             ) = 'tt-stats-schema-version:3',
              false
            ) AS definitions_current,
            coalesce(
@@ -132,6 +134,11 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AND coalesce(has_function_privilege(current_user, to_regprocedure('tt_stats_cache.set_stats_job_active(text,boolean)'), 'EXECUTE'), false)
              AND coalesce(has_function_privilege(current_user, to_regprocedure('tt_stats_cache.request_stats_job_run(text)'), 'EXECUTE'), false)
              AS app_can_manage,
+           coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.video_inactivity_monitor'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.video_inactivity_monitor'), 'UPDATE'), false)
+             AND coalesce(has_schema_privilege(current_user, to_regnamespace('public'), 'USAGE'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.videos'), 'SELECT'), false)
+             AS app_can_monitor_downloads,
            EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
              AS pg_cron_installed,
            (SELECT extversion FROM pg_extension WHERE extname = 'pg_cron')
@@ -177,6 +184,7 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.snapshot.definitionsCurrent = app.definitions_current
     status.snapshot.appCanRead = app.app_can_read
     status.snapshot.appCanManageJobs = app.app_can_manage
+    status.snapshot.appCanMonitorDownloads = app.app_can_monitor_downloads
     status.scheduler.pgCronInstalled = app.pg_cron_installed
     status.scheduler.pgCronVersion = app.pg_cron_version
 
@@ -204,6 +212,7 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.snapshot.definitionsCurrent &&
     status.snapshot.appCanRead &&
     status.snapshot.appCanManageJobs &&
+    status.snapshot.appCanMonitorDownloads &&
     !status.databaseRole.superuser &&
     status.databaseRole.canCreateTemporaryTables &&
     status.databaseRole.canReadSourceTables &&
@@ -351,6 +360,8 @@ export async function configureDatabaseJobsRaw(input: {
                         tt_stats_cache.time_series,
                         tt_stats_cache.rankings,
                         tt_stats_cache.scalars
+        TO ${role};
+        GRANT SELECT, UPDATE ON tt_stats_cache.video_inactivity_monitor
         TO ${role};
         GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_jobs() TO ${role};
         GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_job_runs(TEXT, INTEGER) TO ${role};

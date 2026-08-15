@@ -17,6 +17,9 @@ GRANT SELECT ON tt_stats_cache.refresh_metadata,
                 tt_stats_cache.scalars
 TO :"app_role";
 
+GRANT SELECT, UPDATE ON tt_stats_cache.video_inactivity_monitor
+TO :"app_role";
+
 GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_jobs() TO :"app_role";
 GRANT EXECUTE ON FUNCTION tt_stats_cache.list_stats_job_runs(TEXT, INTEGER) TO :"app_role";
 GRANT EXECUTE ON FUNCTION tt_stats_cache.update_stats_job_schedule(TEXT, TEXT) TO :"app_role";

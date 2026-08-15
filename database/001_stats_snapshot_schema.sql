@@ -60,6 +60,22 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.manual_refresh_requests (
   job_name TEXT NOT NULL DEFAULT ''
 );
 
+CREATE TABLE IF NOT EXISTS tt_stats_cache.video_inactivity_monitor (
+  singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  last_downloaded_at BIGINT CHECK (
+    last_downloaded_at IS NULL OR last_downloaded_at >= 946684800
+  ),
+  stage SMALLINT NOT NULL DEFAULT 0 CHECK (stage BETWEEN 0 AND 2),
+  stage_changed_at TIMESTAMPTZ,
+  monitoring_started_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
+);
+
+INSERT INTO tt_stats_cache.video_inactivity_monitor (
+  singleton, last_downloaded_at
+)
+VALUES (TRUE, NULL)
+ON CONFLICT (singleton) DO NOTHING;
+
 CREATE INDEX IF NOT EXISTS tt_stats_manual_refresh_requested_idx
   ON tt_stats_cache.manual_refresh_requests (requested_at DESC);
 
@@ -283,6 +299,10 @@ BEGIN
     refreshed_at = excluded.refreshed_at,
     window_start_epoch = excluded.window_start_epoch,
     window_end_epoch = excluded.window_end_epoch;
+
+  -- Delivered only after this transaction commits successfully. The app
+  -- listens on this channel and keeps notification credentials out of SQL.
+  PERFORM pg_notify('tt_stats_video_inactivity_check', '');
 END;
 $$;
 
@@ -834,6 +854,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:2';
+  IS 'tt-stats-schema-version:3';
 
 COMMIT;

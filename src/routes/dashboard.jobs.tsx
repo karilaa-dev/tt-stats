@@ -7,22 +7,27 @@ import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsJobCard } from "@/components/dashboard/stats-job-card"
+import { VideoInactivityCard } from "@/components/dashboard/video-inactivity-card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   databaseSetupQueryOptions,
   statsJobsQueryOptions,
 } from "@/lib/stats/query-options"
+import { getVideoNotificationStatus } from "@/lib/notifications/functions"
+import { getVideoMonitorDatabaseStatus } from "@/lib/notifications/status"
 
 export const Route = createFileRoute("/dashboard/jobs")({
   head: () => ({ meta: [{ title: "Database jobs · TT Stats" }] }),
-  loader: ({ context }) => {
+  loader: async ({ context }) => {
     void context.queryClient.prefetchQuery(databaseSetupQueryOptions())
+    return getVideoNotificationStatus()
   },
   component: DatabaseJobsPage,
 })
 
 function DatabaseJobsPage() {
   const { fakeMode } = getRouteApi("/dashboard").useLoaderData()
+  const notificationStatus = Route.useLoaderData()
   const setupQuery = useQuery(databaseSetupQueryOptions())
   const canLoadJobs = Boolean(
     setupQuery.data?.appConnection.ok &&
@@ -57,6 +62,14 @@ function DatabaseJobsPage() {
         status={setupQuery.data}
         checking={setupQuery.isPending || setupQuery.isFetching}
         controlsDisabled={fakeMode}
+      />
+      <VideoInactivityCard
+        status={notificationStatus}
+        monitorDatabaseStatus={getVideoMonitorDatabaseStatus({
+          status: setupQuery.data,
+          queryFailed: setupQuery.isError,
+        })}
+        fakeMode={fakeMode}
       />
       {setupQuery.isError && !setupQuery.data ? (
         <DashboardError

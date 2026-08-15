@@ -312,7 +312,8 @@ export function DatabaseSetupCard({
                   !status.snapshot.schemaInstalled
                     ? "waiting"
                     : status.snapshot.appCanRead &&
-                        status.snapshot.appCanManageJobs
+                        status.snapshot.appCanManageJobs &&
+                        status.snapshot.appCanMonitorDownloads
                       ? "good"
                       : "bad"
                 }
@@ -321,9 +322,10 @@ export function DatabaseSetupCard({
                   !status.snapshot.schemaInstalled
                     ? "Not checked until the snapshot schema is installed."
                     : status.snapshot.appCanRead &&
-                        status.snapshot.appCanManageJobs
-                      ? "The app can read snapshots and call only the fixed management API."
-                      : "Snapshot reads or approved job-management grants are incomplete."
+                        status.snapshot.appCanManageJobs &&
+                        status.snapshot.appCanMonitorDownloads
+                      ? "The app can read snapshots and video downloads, call only the fixed management API, and update the video-monitor state."
+                      : "Snapshot reads, approved job-management grants, or video-monitor state grants are incomplete."
                 }
               />
               <DiagnosticRow

@@ -49,7 +49,32 @@ Optional variables:
 ```dotenv
 DB_POOL_SIZE=5
 BOTSTAT_BASE_URL=https://www.botstat.io
+
+# Configure exactly one video-inactivity notification destination:
+VIDEO_INACTIVITY_WEBHOOK_URL=https://example.com/webhooks/tt-stats
+# VIDEO_INACTIVITY_NTFY_URL=https://ntfy.sh/private-topic
+# VIDEO_INACTIVITY_NTFY_TOKEN=optional-bearer-token
 ```
+
+When a destination is configured, the app checks `public.videos` at startup and
+every minute. The rolling PostgreSQL refresh also emits a transactional `NOTIFY`
+after each successful run so it can trigger an immediate check without making
+the monitor depend on that job's schedule or active state. It sends a warning
+after five minutes without a download and one urgent follow-up at ten minutes
+of total inactivity. A new download resets the escalation cycle. Listener
+connections recover automatically, delivery failures retry on the next check,
+and PostgreSQL state plus an advisory lock prevent duplicate alerts across
+restarts and multiple app instances. The Database jobs page includes a test
+button that sends a notification without changing monitor state. Generic
+webhooks receive JSON; ntfy destinations receive the message and priority
+headers expected by an ntfy topic URL.
+
+After upgrading an installation where `DB_URL` owns `tt_stats_cache`, use
+**Update database definitions** on the Database jobs page once. If the schema
+owner and runtime `DB_URL` role are separate, apply
+`database/001_stats_snapshot_schema.sql` as the schema owner, then reapply
+`database/003_stats_snapshot_grants.sql` with `app_role` set to the runtime role.
+The diagnostics and notification card report missing monitor-state grants.
 
 The guided setup action on `/dashboard/jobs` uses `DB_URL`, but the role must not
 be a PostgreSQL superuser. The page checks the limited grants below and requires
@@ -102,9 +127,10 @@ The role needs only these database-scoped privileges:
 - `CREATE` on the tt-bot database only for the initial guided install or to
   recreate a missing schema. It can be revoked after installation; updating
   definitions in an owned schema does not change schedules.
-- Ownership of the additive `tt_stats_cache` objects created by guided setup.
-  Browser-facing code still exposes only snapshot reads and the fixed
-  management operations.
+- Ownership of the additive `tt_stats_cache` objects created by guided setup,
+  including the small persistent video-inactivity escalation state.
+  Browser-facing code still exposes only snapshot reads, fixed management
+  operations, and the configured notification test.
 
 It does not need `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`,
 `BYPASSRLS`, or privileges on any other database in the cluster.
@@ -200,8 +226,9 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 - Reverse-proxy authentication is required because every data route is public inside the application.
 - Aggregate browser queries read database snapshots without blocking navigation; user lookups remain live and fresh for one minute.
 - Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two TT Stats jobs.
+- The optional notification monitor can update only its singleton escalation-state row; webhook and ntfy credentials remain server-only.
 - Botstat verification sends every stored `users.user_id`, including private users and negative group IDs, to the configured Botstat.io endpoint. The UI requires explicit confirmation.
-- Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, and the exported IDs as sensitive; they are never intentionally logged.
+- Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
 
 ## Attribution and license
 
