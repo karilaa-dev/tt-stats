@@ -24,7 +24,6 @@ export interface VideoNotification {
 interface MonitorStateRow {
   last_downloaded_at: string | null
   stage: number
-  stage_changed_at: Date | string | null
   monitoring_started_at: Date | string
 }
 
@@ -50,7 +49,6 @@ function parseEpochSeconds(value: string | null): number | null {
 
 export function alertStageDue(input: {
   stage: number
-  stageChangedAtMs: number | null
   inactivityStartedAtMs: number
   nowMs: number
 }): AlertStage | null {
@@ -58,13 +56,7 @@ export function alertStageDue(input: {
   if (input.stage === 0 && inactiveFor >= INITIAL_INACTIVITY_MINUTES * 60_000) {
     return 1
   }
-  if (
-    input.stage === 1 &&
-    input.stageChangedAtMs !== null &&
-    input.nowMs - input.stageChangedAtMs >=
-      (URGENT_INACTIVITY_MINUTES - INITIAL_INACTIVITY_MINUTES) * 60_000 &&
-    inactiveFor >= URGENT_INACTIVITY_MINUTES * 60_000
-  ) {
+  if (input.stage === 1 && inactiveFor >= URGENT_INACTIVITY_MINUTES * 60_000) {
     return 2
   }
   return null
@@ -209,8 +201,7 @@ export async function checkVideoInactivity(
         [nowEpoch]
       ),
       client.query<MonitorStateRow>(
-        `SELECT last_downloaded_at::text, stage, stage_changed_at,
-                monitoring_started_at
+        `SELECT last_downloaded_at::text, stage, monitoring_started_at
          FROM tt_stats_cache.video_inactivity_monitor
          WHERE singleton = TRUE
          FOR UPDATE`
@@ -223,14 +214,10 @@ export async function checkVideoInactivity(
 
     const latestValue = latestResult.rows[0]?.latest_downloaded_at ?? null
     let stage = state.stage
-    let stageChangedAtMs = state.stage_changed_at
-      ? new Date(state.stage_changed_at).getTime()
-      : null
     let monitoringStartedAtMs = new Date(state.monitoring_started_at).getTime()
 
     if (latestValue !== state.last_downloaded_at) {
       stage = 0
-      stageChangedAtMs = null
       monitoringStartedAtMs = nowMs
       await client.query(
         `UPDATE tt_stats_cache.video_inactivity_monitor
@@ -247,7 +234,6 @@ export async function checkVideoInactivity(
       : monitoringStartedAtMs
     const dueStage = alertStageDue({
       stage,
-      stageChangedAtMs,
       inactivityStartedAtMs,
       nowMs,
     })

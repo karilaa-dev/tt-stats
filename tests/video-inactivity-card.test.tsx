@@ -33,7 +33,7 @@ function renderCard(configured: boolean) {
           provider: configured ? "ntfy" : null,
           configurationError: false,
         }}
-        monitorReady
+        monitorDatabaseStatus="ready"
       />
     </QueryClientProvider>
   )
@@ -62,5 +62,24 @@ describe("video inactivity notification card", () => {
         }) as HTMLButtonElement
       ).disabled
     ).toBe(true)
+  })
+
+  it("directs split-role installs to reapply monitor grants", () => {
+    const client = new QueryClient()
+    render(
+      <QueryClientProvider client={client}>
+        <VideoInactivityCard
+          status={{
+            configured: true,
+            provider: "webhook",
+            configurationError: false,
+          }}
+          monitorDatabaseStatus="permissions"
+        />
+      </QueryClientProvider>
+    )
+
+    expect(screen.getByText("Monitor state grants required")).toBeTruthy()
+    expect(screen.getByText(/003_stats_snapshot_grants\.sql/u)).toBeTruthy()
   })
 })

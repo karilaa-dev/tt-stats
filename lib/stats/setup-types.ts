@@ -19,6 +19,7 @@ export interface DatabaseSetupStatus {
     definitionsCurrent: boolean
     appCanRead: boolean
     appCanManageJobs: boolean
+    appCanMonitorDownloads: boolean
     rollingSeeded: boolean
     dailySeeded: boolean
   }

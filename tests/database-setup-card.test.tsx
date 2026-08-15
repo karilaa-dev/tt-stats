@@ -28,6 +28,7 @@ const missingSetup: DatabaseSetupStatus = {
     definitionsCurrent: false,
     appCanRead: false,
     appCanManageJobs: false,
+    appCanMonitorDownloads: false,
     rollingSeeded: false,
     dailySeeded: false,
   },
@@ -181,6 +182,7 @@ describe("database setup diagnostics", () => {
         definitionsCurrent: false,
         appCanRead: true,
         appCanManageJobs: true,
+        appCanMonitorDownloads: true,
         rollingSeeded: true,
         dailySeeded: true,
       },
@@ -219,6 +221,35 @@ describe("database setup diagnostics", () => {
     ).toBeTruthy()
     expect(
       screen.getByRole("button", { name: "Update and rebuild" })
+    ).toBeTruthy()
+  })
+
+  it("reports missing video-monitor grants after a split-role upgrade", () => {
+    renderSetup({
+      ...missingSetup,
+      snapshot: {
+        schemaInstalled: true,
+        tablesInstalled: true,
+        jobsApiInstalled: true,
+        definitionsCurrent: true,
+        appCanRead: true,
+        appCanManageJobs: true,
+        appCanMonitorDownloads: false,
+        rollingSeeded: true,
+        dailySeeded: true,
+      },
+      scheduler: {
+        ...missingSetup.scheduler,
+        inspectable: true,
+        rollingJobInstalled: true,
+        dailyJobInstalled: true,
+      },
+    })
+
+    expect(
+      screen.getByText(
+        "Snapshot reads, approved job-management grants, or video-monitor state grants are incomplete."
+      )
     ).toBeTruthy()
   })
 })

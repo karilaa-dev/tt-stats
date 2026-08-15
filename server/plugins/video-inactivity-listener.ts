@@ -7,6 +7,7 @@ import { checkVideoInactivity } from "@/lib/notifications/video-inactivity"
 
 const CHANNEL = "tt_stats_video_inactivity_check"
 const RECONNECT_DELAY_MS = 5_000
+const FALLBACK_CHECK_INTERVAL_MS = 60_000
 
 function safeCode(error: unknown): string {
   return error && typeof error === "object" && "code" in error
@@ -35,7 +36,9 @@ export default definePlugin((nitroApp) => {
   }
 
   let listener: Client | null = null
+  let pendingListener: Client | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let checkTimer: ReturnType<typeof setInterval> | null = null
   let connecting = false
   let closed = false
 
@@ -57,6 +60,11 @@ export default definePlugin((nitroApp) => {
     }, RECONNECT_DELAY_MS)
   }
 
+  checkTimer = setInterval(() => {
+    void runCheck()
+  }, FALLBACK_CHECK_INTERVAL_MS)
+  void runCheck()
+
   const connectListener = async () => {
     if (closed || connecting || listener) return
     connecting = true
@@ -69,6 +77,7 @@ export default definePlugin((nitroApp) => {
         keepAlive: true,
       })
       candidate = nextListener
+      pendingListener = nextListener
       nextListener.on("notification", (notification) => {
         if (notification.channel === CHANNEL) void runCheck()
       })
@@ -85,17 +94,28 @@ export default definePlugin((nitroApp) => {
         scheduleReconnect()
       })
       await nextListener.connect()
+      if (closed) {
+        await nextListener.end().catch(() => undefined)
+        return
+      }
       await nextListener.query(`LISTEN ${CHANNEL}`)
+      if (closed) {
+        await nextListener.end().catch(() => undefined)
+        return
+      }
       listener = nextListener
+      pendingListener = null
       candidate = null
-      void runCheck()
     } catch (error) {
-      console.error("[video-inactivity] listener connection failed", {
-        code: safeCode(error),
-      })
+      if (!closed) {
+        console.error("[video-inactivity] listener connection failed", {
+          code: safeCode(error),
+        })
+      }
       if (candidate) await candidate.end().catch(() => undefined)
       scheduleReconnect()
     } finally {
+      if (pendingListener === candidate) pendingListener = null
       connecting = false
     }
   }
@@ -106,8 +126,16 @@ export default definePlugin((nitroApp) => {
     closed = true
     if (reconnectTimer) clearTimeout(reconnectTimer)
     reconnectTimer = null
+    if (checkTimer) clearInterval(checkTimer)
+    checkTimer = null
     const current = listener
+    const pending = pendingListener
     listener = null
-    if (current) await current.end().catch(() => undefined)
+    pendingListener = null
+    await Promise.all(
+      [current, pending]
+        .filter((client): client is Client => client !== null)
+        .map((client) => client.end().catch(() => undefined))
+    )
   })
 })

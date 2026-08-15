@@ -64,7 +64,13 @@ function DatabaseJobsPage() {
       />
       <VideoInactivityCard
         status={notificationStatus}
-        monitorReady={Boolean(setupQuery.data?.snapshot.definitionsCurrent)}
+        monitorDatabaseStatus={
+          !setupQuery.data?.snapshot.definitionsCurrent
+            ? "definitions"
+            : !setupQuery.data.snapshot.appCanMonitorDownloads
+              ? "permissions"
+              : "ready"
+        }
         fakeMode={fakeMode}
       />
       {setupQuery.isError && !setupQuery.data ? (

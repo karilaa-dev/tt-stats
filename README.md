@@ -56,20 +56,25 @@ VIDEO_INACTIVITY_WEBHOOK_URL=https://example.com/webhooks/tt-stats
 # VIDEO_INACTIVITY_NTFY_TOKEN=optional-bearer-token
 ```
 
-When a destination is configured, the rolling PostgreSQL refresh emits a
-transactional `NOTIFY` after each successful run, normally every five minutes.
-The app listens for that event and checks `public.videos`; it also checks once
-when the listener starts. It sends a warning after five minutes without a
-download and one urgent follow-up after another five minutes if inactivity
-continues. A new download resets the escalation cycle. Listener connections
-recover automatically, delivery failures retry on the next check, and
-PostgreSQL state plus an advisory lock prevent duplicate alerts across restarts
-and multiple app instances. The Database jobs page includes a test button that
-sends a notification without changing monitor state. Generic webhooks receive
-JSON; ntfy destinations receive the message and priority headers expected by an
-ntfy topic URL. After upgrading an existing install, use **Update database
-definitions** on the Database jobs page once to add the persistent monitor state
-and refresh signal without changing either snapshot schedule.
+When a destination is configured, the app checks `public.videos` at startup and
+every minute. The rolling PostgreSQL refresh also emits a transactional `NOTIFY`
+after each successful run so it can trigger an immediate check without making
+the monitor depend on that job's schedule or active state. It sends a warning
+after five minutes without a download and one urgent follow-up at ten minutes
+of total inactivity. A new download resets the escalation cycle. Listener
+connections recover automatically, delivery failures retry on the next check,
+and PostgreSQL state plus an advisory lock prevent duplicate alerts across
+restarts and multiple app instances. The Database jobs page includes a test
+button that sends a notification without changing monitor state. Generic
+webhooks receive JSON; ntfy destinations receive the message and priority
+headers expected by an ntfy topic URL.
+
+After upgrading an installation where `DB_URL` owns `tt_stats_cache`, use
+**Update database definitions** on the Database jobs page once. If the schema
+owner and runtime `DB_URL` role are separate, apply
+`database/001_stats_snapshot_schema.sql` as the schema owner, then reapply
+`database/003_stats_snapshot_grants.sql` with `app_role` set to the runtime role.
+The diagnostics and notification card report missing monitor-state grants.
 
 The guided setup action on `/dashboard/jobs` uses `DB_URL`, but the role must not
 be a PostgreSQL superuser. The page checks the limited grants below and requires

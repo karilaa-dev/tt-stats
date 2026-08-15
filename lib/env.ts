@@ -104,8 +104,9 @@ export function getVideoMonitorEnv(
   return null
 }
 
-export function validateRuntimeConfiguration(): void {
-  getDbEnv()
-  getBotstatEnv()
-  getVideoMonitorEnv()
+export function validateRuntimeConfiguration(
+  source: NodeJS.ProcessEnv = process.env
+): void {
+  getDbEnv(source)
+  getBotstatEnv(source)
 }

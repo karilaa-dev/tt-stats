@@ -25,11 +25,11 @@ import {
 
 export function VideoInactivityCard({
   status,
-  monitorReady,
+  monitorDatabaseStatus,
   fakeMode = false,
 }: {
   status: VideoNotificationStatus
-  monitorReady: boolean
+  monitorDatabaseStatus: "ready" | "definitions" | "permissions"
   fakeMode?: boolean
 }) {
   const mutation = useMutation({
@@ -78,7 +78,7 @@ export function VideoInactivityCard({
               sends through the configured destination.
             </AlertDescription>
           </Alert>
-        ) : status.configured && !monitorReady ? (
+        ) : status.configured && monitorDatabaseStatus === "definitions" ? (
           <Alert>
             <TriangleAlertIcon />
             <AlertTitle>Database update required</AlertTitle>
@@ -87,13 +87,22 @@ export function VideoInactivityCard({
               escalation state. The test button is available now.
             </AlertDescription>
           </Alert>
+        ) : status.configured && monitorDatabaseStatus === "permissions" ? (
+          <Alert variant="destructive">
+            <TriangleAlertIcon />
+            <AlertTitle>Monitor state grants required</AlertTitle>
+            <AlertDescription>
+              Reapply database/003_stats_snapshot_grants.sql for the runtime
+              DB_URL role. The test button remains available.
+            </AlertDescription>
+          </Alert>
         ) : status.configured ? (
           <Alert>
             <CheckCircle2Icon />
             <AlertTitle>Monitor active</AlertTitle>
             <AlertDescription>
-              The server checks after each rolling refresh, normally every five
-              minutes. A new download resets both alert stages automatically.
+              The server checks every minute, and each rolling refresh triggers
+              an immediate check. A new download resets both alert stages.
             </AlertDescription>
           </Alert>
         ) : (

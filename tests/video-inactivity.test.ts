@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 
-import { getVideoMonitorEnv } from "@/lib/env"
+import { getVideoMonitorEnv, validateRuntimeConfiguration } from "@/lib/env"
 import {
   alertStageDue,
   buildInactivityNotification,
@@ -43,6 +43,19 @@ describe("video inactivity notification configuration", () => {
       getVideoMonitorEnv({ VIDEO_INACTIVITY_WEBHOOK_URL: "file:///tmp/hook" })
     ).toThrow()
   })
+
+  it("does not fail core health validation for optional alerting errors", () => {
+    expect(() =>
+      validateRuntimeConfiguration({
+        DB_URL: "postgresql://app:secret@database.test/ttbot",
+        BOT_TOKEN: "12345:secret",
+        BOTSTAT_ACCESS_KEY: "access-key",
+        BOTSTAT_NOTIFY_ID: "1234567",
+        VIDEO_INACTIVITY_WEBHOOK_URL: "https://example.test/hook",
+        VIDEO_INACTIVITY_NTFY_URL: "not-a-valid-url",
+      })
+    ).not.toThrow()
+  })
 })
 
 describe("video inactivity escalation", () => {
@@ -52,7 +65,6 @@ describe("video inactivity escalation", () => {
     expect(
       alertStageDue({
         stage: 0,
-        stageChangedAtMs: null,
         inactivityStartedAtMs: 0,
         nowMs: 5 * minute - 1,
       })
@@ -60,7 +72,6 @@ describe("video inactivity escalation", () => {
     expect(
       alertStageDue({
         stage: 0,
-        stageChangedAtMs: null,
         inactivityStartedAtMs: 0,
         nowMs: 5 * minute,
       })
@@ -68,7 +79,6 @@ describe("video inactivity escalation", () => {
     expect(
       alertStageDue({
         stage: 1,
-        stageChangedAtMs: 5 * minute,
         inactivityStartedAtMs: 0,
         nowMs: 10 * minute,
       })
@@ -76,11 +86,20 @@ describe("video inactivity escalation", () => {
     expect(
       alertStageDue({
         stage: 2,
-        stageChangedAtMs: 10 * minute,
         inactivityStartedAtMs: 0,
         nowMs: 30 * minute,
       })
     ).toBeNull()
+  })
+
+  it("does not delay an urgent alert because consecutive checks have jitter", () => {
+    expect(
+      alertStageDue({
+        stage: 1,
+        inactivityStartedAtMs: 0,
+        nowMs: 10 * minute,
+      })
+    ).toBe(2)
   })
 
   it("builds increasingly urgent messages with safe timestamps", () => {

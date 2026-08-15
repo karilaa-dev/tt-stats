@@ -88,6 +88,7 @@ function getFakeDatabaseSetupStatus(): DatabaseSetupStatus {
       definitionsCurrent: true,
       appCanRead: true,
       appCanManageJobs: true,
+      appCanMonitorDownloads: true,
       rollingSeeded: true,
       dailySeeded: true,
     },
