@@ -324,7 +324,7 @@ export function DatabaseSetupCard({
                     : status.snapshot.appCanRead &&
                         status.snapshot.appCanManageJobs &&
                         status.snapshot.appCanMonitorDownloads
-                      ? "The app can read snapshots, call only the fixed management API, and update the video-monitor state."
+                      ? "The app can read snapshots and video downloads, call only the fixed management API, and update the video-monitor state."
                       : "Snapshot reads, approved job-management grants, or video-monitor state grants are incomplete."
                 }
               />

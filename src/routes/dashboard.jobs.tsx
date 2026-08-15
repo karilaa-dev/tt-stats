@@ -14,6 +14,7 @@ import {
   statsJobsQueryOptions,
 } from "@/lib/stats/query-options"
 import { getVideoNotificationStatus } from "@/lib/notifications/functions"
+import { getVideoMonitorDatabaseStatus } from "@/lib/notifications/status"
 
 export const Route = createFileRoute("/dashboard/jobs")({
   head: () => ({ meta: [{ title: "Database jobs · TT Stats" }] }),
@@ -64,17 +65,10 @@ function DatabaseJobsPage() {
       />
       <VideoInactivityCard
         status={notificationStatus}
-        monitorDatabaseStatus={
-          !setupQuery.data
-            ? setupQuery.isError
-              ? "unavailable"
-              : "checking"
-            : !setupQuery.data.snapshot.definitionsCurrent
-              ? "definitions"
-            : !setupQuery.data.snapshot.appCanMonitorDownloads
-              ? "permissions"
-              : "ready"
-        }
+        monitorDatabaseStatus={getVideoMonitorDatabaseStatus({
+          status: setupQuery.data,
+          queryFailed: setupQuery.isError,
+        })}
         fakeMode={fakeMode}
       />
       {setupQuery.isError && !setupQuery.data ? (

@@ -42,6 +42,16 @@ describe("video inactivity notification configuration", () => {
     expect(() =>
       getVideoMonitorEnv({ VIDEO_INACTIVITY_WEBHOOK_URL: "file:///tmp/hook" })
     ).toThrow()
+    expect(() =>
+      getVideoMonitorEnv({
+        VIDEO_INACTIVITY_WEBHOOK_URL: "https://user:password@example.test/hook",
+      })
+    ).toThrow()
+    expect(() =>
+      getVideoMonitorEnv({
+        VIDEO_INACTIVITY_NTFY_URL: "https://token@ntfy.sh/private-topic",
+      })
+    ).toThrow()
   })
 
   it("does not fail core health validation for optional alerting errors", () => {

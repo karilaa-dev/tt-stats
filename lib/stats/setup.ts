@@ -136,6 +136,8 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AS app_can_manage,
            coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.video_inactivity_monitor'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.video_inactivity_monitor'), 'UPDATE'), false)
+             AND coalesce(has_schema_privilege(current_user, to_regnamespace('public'), 'USAGE'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.videos'), 'SELECT'), false)
              AS app_can_monitor_downloads,
            EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')
              AS pg_cron_installed,

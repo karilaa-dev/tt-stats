@@ -73,11 +73,7 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.video_inactivity_monitor (
 INSERT INTO tt_stats_cache.video_inactivity_monitor (
   singleton, last_downloaded_at
 )
-SELECT TRUE, max(downloaded_at)
-FROM public.videos
-WHERE user_id <> 0
-  AND downloaded_at >= 946684800
-  AND downloaded_at <= floor(extract(epoch FROM clock_timestamp()))::bigint
+VALUES (TRUE, NULL)
 ON CONFLICT (singleton) DO NOTHING;
 
 CREATE INDEX IF NOT EXISTS tt_stats_manual_refresh_requested_idx

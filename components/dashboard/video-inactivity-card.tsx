@@ -23,6 +23,7 @@ import {
   sendVideoNotificationTest,
   type VideoNotificationStatus,
 } from "@/lib/notifications/functions"
+import type { VideoMonitorDatabaseStatus } from "@/lib/notifications/status"
 
 export function VideoInactivityCard({
   status,
@@ -30,12 +31,7 @@ export function VideoInactivityCard({
   fakeMode = false,
 }: {
   status: VideoNotificationStatus
-  monitorDatabaseStatus:
-    | "checking"
-    | "unavailable"
-    | "ready"
-    | "definitions"
-    | "permissions"
+  monitorDatabaseStatus: VideoMonitorDatabaseStatus
   fakeMode?: boolean
 }) {
   const mutation = useMutation({
@@ -102,6 +98,15 @@ export function VideoInactivityCard({
               not be verified. The test button remains available.
             </AlertDescription>
           </Alert>
+        ) : status.configured && monitorDatabaseStatus === "install" ? (
+          <Alert>
+            <TriangleAlertIcon />
+            <AlertTitle>Database setup required</AlertTitle>
+            <AlertDescription>
+              Use Install or repair database jobs above before the automatic
+              monitor can run. The test button is available now.
+            </AlertDescription>
+          </Alert>
         ) : status.configured && monitorDatabaseStatus === "definitions" ? (
           <Alert>
             <TriangleAlertIcon />
@@ -114,10 +119,11 @@ export function VideoInactivityCard({
         ) : status.configured && monitorDatabaseStatus === "permissions" ? (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Monitor state grants required</AlertTitle>
+            <AlertTitle>Monitor database grants required</AlertTitle>
             <AlertDescription>
               Reapply database/003_stats_snapshot_grants.sql for the runtime
-              DB_URL role. The test button remains available.
+              DB_URL role to grant video reads and monitor-state access. The
+              test button remains available.
             </AlertDescription>
           </Alert>
         ) : status.configured ? (
