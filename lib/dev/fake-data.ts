@@ -87,6 +87,7 @@ const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
       ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
       : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
     mediaKind: images ? "images" : "video",
+    cacheHit: index % 3 !== 0,
   }
 })
 
@@ -123,6 +124,7 @@ export function getFakeStatsBreakdown(
       uniqueUsers: scaledCount(81_340, scope, range),
       images: scaledCount(216_890, scope, range),
       uniqueImageUsers: scaledCount(43_680, scope, range),
+      cacheHits: scaledCount(932_410, scope, range),
     },
   }
 }

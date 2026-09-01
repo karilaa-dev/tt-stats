@@ -57,6 +57,7 @@ export interface StatsBreakdown {
   downloads: MetricCount & {
     images: string
     uniqueImageUsers: string
+    cacheHits: string
   }
 }
 
@@ -92,6 +93,7 @@ export interface UserDownload {
   downloadedAt: number | null
   sharedLink: string
   mediaKind: "video" | "images"
+  cacheHit: boolean
 }
 
 export interface PaginatedUserDownloads {

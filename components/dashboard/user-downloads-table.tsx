@@ -64,7 +64,7 @@ export function UserDownloadsTable({
       <CardHeader>
         <CardTitle>Latest video downloads</CardTitle>
         <CardDescription>
-          Newest video and image deliveries for this chat.
+          Newest video and image deliveries, including cache hits and misses.
         </CardDescription>
         {data ? (
           <CardAction>
@@ -85,6 +85,7 @@ export function UserDownloadsTable({
               <TableRow>
                 <TableHead>Downloaded</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Cache</TableHead>
                 <TableHead>Source</TableHead>
               </TableRow>
             </TableHeader>
@@ -110,6 +111,13 @@ export function UserDownloadsTable({
                         <VideoIcon data-icon="inline-start" />
                       )}
                       {download.mediaKind === "images" ? "Images" : "Video"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={download.cacheHit ? "secondary" : "outline"}
+                    >
+                      {download.cacheHit ? "Hit" : "Miss"}
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-72">

@@ -2,6 +2,17 @@ import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
 
 describe("database schema", () => {
+  it("adds cache-hit counts to new and existing breakdown snapshots", async () => {
+    const schema = await readFile(
+      new URL("../database/001_stats_snapshot_schema.sql", import.meta.url),
+      "utf8"
+    )
+
+    expect(schema).toContain("ADD COLUMN IF NOT EXISTS cache_hits")
+    expect(schema).toContain("count(*) FILTER (WHERE cache_hit)")
+    expect(schema).toContain("tt-stats-schema-version:4")
+  })
+
   it("installs monitor state without reading source tables", async () => {
     const schema = await readFile(
       new URL("../database/001_stats_snapshot_schema.sql", import.meta.url),

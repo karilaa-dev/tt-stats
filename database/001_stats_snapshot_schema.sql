@@ -21,8 +21,13 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.breakdown (
   image_users BIGINT NOT NULL CHECK (image_users >= 0),
   music BIGINT NOT NULL CHECK (music >= 0),
   music_users BIGINT NOT NULL CHECK (music_users >= 0),
+  cache_hits BIGINT NOT NULL DEFAULT 0 CHECK (cache_hits >= 0),
   PRIMARY KEY (scope, range)
 );
+
+ALTER TABLE tt_stats_cache.breakdown
+  ADD COLUMN IF NOT EXISTS cache_hits BIGINT NOT NULL DEFAULT 0
+  CHECK (cache_hits >= 0);
 
 CREATE TABLE IF NOT EXISTS tt_stats_cache.time_series (
   metric TEXT NOT NULL CHECK (metric IN ('users', 'videos', 'music')),
@@ -185,9 +190,9 @@ BEGIN
 
   INSERT INTO tt_stats_breakdown_stage (
     scope, range, chats, downloads, download_users,
-    images, image_users, music, music_users
+    images, image_users, music, music_users, cache_hits
   )
-  SELECT scope, '24h', 0, 0, 0, 0, 0, 0, 0
+  SELECT scope, '24h', 0, 0, 0, 0, 0, 0, 0, 0
   FROM (VALUES ('users'), ('groups'), ('all')) AS scopes(scope);
 
   WITH counts AS (
@@ -225,9 +230,10 @@ BEGIN
       count(*) FILTER (WHERE media_kind = 'images')::bigint AS images,
       count(DISTINCT user_id) FILTER (
         WHERE media_kind = 'images'
-      )::bigint AS image_users
+      )::bigint AS image_users,
+      count(*) FILTER (WHERE cache_hit)::bigint AS cache_hits
     FROM (
-      SELECT user_id, user_id > 0 AS is_user, media_kind
+      SELECT user_id, user_id > 0 AS is_user, media_kind, cache_hit
       FROM public.videos
       WHERE user_id <> 0
         AND downloaded_at IS NOT NULL
@@ -240,7 +246,8 @@ BEGIN
   SET downloads = counts.total,
       download_users = counts.users,
       images = counts.images,
-      image_users = counts.image_users
+      image_users = counts.image_users,
+      cache_hits = counts.cache_hits
   FROM counts
   WHERE target.scope = counts.scope;
 
@@ -336,9 +343,9 @@ BEGIN
   ) ON COMMIT DROP;
   INSERT INTO tt_stats_breakdown_stage (
     scope, range, chats, downloads, download_users,
-    images, image_users, music, music_users
+    images, image_users, music, music_users, cache_hits
   )
-  SELECT scope, ranges.range, 0, 0, 0, 0, 0, 0, 0
+  SELECT scope, ranges.range, 0, 0, 0, 0, 0, 0, 0, 0
   FROM (VALUES ('users'), ('groups'), ('all')) AS scopes(scope)
   CROSS JOIN tt_stats_ranges ranges;
 
@@ -381,10 +388,11 @@ BEGIN
       count(*) FILTER (WHERE media_kind = 'images')::bigint AS images,
       count(DISTINCT user_id) FILTER (
         WHERE media_kind = 'images'
-      )::bigint AS image_users
+      )::bigint AS image_users,
+      count(*) FILTER (WHERE cache_hit)::bigint AS cache_hits
     FROM (
       SELECT ranges.range, videos.user_id, videos.user_id > 0 AS is_user,
-             videos.media_kind
+             videos.media_kind, videos.cache_hit
       FROM tt_stats_ranges ranges
       JOIN public.videos
         ON videos.user_id <> 0
@@ -399,7 +407,8 @@ BEGIN
   SET downloads = counts.total,
       download_users = counts.users,
       images = counts.images,
-      image_users = counts.image_users
+      image_users = counts.image_users,
+      cache_hits = counts.cache_hits
   FROM counts
   WHERE target.range = counts.range AND target.scope = counts.scope;
 
@@ -854,6 +863,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:3';
+  IS 'tt-stats-schema-version:4';
 
 COMMIT;

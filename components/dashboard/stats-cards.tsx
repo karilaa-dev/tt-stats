@@ -1,4 +1,10 @@
-import { DownloadIcon, ImagesIcon, Music2Icon, UsersIcon } from "lucide-react"
+import {
+  DatabaseZapIcon,
+  DownloadIcon,
+  ImagesIcon,
+  Music2Icon,
+  UsersIcon,
+} from "lucide-react"
 
 import {
   Card,
@@ -14,16 +20,25 @@ function count(value: string) {
   return BigInt(value).toLocaleString("en-US")
 }
 
+function percentage(part: string, total: string): string {
+  const denominator = BigInt(total)
+  if (denominator === 0n) return "0.0%"
+  const numerator = BigInt(part)
+  const tenths = (numerator * 1000n + denominator / 2n) / denominator
+  return `${tenths / 10n}.${tenths % 10n}%`
+}
+
 const metrics = [
   { key: "chats", label: "Registered chats", icon: UsersIcon },
   { key: "music", label: "Music downloads", icon: Music2Icon },
   { key: "downloads", label: "Video downloads", icon: DownloadIcon },
   { key: "images", label: "Image albums", icon: ImagesIcon },
+  { key: "cacheHits", label: "Cache hits", icon: DatabaseZapIcon },
 ] as const
 
 export function StatsCards({ stats }: { stats: StatsBreakdown }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       {metrics.map((metric) => {
         const Icon = metric.icon
         let total = stats.chats
@@ -37,6 +52,10 @@ export function StatsCards({ stats }: { stats: StatsBreakdown }) {
         } else if (metric.key === "images") {
           total = stats.downloads.images
           detail = `${count(stats.downloads.uniqueImageUsers)} unique chats`
+        } else if (metric.key === "cacheHits") {
+          total = stats.downloads.cacheHits
+          const misses = BigInt(stats.downloads.total) - BigInt(total)
+          detail = `${misses.toLocaleString("en-US")} misses · ${percentage(total, stats.downloads.total)} hit rate`
         }
         return (
           <Card key={metric.key}>

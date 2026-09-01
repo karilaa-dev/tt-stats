@@ -35,6 +35,7 @@ interface BreakdownRow {
   image_users: string
   music: string
   music_users: string
+  cache_hits: string
   generated_at?: string
   metadata_count?: string
 }
@@ -87,6 +88,7 @@ function mapBreakdown(row: BreakdownRow): StatsBreakdown {
       uniqueUsers: row.download_users,
       images: row.images,
       uniqueImageUsers: row.image_users,
+      cacheHits: row.cache_hits,
     },
     music: { total: row.music, uniqueUsers: row.music_users },
   }
@@ -113,7 +115,7 @@ export async function getStatsBreakdownRaw(
     pool,
     `SELECT scope, range, chats::text, downloads::text,
             download_users::text, images::text, image_users::text,
-            music::text, music_users::text
+            music::text, music_users::text, cache_hits::text
      FROM tt_stats_cache.breakdown
      WHERE scope = $1 AND range = $2`,
     [scope, range]
@@ -136,6 +138,7 @@ export async function getOverviewRaw(
             breakdown.downloads::text, breakdown.download_users::text,
             breakdown.images::text, breakdown.image_users::text,
             breakdown.music::text, breakdown.music_users::text,
+            breakdown.cache_hits::text,
             metadata.generated_at, metadata.metadata_count
      FROM tt_stats_cache.breakdown breakdown
      CROSS JOIN metadata
@@ -270,9 +273,10 @@ export async function getUserDownloadsRaw(
     downloaded_at: string | number | null
     shared_link: string
     media_kind: "video" | "images"
+    cache_hit: boolean
   }>(
     pool,
-    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind
+    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind, cache_hit
      FROM public.videos
      WHERE user_id = $1::bigint
      ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC
@@ -286,6 +290,7 @@ export async function getUserDownloadsRaw(
         row.downloaded_at === null ? null : Number(row.downloaded_at),
       sharedLink: row.shared_link,
       mediaKind: row.media_kind,
+      cacheHit: row.cache_hit,
     })),
     page,
     pageSize,

@@ -82,18 +82,18 @@ integration("PostgreSQL statistics queries", () => {
       ]
     )
     await pool.query(
-      `INSERT INTO videos (user_id, downloaded_at, shared_link, media_kind, delivery_surface, delivery_mode) VALUES
-       (1, $1, 'https://example.test/new', 'video', 'chat', 'media'),
-       (1, $2, 'https://example.test/images,"quoted"', 'images', 'inline', NULL),
-       (1, $3, 'https://example.test/old', 'video', 'chat', 'document'),
-       (2, $4, 'https://example.test/boundary', 'video', 'chat', 'media'),
-       (-10, $5, 'https://example.test/group-image', 'images', 'chat', 'media'),
-       (-20, $6, 'https://example.test/group-old', 'video', 'chat', 'media'),
-       (0, $7, 'https://example.test/zero', 'video', 'chat', 'media'),
-       (3, NULL, 'https://example.test/null-time', 'video', 'chat', 'media'),
-       (4, $8, 'https://example.test/unfinished', 'video', 'chat', 'media'),
-       (5, $9, 'https://example.test/future', 'video', 'chat', 'media'),
-       (6, 0, 'https://example.test/invalid-epoch', 'video', 'chat', 'media')`,
+      `INSERT INTO videos (user_id, downloaded_at, shared_link, media_kind, delivery_surface, delivery_mode, cache_hit) VALUES
+       (1, $1, 'https://example.test/new', 'video', 'chat', 'media', TRUE),
+       (1, $2, 'https://example.test/images,"quoted"', 'images', 'inline', NULL, FALSE),
+       (1, $3, 'https://example.test/old', 'video', 'chat', 'document', FALSE),
+       (2, $4, 'https://example.test/boundary', 'video', 'chat', 'media', FALSE),
+       (-10, $5, 'https://example.test/group-image', 'images', 'chat', 'media', FALSE),
+       (-20, $6, 'https://example.test/group-old', 'video', 'chat', 'media', FALSE),
+       (0, $7, 'https://example.test/zero', 'video', 'chat', 'media', FALSE),
+       (3, NULL, 'https://example.test/null-time', 'video', 'chat', 'media', FALSE),
+       (4, $8, 'https://example.test/unfinished', 'video', 'chat', 'media', FALSE),
+       (5, $9, 'https://example.test/future', 'video', 'chat', 'media', FALSE),
+       (6, 0, 'https://example.test/invalid-epoch', 'video', 'chat', 'media', FALSE)`,
       [
         windowEnd - 10,
         windowEnd - 20,
@@ -140,8 +140,11 @@ integration("PostgreSQL statistics queries", () => {
       uniqueUsers: "2",
       images: "1",
       uniqueImageUsers: "1",
+      cacheHits: "1",
     })
-    expect((await getStatsBreakdownRaw("all", "24h", pool)).chats).toBe("3")
+    const allChats = await getStatsBreakdownRaw("all", "24h", pool)
+    expect(allChats.chats).toBe("3")
+    expect(allChats.downloads.cacheHits).toBe("1")
   })
 
   it("zero-fills analytics and excludes the zero ID", async () => {
@@ -276,6 +279,7 @@ integration("PostgreSQL statistics queries", () => {
       "https://example.test/new",
       'https://example.test/images,"quoted"',
     ])
+    expect(firstPage.items.map((item) => item.cacheHit)).toEqual([true, false])
 
     const clampedPage = await getUserDownloadsRaw("1", 99, 2, pool)
     expect(clampedPage.page).toBe(2)
