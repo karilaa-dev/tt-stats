@@ -61,11 +61,12 @@ every minute. The rolling PostgreSQL refresh also emits a transactional `NOTIFY`
 after each successful run so it can trigger an immediate check without making
 the monitor depend on that job's schedule or active state. It sends a warning
 after five minutes without a download and one urgent follow-up at ten minutes
-of total inactivity. A new download resets the escalation cycle. Listener
-connections recover automatically, delivery failures retry on the next check,
-and PostgreSQL state plus an advisory lock prevent duplicate alerts across
-restarts and multiple app instances. The Database jobs page includes a test
-button that sends a notification without changing monitor state. Generic
+of total inactivity. A download after at least five quiet minutes sends a
+recovery notification that the bot is working and resets the escalation cycle.
+Listener connections recover automatically, delivery failures retry on the next
+check, and PostgreSQL state plus an advisory lock prevent duplicate alerts
+across restarts and multiple app instances. The Database jobs page includes a
+test button that sends a notification without changing monitor state. Generic
 webhooks receive JSON; ntfy destinations receive the message and priority
 headers expected by an ntfy topic URL.
 

@@ -9,10 +9,11 @@ import { getVideoMonitorEnv, type VideoMonitorEnv } from "@/lib/env"
 export const INITIAL_INACTIVITY_MINUTES = 5
 export const URGENT_INACTIVITY_MINUTES = 10
 
-export type VideoNotificationSeverity = "test" | "warning" | "critical"
+export type VideoNotificationSeverity =
+  "test" | "success" | "warning" | "critical"
 
 export interface VideoNotification {
-  event: "test" | "video_download_inactivity"
+  event: "test" | "video_download_inactivity" | "video_download_recovery"
   severity: VideoNotificationSeverity
   title: string
   message: string
@@ -36,6 +37,7 @@ type AlertStage = 1 | 2
 export type MonitorResult =
   | { status: "disabled" | "idle" | "locked" }
   | { status: "sent"; stage: AlertStage }
+  | { status: "sent"; kind: "recovery" }
 
 function elapsedMinutes(fromMs: number, nowMs: number): number {
   return Math.max(0, Math.floor((nowMs - fromMs) / 60_000))
@@ -85,6 +87,42 @@ export function buildInactivityNotification(
     lastDownloadedAt: lastDownloadedEpoch
       ? new Date(lastDownloadedEpoch * 1000).toISOString()
       : null,
+    detectedAt: new Date(nowMs).toISOString(),
+  }
+}
+
+export function recoveryInactivityMinutes(input: {
+  previousDownloadedEpoch: number | null
+  monitoringStartedAtMs: number
+  resumedDownloadedEpoch: number
+}): number | null {
+  const inactivityStartedAtMs = input.previousDownloadedEpoch
+    ? input.previousDownloadedEpoch * 1000
+    : input.monitoringStartedAtMs
+  const resumedAtMs = input.resumedDownloadedEpoch * 1000
+  if (
+    resumedAtMs - inactivityStartedAtMs <
+    INITIAL_INACTIVITY_MINUTES * 60_000
+  ) {
+    return null
+  }
+  return elapsedMinutes(inactivityStartedAtMs, resumedAtMs)
+}
+
+export function buildRecoveryNotification(
+  downloadedEpoch: number,
+  inactivityStartedAtMs: number,
+  nowMs: number
+): VideoNotification {
+  const downloadedAtMs = downloadedEpoch * 1000
+  const minutes = elapsedMinutes(inactivityStartedAtMs, downloadedAtMs)
+  return {
+    event: "video_download_recovery",
+    severity: "success",
+    title: "Bot is working",
+    message: `A video was downloaded after ${minutes} minutes of inactivity. The bot is working.`,
+    inactivityMinutes: minutes,
+    lastDownloadedAt: new Date(downloadedAtMs).toISOString(),
     detectedAt: new Date(nowMs).toISOString(),
   }
 }
@@ -217,6 +255,21 @@ export async function checkVideoInactivity(
     let monitoringStartedAtMs = new Date(state.monitoring_started_at).getTime()
 
     if (latestValue !== state.last_downloaded_at) {
+      const previousDownloadedEpoch = parseEpochSeconds(
+        state.last_downloaded_at
+      )
+      const latestEpoch = parseEpochSeconds(latestValue)
+      const previousInactivityStartedAtMs = previousDownloadedEpoch
+        ? previousDownloadedEpoch * 1000
+        : monitoringStartedAtMs
+      const recoveryMinutes = latestEpoch
+        ? recoveryInactivityMinutes({
+            previousDownloadedEpoch,
+            monitoringStartedAtMs,
+            resumedDownloadedEpoch: latestEpoch,
+          })
+        : null
+
       stage = 0
       monitoringStartedAtMs = nowMs
       await client.query(
@@ -226,6 +279,20 @@ export async function checkVideoInactivity(
          WHERE singleton = TRUE`,
         [latestValue, now]
       )
+
+      if (latestEpoch && recoveryMinutes !== null) {
+        await deliverVideoNotification(
+          buildRecoveryNotification(
+            latestEpoch,
+            previousInactivityStartedAtMs,
+            nowMs
+          ),
+          env,
+          options.fetcher
+        )
+        await client.query("COMMIT")
+        return { status: "sent", kind: "recovery" }
+      }
     }
 
     const latestEpoch = parseEpochSeconds(latestValue)

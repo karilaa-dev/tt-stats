@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest"
+import type { Pool } from "pg"
 
 import { getVideoMonitorEnv, validateRuntimeConfiguration } from "@/lib/env"
 import {
   alertStageDue,
   buildInactivityNotification,
   buildNotificationRequest,
+  buildRecoveryNotification,
   buildTestNotification,
+  checkVideoInactivity,
   deliverVideoNotification,
+  recoveryInactivityMinutes,
 } from "@/lib/notifications/video-inactivity"
 
 describe("video inactivity notification configuration", () => {
@@ -127,6 +131,37 @@ describe("video inactivity escalation", () => {
     expect(urgent.title).toContain("URGENT")
     expect(urgent.lastDownloadedAt).toBe("2026-08-14T12:00:00.000Z")
   })
+
+  it("detects a download that resumes after five quiet minutes", () => {
+    expect(
+      recoveryInactivityMinutes({
+        previousDownloadedEpoch: 1_000,
+        monitoringStartedAtMs: 0,
+        resumedDownloadedEpoch: 1_299,
+      })
+    ).toBeNull()
+    expect(
+      recoveryInactivityMinutes({
+        previousDownloadedEpoch: 1_000,
+        monitoringStartedAtMs: 0,
+        resumedDownloadedEpoch: 1_300,
+      })
+    ).toBe(5)
+  })
+
+  it("builds a success notification when downloads resume", () => {
+    const notification = buildRecoveryNotification(1_300, 1_000_000, 1_301_000)
+
+    expect(notification).toMatchObject({
+      event: "video_download_recovery",
+      severity: "success",
+      title: "Bot is working",
+      message:
+        "A video was downloaded after 5 minutes of inactivity. The bot is working.",
+      inactivityMinutes: 5,
+      lastDownloadedAt: "1970-01-01T00:21:40.000Z",
+    })
+  })
 })
 
 describe("video notification delivery", () => {
@@ -177,5 +212,69 @@ describe("video notification delivery", () => {
         async () => new Response("secret response", { status: 503 })
       )
     ).rejects.toThrow("HTTP 503")
+  })
+})
+
+describe("video inactivity monitoring", () => {
+  it("sends one recovery notification when a download follows a quiet period", async () => {
+    let state = {
+      last_downloaded_at: "1000" as string | null,
+      stage: 1,
+      monitoring_started_at: new Date(1_000_000),
+    }
+    const query = vi.fn(async (text: string, values?: unknown[]) => {
+      if (text.includes("pg_try_advisory_xact_lock")) {
+        return { rows: [{ acquired: true }] }
+      }
+      if (text.includes("max(downloaded_at)")) {
+        return { rows: [{ latest_downloaded_at: "1300" }] }
+      }
+      if (text.includes("SELECT last_downloaded_at::text")) {
+        return { rows: [state] }
+      }
+      if (text.includes("SET last_downloaded_at")) {
+        state = {
+          last_downloaded_at: String(values?.[0]),
+          stage: 0,
+          monitoring_started_at: values?.[1] as Date,
+        }
+      }
+      return { rows: [] }
+    })
+    const client = { query, release: vi.fn() }
+    const pool = {
+      connect: vi.fn(async () => client),
+    } as unknown as Pool
+    const deliveredBodies: BodyInit[] = []
+    const fetcher = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.body) deliveredBodies.push(init.body)
+        return new Response(null, { status: 204 })
+      }
+    )
+    const options = {
+      pool,
+      env: {
+        provider: "webhook" as const,
+        url: "https://example.test/hook",
+      },
+      fetcher,
+      nowMs: 1_400_000,
+    }
+
+    await expect(checkVideoInactivity(options)).resolves.toEqual({
+      status: "sent",
+      kind: "recovery",
+    })
+    expect(fetcher).toHaveBeenCalledOnce()
+    expect(JSON.parse(String(deliveredBodies[0]))).toMatchObject({
+      event: "video_download_recovery",
+      inactivityMinutes: 5,
+    })
+
+    await expect(checkVideoInactivity(options)).resolves.toEqual({
+      status: "idle",
+    })
+    expect(fetcher).toHaveBeenCalledOnce()
   })
 })
