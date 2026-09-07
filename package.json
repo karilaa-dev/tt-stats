@@ -67,5 +67,8 @@
     "typescript-eslint": "^8.67.0",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
+  },
+  "optionalDependencies": {
+    "lru-cache": "^11.5.2"
   }
 }
