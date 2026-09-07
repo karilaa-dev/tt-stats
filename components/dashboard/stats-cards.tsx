@@ -1,3 +1,4 @@
+import { AnimatedCounter } from "@/components/ui/animated-counter"
 import {
   DatabaseXIcon,
   DatabaseZapIcon,
@@ -17,6 +18,20 @@ import {
 } from "@/components/ui/card"
 import type { StatsBreakdown } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
+
+function MetricValue({ value }: { value: string }) {
+  const numeric = Number(value.replaceAll(",", "").replace("%", ""))
+  // PostgreSQL bigint counts must stay exact even beyond JavaScript's safe range.
+  if (!Number.isSafeInteger(numeric * (value.endsWith("%") ? 10 : 1)))
+    return <>{value}</>
+  return (
+    <AnimatedCounter
+      value={numeric}
+      decimals={value.endsWith("%") ? 1 : 0}
+      suffix={value.endsWith("%") ? "%" : undefined}
+    />
+  )
+}
 
 function count(value: string) {
   return BigInt(value).toLocaleString("en-US")
@@ -118,7 +133,7 @@ export function StatsCards({
             <CardHeader>
               <CardDescription>{metric.label}</CardDescription>
               <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
-                {metric.value}
+                <MetricValue value={metric.value} />
               </CardTitle>
               <CardAction>
                 <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -185,7 +200,7 @@ function CacheMetric({
         {label}
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">
-        {count(value)}
+        <MetricValue value={count(value)} />
       </p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">
         {rate} of downloads

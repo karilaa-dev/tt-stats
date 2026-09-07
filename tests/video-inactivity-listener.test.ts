@@ -10,10 +10,6 @@ const runtime = vi.hoisted(() => ({
   connect: vi.fn<() => Promise<void>>(async () => undefined),
 }))
 
-vi.mock("nitro", () => ({
-  definePlugin: (plugin: unknown) => plugin,
-}))
-
 vi.mock("pg", () => ({
   Client: class {
     connect = vi.fn(() => runtime.connect())
@@ -46,23 +42,15 @@ vi.mock("@/lib/notifications/video-inactivity", () => ({
   checkVideoInactivity: runtime.check,
 }))
 
-import listenerPlugin from "@/server/plugins/video-inactivity-listener"
+import { startVideoInactivityMonitor } from "@/server/plugins/video-inactivity-listener"
 
-type CloseHook = () => void | Promise<void>
-
-function startPlugin(): { close: CloseHook } {
-  let close: CloseHook = () => undefined
-  const plugin = listenerPlugin as unknown as (app: {
-    hooks: { hook: (name: string, callback: CloseHook) => void }
-  }) => void
-  plugin({
-    hooks: {
-      hook(name, callback) {
-        if (name === "close") close = callback
-      },
+function startPlugin() {
+  const close = startVideoInactivityMonitor()
+  return {
+    close: async () => {
+      await close?.()
     },
-  })
-  return { close: () => close() }
+  }
 }
 
 describe("video inactivity listener lifecycle", () => {

@@ -1,6 +1,4 @@
-import { createServerFn } from "@tanstack/react-start"
-
-import { startBotstatVerification } from "@/lib/botstat/client"
+import { actions } from "astro:actions"
 
 export interface BotstatMutationResult {
   status: "success" | "error"
@@ -8,22 +6,4 @@ export interface BotstatMutationResult {
   taskId?: string
 }
 
-export const startBotstat = createServerFn({ method: "POST" }).handler(
-  async (): Promise<BotstatMutationResult> => {
-    try {
-      const result = await startBotstatVerification()
-      return result.ok
-        ? {
-            status: "success",
-            message: "Botstat verification started.",
-            taskId: result.taskId,
-          }
-        : { status: "error", message: result.message }
-    } catch {
-      return {
-        status: "error",
-        message: "Botstat verification is temporarily unavailable.",
-      }
-    }
-  }
-)
+export const startBotstat = () => actions.startBotstat.orThrow()

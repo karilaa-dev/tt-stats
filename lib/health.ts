@@ -1,4 +1,4 @@
-import "@tanstack/react-start/server-only"
+import "@/lib/server-only"
 
 import { getPool } from "@/lib/db/pool"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"

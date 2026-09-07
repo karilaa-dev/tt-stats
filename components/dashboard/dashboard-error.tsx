@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router"
 import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -30,13 +29,13 @@ export function DashboardError({
       <div className="flex flex-wrap gap-2">
         <Button onClick={reset}>Try again</Button>
         {showJobs ? (
-          <Link
-            to="/dashboard/jobs"
+          <a
+            href="/dashboard/jobs"
             className={buttonVariants({ variant: "outline" })}
           >
             <DatabaseZapIcon data-icon="inline-start" />
             Open Database jobs
-          </Link>
+          </a>
         ) : null}
       </div>
     </div>

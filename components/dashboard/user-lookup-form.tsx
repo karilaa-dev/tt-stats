@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react"
 import { useForm, useStore } from "@tanstack/react-form"
-import { useNavigate } from "@tanstack/react-router"
+import { useDashboardNavigate, useHydrated } from "@/lib/dashboard-context"
 import { SearchIcon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -22,7 +22,8 @@ export function UserLookupForm({
   initialId: string
   searching: boolean
 }) {
-  const navigate = useNavigate({ from: "/dashboard/users" })
+  const navigate = useDashboardNavigate()
+  const hydrated = useHydrated()
   const navigatedId = useRef(initialId)
   const form = useForm({
     defaultValues: { id: initialId },
@@ -89,6 +90,7 @@ export function UserLookupForm({
                   </FieldLabel>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Input
+                      disabled={!hydrated}
                       id={field.name}
                       name={field.name}
                       value={field.state.value}

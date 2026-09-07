@@ -1,5 +1,4 @@
 import { Client } from "pg"
-import { definePlugin } from "nitro"
 
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { getDbEnv, getVideoMonitorEnv } from "@/lib/env"
@@ -15,7 +14,8 @@ function safeCode(error: unknown): string {
     : "unknown"
 }
 
-export default definePlugin((nitroApp) => {
+export function startVideoInactivityMonitor():
+  (() => Promise<void>) | undefined {
   if (isFakeDataEnabled()) return
 
   let notificationEnv
@@ -127,7 +127,7 @@ export default definePlugin((nitroApp) => {
 
   void connectListener()
 
-  nitroApp.hooks.hook("close", async () => {
+  return async () => {
     closed = true
     if (reconnectTimer) clearTimeout(reconnectTimer)
     reconnectTimer = null
@@ -142,5 +142,5 @@ export default definePlugin((nitroApp) => {
         .filter((client): client is Client => client !== null)
         .map((client) => client.end().catch(() => undefined))
     )
-  })
-})
+  }
+}

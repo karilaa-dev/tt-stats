@@ -1,5 +1,8 @@
+import {
+  useDashboardSearch,
+  useDashboardNavigate,
+} from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -12,33 +15,11 @@ import {
   statsBreakdownQueryOptions,
   timeSeriesQueryOptions,
 } from "@/lib/stats/query-options"
-import { parseStatsRange } from "@/lib/stats/validation"
 
-export const Route = createFileRoute("/dashboard/analytics")({
-  head: () => ({ meta: [{ title: "Analytics · TT Stats" }] }),
-  validateSearch: (search) => ({ range: parseStatsRange(search.range) }),
-  loaderDeps: ({ search: { range } }) => ({ range }),
-  loader: ({ context, deps: { range } }) => {
-    void context.queryClient.prefetchQuery(
-      timeSeriesQueryOptions("users", range)
-    )
-    void context.queryClient.prefetchQuery(
-      timeSeriesQueryOptions("videos", range)
-    )
-    void context.queryClient.prefetchQuery(
-      timeSeriesQueryOptions("music", range)
-    )
-    void context.queryClient.prefetchQuery(
-      statsBreakdownQueryOptions("all", range)
-    )
-  },
-  component: AnalyticsPage,
-})
-
-function AnalyticsPage() {
+export function AnalyticsPage() {
   const time = useBrowserTime()
-  const { range } = Route.useSearch()
-  const navigate = Route.useNavigate()
+  const { range } = useDashboardSearch()
+  const navigate = useDashboardNavigate()
   const usersQuery = useQuery(timeSeriesQueryOptions("users", range))
   const videosQuery = useQuery(timeSeriesQueryOptions("videos", range))
   const musicQuery = useQuery(timeSeriesQueryOptions("music", range))
@@ -51,7 +32,7 @@ function AnalyticsPage() {
     <>
       <PageHeading
         title="Analytics"
-        description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
+        description={`Registrations and downloads over time. Times shown in ${time.timeZone}.`}
       />
       <StatsFilters
         range={range}

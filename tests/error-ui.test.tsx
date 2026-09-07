@@ -6,12 +6,6 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DATABASE_ERROR_COPY, isSafeDatabaseError } from "@/lib/db/errors"
 
-vi.mock("@tanstack/react-router", () => ({
-  Link: ({ to, ...props }: { to: string; children?: React.ReactNode }) => (
-    <a href={to} {...props} />
-  ),
-}))
-
 describe("dashboard infrastructure failures", () => {
   afterEach(cleanup)
 

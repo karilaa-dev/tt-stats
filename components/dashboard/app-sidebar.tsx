@@ -1,4 +1,3 @@
-import { Link, useRouterState } from "@tanstack/react-router"
 import {
   BarChart3Icon,
   ChartNoAxesCombinedIcon,
@@ -7,22 +6,20 @@ import {
   ListFilterIcon,
   SearchIcon,
   Share2Icon,
+  ActivityIcon,
 } from "lucide-react"
-
+import { BounceSidebar } from "@/components/ui/bounce-sidebar"
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { useDashboardContext } from "@/lib/dashboard-context"
 
 const navigation = [
+  { label: "Activity", heading: true as const },
   { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
   {
     href: "/dashboard/analytics",
@@ -30,64 +27,57 @@ const navigation = [
     icon: ChartNoAxesCombinedIcon,
   },
   { href: "/dashboard/detailed", label: "Detailed", icon: ListFilterIcon },
+  { label: "Audience", heading: true as const },
   { href: "/dashboard/users", label: "User lookup", icon: SearchIcon },
   { href: "/dashboard/referrals", label: "Referrals", icon: Share2Icon },
   { href: "/dashboard/other", label: "Other stats", icon: BarChart3Icon },
+  { label: "Operations", heading: true as const },
   { href: "/dashboard/jobs", label: "Database jobs", icon: DatabaseZapIcon },
 ]
-
 export function AppSidebar() {
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
+  const { pathname, fakeMode } = useDashboardContext()
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              render={<Link to="/dashboard" />}
-              tooltip="TT Stats"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                <BarChart3Icon />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">TT Stats</span>
-                <span className="truncate text-xs">Operations dashboard</span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader>
+        <a
+          href="/dashboard"
+          className="brand-lockup"
+          aria-label="TT Stats overview"
+        >
+          <span className="brand-mark" aria-hidden="true">
+            <BarChart3Icon />
+          </span>
+          <span>
+            <strong>TT Stats</strong>
+            <small>Bot operations</small>
+          </span>
+        </a>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Statistics</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navigation.map((item) => {
-                const active =
-                  item.href === "/dashboard"
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href)
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      isActive={active}
-                      tooltip={item.label}
-                      render={<Link to={item.href} />}
-                    >
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                )
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <nav aria-label="Main navigation" className="px-3 py-5">
+          <BounceSidebar
+            items={navigation}
+            value={Math.max(
+              0,
+              navigation.findIndex((item) => item.href === pathname)
+            )}
+            dotColor="var(--primary)"
+          />
+        </nav>
       </SidebarContent>
+      <SidebarFooter>
+        <div className="sidebar-status">
+          <ActivityIcon aria-hidden="true" />
+          <span>
+            {fakeMode ? "Demo workspace" : "tt-bot workspace"}
+            <small>
+              {fakeMode
+                ? "Explore with sample data"
+                : "Download activity & audience"}
+            </small>
+          </span>
+        </div>
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   )

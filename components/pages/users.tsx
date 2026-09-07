@@ -1,5 +1,8 @@
+import {
+  useDashboardSearch,
+  useDashboardNavigate,
+} from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
 import type { LucideIcon } from "lucide-react"
 import {
   CalendarClockIcon,
@@ -47,31 +50,9 @@ import { parseTelegramId } from "@/lib/stats/validation"
 
 const DOWNLOADS_PAGE_SIZE = 8
 
-export const Route = createFileRoute("/dashboard/users")({
-  head: () => ({ meta: [{ title: "User lookup · TT Stats" }] }),
-  validateSearch: (search) => {
-    const rawPage = Number(search.page)
-    return {
-      id: typeof search.id === "string" ? search.id : "",
-      page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
-    }
-  },
-  loaderDeps: ({ search: { id, page } }) => ({ id: id.trim(), page }),
-  loader: ({ context, deps: { id, page } }) => {
-    const userId = id ? parseTelegramId(id) : null
-    if (!userId) return
-
-    void context.queryClient.prefetchQuery(userStatsQueryOptions(userId))
-    void context.queryClient.prefetchQuery(
-      userDownloadsQueryOptions(userId, page, DOWNLOADS_PAGE_SIZE)
-    )
-  },
-  component: UsersPage,
-})
-
-function UsersPage() {
-  const { id, page } = Route.useSearch()
-  const navigate = Route.useNavigate()
+export function UsersPage() {
+  const { id, page } = useDashboardSearch()
+  const navigate = useDashboardNavigate()
   const requested = id.trim()
   const userId = requested ? parseTelegramId(requested) : null
   const userQuery = useQuery({
@@ -87,7 +68,7 @@ function UsersPage() {
     <>
       <PageHeading
         title="User lookup"
-        description="Look up private users and groups without converting Telegram IDs to JavaScript numbers."
+        description="Find a Telegram user or group and browse their download history."
       />
       <UserLookupForm
         initialId={requested}

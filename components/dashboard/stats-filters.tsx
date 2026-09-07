@@ -41,7 +41,7 @@ export function StatsFilters({
               <ToggleGroup
                 value={[scope]}
                 onValueChange={(values) =>
-                  values[0] && onScopeChange?.(values[0] as ChatScope)
+                  onScopeChange?.((values[0] as ChatScope | undefined) ?? scope)
                 }
                 variant="outline"
                 spacing={0}
@@ -60,7 +60,7 @@ export function StatsFilters({
             <ToggleGroup
               value={[range]}
               onValueChange={(values) =>
-                values[0] && onRangeChange(values[0] as StatsRange)
+                onRangeChange((values[0] as StatsRange | undefined) ?? range)
               }
               variant="outline"
               spacing={0}

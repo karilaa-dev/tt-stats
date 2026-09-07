@@ -39,3 +39,8 @@ pnpm-debug.log*
 
 # typescript
 *.tsbuildinfo
+
+# Astro
+/.astro/
+/test-results/
+/playwright-report/

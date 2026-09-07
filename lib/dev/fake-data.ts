@@ -1,4 +1,4 @@
-import "@tanstack/react-start/server-only"
+import "@/lib/server-only"
 
 import type { HistoryCsvRow } from "@/lib/csv/format"
 import { bucketSecondsForRange } from "@/lib/stats/time-series"

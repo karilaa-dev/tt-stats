@@ -16,10 +16,6 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined }),
   useQueryClient: () => ({ refetchQueries: vi.fn() }),
 }))
-vi.mock("@tanstack/react-router", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
-  useRouterState: () => "/dashboard",
-}))
 vi.mock("next-themes", () => ({ useTheme: () => ({ setTheme: vi.fn() }) }))
 vi.mock("@/components/ui/sidebar", () => ({
   SidebarTrigger: () => <button>Sidebar</button>,

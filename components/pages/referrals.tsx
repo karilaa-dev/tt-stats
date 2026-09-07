@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
 import { Share2Icon } from "lucide-react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
@@ -22,22 +21,14 @@ import {
 } from "@/components/ui/empty"
 import { referralStatsQueryOptions } from "@/lib/stats/query-options"
 
-export const Route = createFileRoute("/dashboard/referrals")({
-  head: () => ({ meta: [{ title: "Referrals · TT Stats" }] }),
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery(referralStatsQueryOptions())
-  },
-  component: ReferralsPage,
-})
-
-function ReferralsPage() {
+export function ReferralsPage() {
   const referralsQuery = useQuery(referralStatsQueryOptions())
   const rows = referralsQuery.data
   return (
     <>
       <PageHeading
         title="Referrals"
-        description="The ten most common non-null referral values."
+        description="See which referrals bring users to your bot."
       />
       {referralsQuery.isError && !rows ? (
         <DashboardError
@@ -51,7 +42,7 @@ function ReferralsPage() {
           <CardHeader>
             <CardTitle>Referral ranking</CardTitle>
             <CardDescription>
-              Deterministic ordering when counts are equal.
+              Top referrals by registered chats.
             </CardDescription>
           </CardHeader>
           <CardContent>

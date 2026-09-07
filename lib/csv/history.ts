@@ -1,4 +1,4 @@
-import "@tanstack/react-start/server-only"
+import "@/lib/server-only"
 
 import { Readable } from "node:stream"
 import { finished } from "node:stream/promises"

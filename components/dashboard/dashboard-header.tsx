@@ -4,7 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { useHydrated, useRouterState } from "@tanstack/react-router"
+import { useHydrated, useDashboardContext } from "@/lib/dashboard-context"
 import { useTheme } from "next-themes"
 import { MonitorIcon, MoonIcon, RefreshCwIcon, SunIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -69,9 +69,7 @@ function isSnapshotQuery(query: { queryKey: readonly unknown[] }) {
 
 export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
   const hydrated = useHydrated()
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
+  const { pathname } = useDashboardContext()
   const queryClient = useQueryClient()
   const time = useBrowserTime()
   const metadataQuery = useQuery(snapshotMetadataQueryOptions())

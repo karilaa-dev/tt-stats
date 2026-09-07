@@ -16,6 +16,7 @@ const periodOptions = [
 for (const route of dashboardRoutes) {
   test(`${route} stays within the viewport`, async ({ page }) => {
     await page.goto(route)
+    await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
 
     const layout = await page.evaluate(() => ({
       viewportWidth: window.innerWidth,
@@ -33,6 +34,7 @@ for (const route of ["/dashboard/detailed", "/dashboard/analytics"]) {
     page,
   }) => {
     await page.goto(route)
+    await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
     const selector = page.getByRole("group", { name: "Statistics period" })
     await expect(selector.getByRole("button")).toHaveCount(4)
 

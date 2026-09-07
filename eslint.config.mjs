@@ -16,6 +16,8 @@ export default defineConfig([
     ".tanstack/**",
     ".next/**",
     "dist/**",
-    "src/routeTree.gen.ts",
+    ".astro/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ])

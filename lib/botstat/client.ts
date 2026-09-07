@@ -1,4 +1,4 @@
-import "@tanstack/react-start/server-only"
+import "@/lib/server-only"
 
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { getBotstatEnv, type BotstatEnv } from "@/lib/env"

@@ -1,5 +1,8 @@
+import {
+  useDashboardSearch,
+  useDashboardNavigate,
+} from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
 import { FilesIcon, LanguagesIcon, TrophyIcon } from "lucide-react"
 
 import { BotstatCard } from "@/components/dashboard/botstat-card"
@@ -20,25 +23,11 @@ import { otherStatsQueryOptions } from "@/lib/stats/query-options"
 
 const PAGE_SIZE = 20
 
-export const Route = createFileRoute("/dashboard/other")({
-  head: () => ({ meta: [{ title: "Other stats · TT Stats" }] }),
-  validateSearch: (search) => {
-    const rawPage = Number(search.page)
-    return {
-      page: Number.isInteger(rawPage) && rawPage > 0 ? rawPage : 1,
-    }
-  },
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery(otherStatsQueryOptions())
-  },
-  component: OtherPage,
-})
-
-function OtherPage() {
+export function OtherPage() {
   const statsQuery = useQuery(otherStatsQueryOptions())
   const stats = statsQuery.data
-  const { page: requestedPage } = Route.useSearch()
-  const navigate = Route.useNavigate()
+  const { page: requestedPage } = useDashboardSearch()
+  const navigate = useDashboardNavigate()
   const totalPages = Math.max(
     1,
     Math.ceil((stats?.languages.length ?? 0) / PAGE_SIZE)
@@ -49,7 +38,7 @@ function OtherPage() {
     <>
       <PageHeading
         title="Other statistics"
-        description="File mode, language distribution, top downloaders, and manual Botstat verification."
+        description="Audience languages, download leaders, and file preferences."
       />
       {statsQuery.isError && !stats ? (
         <DashboardError

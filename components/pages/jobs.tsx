@@ -1,5 +1,5 @@
+import { useDashboardContext } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute, getRouteApi } from "@tanstack/react-router"
 import { DatabaseZapIcon } from "lucide-react"
 
 import { DatabaseSetupCard } from "@/components/dashboard/database-setup-card"
@@ -16,18 +16,17 @@ import {
 import { getVideoNotificationStatus } from "@/lib/notifications/functions"
 import { getVideoMonitorDatabaseStatus } from "@/lib/notifications/status"
 
-export const Route = createFileRoute("/dashboard/jobs")({
-  head: () => ({ meta: [{ title: "Database jobs · TT Stats" }] }),
-  loader: async ({ context }) => {
-    void context.queryClient.prefetchQuery(databaseSetupQueryOptions())
-    return getVideoNotificationStatus()
-  },
-  component: DatabaseJobsPage,
-})
-
-function DatabaseJobsPage() {
-  const { fakeMode } = getRouteApi("/dashboard").useLoaderData()
-  const notificationStatus = Route.useLoaderData()
+export function DatabaseJobsPage() {
+  const { fakeMode } = useDashboardContext()
+  const notificationQuery = useQuery({
+    queryKey: ["video-notification-status"],
+    queryFn: getVideoNotificationStatus,
+  })
+  const notificationStatus = notificationQuery.data ?? {
+    configured: false,
+    provider: null,
+    configurationError: false,
+  }
   const setupQuery = useQuery(databaseSetupQueryOptions())
   const canLoadJobs = Boolean(
     setupQuery.data?.appConnection.ok &&
@@ -46,7 +45,7 @@ function DatabaseJobsPage() {
     <>
       <PageHeading
         title="Database jobs"
-        description="Manage the two fixed PostgreSQL snapshot jobs without exposing arbitrary SQL or unrelated cron jobs."
+        description="Check database health and manage automatic statistics updates."
       />
       {fakeMode ? (
         <Alert className="mb-6">

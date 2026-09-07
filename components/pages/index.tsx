@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query"
-import { createFileRoute } from "@tanstack/react-router"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -8,22 +7,14 @@ import { StatsCards } from "@/components/dashboard/stats-cards"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { overviewQueryOptions } from "@/lib/stats/query-options"
 
-export const Route = createFileRoute("/dashboard/")({
-  head: () => ({ meta: [{ title: "Overview · TT Stats" }] }),
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery(overviewQueryOptions())
-  },
-  component: OverviewPage,
-})
-
-function OverviewPage() {
+export function OverviewPage() {
   const overviewQuery = useQuery(overviewQueryOptions())
   const overview = overviewQuery.data
   return (
     <>
       <PageHeading
         title="Overview"
-        description="Private users and groups through the latest completed database windows."
+        description="Track your bot’s audience and download activity."
       />
       {overviewQuery.isError && !overview ? (
         <DashboardError

@@ -10,15 +10,23 @@ intentionally has no login system; access control belongs at the reverse proxy.
 
 ## Stack
 
-- Node.js 22+, TanStack Start, TanStack Router, React, TypeScript, Vite, and Nitro
-- TanStack Query for non-blocking SSR hydration, background refreshes, and previous-data retention
+- Node.js 22.12+, [Astro](https://astro.build/) with the Node adapter, React islands, and TypeScript
+- Astro Actions for validated server calls; TanStack Query for background refreshes and previous-data retention
 - TanStack Charts for accessible responsive SVG time series
 - TanStack Table for ranked data and pagination
 - TanStack Form for the Telegram chat lookup
-- shadcn/ui `base-nova` with Base UI and Tailwind CSS 4
+- [Rare UI](https://www.rareui.com/) Bounce Sidebar and Animated Counter, with Base UI controls and Tailwind CSS 4
 - PostgreSQL through `pg`
 
 TanStack Charts is currently pre-alpha. The lockfile pins the tested release used by this project.
+
+## App structure
+
+Astro routes live in `src/pages`. Each dashboard page hydrates its own React island, sharing the shell in `components/dashboard/dashboard-shell.tsx`. Filters and lookup pagination stay in the URL and support browser back/forward. `src/actions` validates server inputs and calls the existing PostgreSQL query layer. Database and credential modules are blocked from browser builds.
+
+The notification monitor starts with the dev server and with `npm start`, and closes its listeners on shutdown. `npm run build` bundles it separately as `dist/monitor.mjs`.
+
+Rare UI source is checked into `components/ui/bounce-sidebar.tsx` and `components/ui/animated-counter.tsx`. The sidebar uses native links and respects reduced motion. Counters retain exact text for counts beyond JavaScript's safe integer range. Both components are adapted from the [Rare UI registry](https://www.rareui.com/components).
 
 ## Requirements
 
@@ -235,13 +243,13 @@ The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"
 
 ## Reverse-proxy authentication
 
-The application contains no login page, credentials, cookies, sessions, middleware guards, or authorization checks. The CSV endpoint and TanStack server functions are also unguarded at the application layer.
+The application contains no login page, credentials, cookies, sessions, middleware guards, or authorization checks. The CSV endpoint and Astro Actions at `/_actions/*` are also unguarded at the application layer.
 
-Keep the application origin private and make the reverse proxy the only network path to it. Protect the entire origin, not only `/dashboard`; if the health check must remain public, exempt only `/api/health`. Forward the original host/protocol headers and do not expose the Nitro listener directly to an untrusted network.
+Keep the application origin private and make the reverse proxy the only network path to it. Protect the entire origin, not only `/dashboard`; if the health check must remain public, exempt only `/api/health`. Forward the original host/protocol headers and do not expose the Node listener directly to an untrusted network.
 
 ## Dokploy and Railpack
 
-Connect this repository as a Node.js application. The package scripts build with Vite and start Nitro's Node server from `.output/server/index.mjs`; the server honors the platform-provided `PORT`.
+Connect this repository as a Node.js application. `npm run build` builds Astro and the notification monitor. `npm start` starts the monitor and Astro's standalone Node server from `dist/server/entry.mjs`. Set `HOST=0.0.0.0` and the platform-provided `PORT`. Supply production secrets through the platform environment; the standalone server does not read `.env.local`.
 
 The checked-in `railpack.json` keeps development dependencies available during the image build, even when the deployment environment sets npm's legacy `production` option. Vite and the Tailwind/Vite plugins are build-time dependencies and must be installed before `npm run build`.
 
@@ -258,6 +266,9 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 - Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
 
 ## Attribution and license
+
+The Bounce Sidebar and Animated Counter are from [Rare UI](https://www.rareui.com/), by Swami Malode. Their source has been adapted for Astro navigation, dashboard icons, accessibility, and reduced motion. Rare UI permits personal and commercial use and modification; do not resell its components as a kit.
+
 
 TT Stats is adapted from the database-backed statistics in [`tt-bot` v5.4.6](https://github.com/karilaa-dev/tt-bot/tree/v5.4.6/stats), created by Kyryl Andreiev. Changes include a web interface, current v6 schema mapping, completed UTC-duration buckets displayed in each visitor's timezone, PostgreSQL-managed snapshots, streaming CSV, and constrained job controls.
 

@@ -1,0 +1,15 @@
+---
+import Layout from "@/src/layouts/base.astro"
+import Dashboard from "@/components/pages/analytics-island"
+import { isFakeDataEnabled } from "@/lib/dev/fake-data"
+const pathname = Astro.url.pathname.replace(/\/$/, "")
+---
+
+<Layout title="Analytics · TT Stats">
+  <Dashboard
+    client:load
+    pathname={pathname}
+    search={Astro.url.search}
+    fakeMode={isFakeDataEnabled()}
+  />
+</Layout>
