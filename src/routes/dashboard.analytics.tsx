@@ -49,21 +49,17 @@ function AnalyticsPage() {
 
   return (
     <>
-      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <PageHeading
-          title="Analytics"
-          description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
-          className="mb-0 xl:min-w-0"
-        />
-        <StatsFilters
-          range={range}
-          showScope={false}
-          className="mb-0 w-full xl:w-auto xl:min-w-max xl:shrink-0"
-          onRangeChange={(nextRange) =>
-            navigate({ search: { range: nextRange } })
-          }
-        />
-      </div>
+      <PageHeading
+        title="Analytics"
+        description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
+      />
+      <StatsFilters
+        range={range}
+        showScope={false}
+        onRangeChange={(nextRange) =>
+          navigate({ search: { range: nextRange } })
+        }
+      />
       {failed ? (
         <DashboardError
           error={queries.find((query) => query.isError)?.error}
