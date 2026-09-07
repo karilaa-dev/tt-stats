@@ -7,37 +7,65 @@ import {
   SearchIcon,
   Share2Icon,
   ActivityIcon,
+  ArrowUpRightIcon,
 } from "lucide-react"
-import { BounceSidebar } from "@/components/ui/bounce-sidebar"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
 import { useDashboardContext } from "@/lib/dashboard-context"
 
 const navigation = [
-  { label: "Activity", heading: true as const },
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
   {
-    href: "/dashboard/analytics",
-    label: "Analytics",
-    icon: ChartNoAxesCombinedIcon,
+    label: "Activity",
+    items: [
+      { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
+      {
+        href: "/dashboard/analytics",
+        label: "Trends",
+        icon: ChartNoAxesCombinedIcon,
+      },
+      { href: "/dashboard/detailed", label: "Breakdown", icon: ListFilterIcon },
+    ],
   },
-  { href: "/dashboard/detailed", label: "Detailed", icon: ListFilterIcon },
-  { label: "Audience", heading: true as const },
-  { href: "/dashboard/users", label: "User lookup", icon: SearchIcon },
-  { href: "/dashboard/referrals", label: "Referrals", icon: Share2Icon },
-  { href: "/dashboard/other", label: "Other stats", icon: BarChart3Icon },
-  { label: "Operations", heading: true as const },
-  { href: "/dashboard/jobs", label: "Database jobs", icon: DatabaseZapIcon },
+  {
+    label: "Audience",
+    items: [
+      { href: "/dashboard/users", label: "User lookup", icon: SearchIcon },
+      { href: "/dashboard/referrals", label: "Referrals", icon: Share2Icon },
+      {
+        href: "/dashboard/other",
+        label: "Audience insights",
+        icon: BarChart3Icon,
+      },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      {
+        href: "/dashboard/jobs",
+        label: "Database jobs",
+        icon: DatabaseZapIcon,
+      },
+    ],
+  },
 ]
+
 export function AppSidebar() {
   const { pathname, fakeMode } = useDashboardContext()
+  const currentPath = pathname.replace(/\/$/, "")
   return (
-    <Sidebar collapsible="offcanvas">
+    <Sidebar collapsible="offcanvas" className="workspace-sidebar">
       <SidebarHeader>
         <a
           href="/dashboard"
@@ -48,35 +76,56 @@ export function AppSidebar() {
             <BarChart3Icon />
           </span>
           <span>
-            <strong>TT Stats</strong>
-            <small>Bot operations</small>
+            <strong>
+              TT Stats<span className="brand-period">.</span>
+            </strong>
+            <small>Bot analytics workspace</small>
           </span>
         </a>
       </SidebarHeader>
       <SidebarContent>
-        <nav aria-label="Main navigation" className="px-3 py-5">
-          <BounceSidebar
-            items={navigation}
-            value={Math.max(
-              0,
-              navigation.findIndex((item) => item.href === pathname)
-            )}
-            dotColor="var(--primary)"
-          />
+        <nav aria-label="Main navigation" className="workspace-navigation">
+          {navigation.map((group) => (
+            <SidebarGroup key={group.label}>
+              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map(({ href, label, icon: Icon }) => (
+                    <SidebarMenuItem key={href}>
+                      <SidebarMenuButton
+                        render={
+                          <a
+                            href={href}
+                            aria-current={
+                              currentPath === href ? "page" : undefined
+                            }
+                          />
+                        }
+                        isActive={currentPath === href}
+                        className="workspace-nav-link h-11 gap-3 px-3"
+                      >
+                        <Icon aria-hidden="true" />
+                        <span>{label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))}
         </nav>
       </SidebarContent>
       <SidebarFooter>
-        <div className="sidebar-status">
+        <a className="sidebar-status" href="/dashboard/jobs">
           <ActivityIcon aria-hidden="true" />
           <span>
             {fakeMode ? "Demo workspace" : "tt-bot workspace"}
             <small>
-              {fakeMode
-                ? "Explore with sample data"
-                : "Download activity & audience"}
+              {fakeMode ? "Exploring sample data" : "Schedules & notifications"}
             </small>
           </span>
-        </div>
+          <ArrowUpRightIcon aria-hidden="true" />
+        </a>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

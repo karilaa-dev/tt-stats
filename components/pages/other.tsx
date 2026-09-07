@@ -37,7 +37,7 @@ export function OtherPage() {
   return (
     <>
       <PageHeading
-        title="Other statistics"
+        title="Audience insights"
         description="Audience languages, download leaders, and file preferences."
       />
       {statsQuery.isError && !stats ? (

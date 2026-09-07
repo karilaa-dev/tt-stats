@@ -52,38 +52,38 @@
 }
 
 :root {
-  --background: #f3f7fa;
-  --foreground: #203447;
+  --background: #f6f8fc;
+  --foreground: #172b45;
   --card: #ffffff;
-  --card-foreground: #203447;
+  --card-foreground: #172b45;
   --popover: #ffffff;
-  --popover-foreground: #203447;
-  --primary: #087f8c;
+  --popover-foreground: #172b45;
+  --primary: #315ed0;
   --primary-foreground: #ffffff;
-  --secondary: #e4eef3;
-  --secondary-foreground: #203447;
-  --muted: #eaf1f5;
-  --muted-foreground: #5b7082;
-  --accent: #dceff0;
-  --accent-foreground: #075d67;
-  --destructive: #bd374d;
-  --border: #dce5ed;
-  --input: #cddbe5;
-  --ring: #087f8c;
-  --chart-1: #087f8c;
-  --chart-2: #5477c4;
-  --chart-3: #ac709f;
-  --chart-4: #c08b36;
-  --chart-5: #bd374d;
-  --radius: 0.75rem;
-  --sidebar: #edf3f7;
-  --sidebar-foreground: #203447;
-  --sidebar-primary: #087f8c;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #dceff0;
-  --sidebar-accent-foreground: #075d67;
-  --sidebar-border: #dce5ed;
-  --sidebar-ring: #087f8c;
+  --secondary: #e9effb;
+  --secondary-foreground: #284a94;
+  --muted: #eef2f7;
+  --muted-foreground: #607086;
+  --accent: #e8eefb;
+  --accent-foreground: #284a94;
+  --destructive: #b83246;
+  --border: #dfe6ef;
+  --input: #cbd5e3;
+  --ring: #315ed0;
+  --chart-1: #315ed0;
+  --chart-2: #14817b;
+  --chart-3: #8960bb;
+  --chart-4: #a9731b;
+  --chart-5: #b83246;
+  --radius: 0.625rem;
+  --sidebar: #172b45;
+  --sidebar-foreground: #d7e2f2;
+  --sidebar-primary: #9cbaff;
+  --sidebar-primary-foreground: #172b45;
+  --sidebar-accent: #2b4569;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #30445f;
+  --sidebar-ring: #9cbaff;
 }
 
 .dark {
@@ -93,7 +93,7 @@
   --card-foreground: oklch(0.96 0.01 255);
   --popover: oklch(0.2 0.022 265);
   --popover-foreground: oklch(0.96 0.01 255);
-  --primary: oklch(0.74 0.12 190);
+  --primary: #9cbaff;
   --primary-foreground: oklch(0.16 0.03 265);
   --secondary: oklch(0.27 0.035 265);
   --secondary-foreground: oklch(0.985 0 0);
@@ -104,8 +104,8 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.68 0.12 190);
-  --chart-1: oklch(0.74 0.12 190);
+  --ring: #9cbaff;
+  --chart-1: #9cbaff;
   --chart-2: oklch(0.72 0.14 220);
   --chart-3: oklch(0.73 0.16 155);
   --chart-4: oklch(0.79 0.15 78);
@@ -136,69 +136,104 @@
   .brand-lockup {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 1.15rem 0.75rem;
+    gap: 0.7rem;
+    padding: 1.1rem 0.7rem 1.4rem;
+    color: var(--sidebar-accent-foreground);
   }
   .brand-mark {
     display: grid;
     place-items: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 0.85rem;
-    background: var(--primary);
-    color: var(--primary-foreground);
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 1px solid var(--sidebar-border);
+    border-radius: 0.6rem;
+    background: var(--sidebar-accent);
+    color: var(--sidebar-primary);
+  }
+  .brand-mark svg {
+    width: 1.2rem;
+    height: 1.2rem;
   }
   .brand-lockup strong {
     font-family: var(--font-heading);
-    font-size: 1.125rem;
+    font-size: 1.2rem;
     font-weight: 800;
     letter-spacing: -0.04em;
   }
+  .brand-period {
+    color: var(--sidebar-primary);
+  }
   .brand-lockup small {
     display: block;
-    font-size: 0.7rem;
-    color: var(--muted-foreground);
-    margin-top: 0.1rem;
+    font-size: 0.65rem;
+    color: var(--sidebar-foreground);
+    margin-top: 0.15rem;
   }
-  [data-slot="bounce-sidebar-item"] {
-    gap: 0.75rem;
-    padding: 0.75rem;
-    color: var(--muted-foreground);
-    font-weight: 500;
+  .workspace-navigation {
+    padding: 0 0.45rem;
   }
-  [data-slot="bounce-sidebar-item"] svg {
-    width: 1.05rem;
-    height: 1.05rem;
-    flex-shrink: 0;
+  .workspace-navigation [data-slot="sidebar-group"] {
+    padding-bottom: 1.25rem;
   }
-  [data-slot="bounce-sidebar-item"][data-active="true"],
-  [data-slot="bounce-sidebar-item"]:hover {
-    background: var(--accent);
-    color: var(--accent-foreground);
+  .workspace-navigation [data-slot="sidebar-group-label"] {
+    color: var(--sidebar-foreground);
+    font-size: 0.65rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding-left: 0.8rem;
+    opacity: 0.7;
   }
-  [data-slot="bounce-sidebar-heading"] {
-    color: var(--muted-foreground) !important;
+  .workspace-nav-link {
+    height: 2.75rem;
+    padding-inline: 0.8rem;
+    gap: 0.8rem;
+    border-radius: 0.45rem;
+    transition:
+      background-color 140ms,
+      color 140ms;
+  }
+  .workspace-nav-link[data-active="true"] {
+    box-shadow: inset 3px 0 0 var(--sidebar-primary);
+    font-weight: 600;
   }
   .sidebar-status {
     display: flex;
     align-items: center;
-    gap: 0.7rem;
-    margin: 0.5rem;
-    padding: 1rem 0.3rem;
-    border-top: 1px solid var(--border);
+    gap: 0.65rem;
+    margin: 0.35rem;
+    padding: 1rem 0.5rem;
+    border-top: 1px solid var(--sidebar-border);
+    color: var(--sidebar-foreground);
     font-size: 0.75rem;
     font-weight: 600;
   }
   .sidebar-status svg {
-    width: 1.15rem;
-    color: var(--primary);
+    width: 1.1rem;
+    flex-shrink: 0;
+    color: var(--sidebar-primary);
+  }
+  .sidebar-status svg:last-child {
+    margin-left: auto;
+    width: 0.85rem;
   }
   .sidebar-status small {
     display: block;
     margin-top: 0.2rem;
-    color: var(--muted-foreground);
+    opacity: 0.75;
     font-weight: 400;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
+  }
+  .workspace-header {
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--border), transparent 60%);
+  }
+  .workspace-header [data-slot="button"] {
+    min-height: 2.25rem;
+  }
+  .page-heading h1 {
+    line-height: 1.15;
+  }
+  .dashboard-main {
+    min-width: 0;
   }
   .dashboard-main h1 {
     font-family: var(--font-heading);
@@ -240,5 +275,16 @@
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .workspace-header [data-slot="button"] {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+  .dashboard-footer {
+    margin-inline: 1rem;
+    font-size: 0.65rem;
   }
 }

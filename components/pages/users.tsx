@@ -22,7 +22,7 @@ import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Card,
   CardAction,
@@ -40,6 +40,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import {
   userDownloadsQueryOptions,
@@ -62,30 +63,42 @@ export function UsersPage() {
   const downloadsQuery = useQuery({
     ...userDownloadsQueryOptions(userId ?? "0", page, DOWNLOADS_PAGE_SIZE),
     enabled: Boolean(userId),
+    placeholderData: (previousData, previousQuery) =>
+      previousQuery?.queryKey[2] === userId ? previousData : undefined,
   })
 
   return (
     <>
       <PageHeading
         title="User lookup"
-        description="Find a Telegram user or group and browse their download history."
+        description="Investigate a chat's activity, preferences, and download history."
       />
       <UserLookupForm
         initialId={requested}
         searching={Boolean(userId) && userQuery.isFetching}
       />
       {!requested ? (
-        <Empty className="border">
+        <Empty className="min-h-72 border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <UserRoundSearchIcon />
             </EmptyMedia>
             <EmptyTitle>Enter an ID to begin</EmptyTitle>
             <EmptyDescription>
-              Both positive private-user IDs and negative group IDs are
-              supported.
+              Paste a Telegram user or group ID above. You'll see their chat
+              profile, recent downloads, and a CSV export of their history.
             </EmptyDescription>
           </EmptyHeader>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Badge variant="outline">
+              <UserIcon data-icon="inline-start" />
+              Private users
+            </Badge>
+            <Badge variant="outline">
+              <UsersIcon data-icon="inline-start" />
+              Groups
+            </Badge>
+          </div>
         </Empty>
       ) : !userId ? (
         <Empty className="border">
@@ -102,8 +115,18 @@ export function UsersPage() {
         <Alert variant="destructive">
           <UserRoundSearchIcon />
           <AlertTitle>Lookup failed</AlertTitle>
-          <AlertDescription>
-            The database could not complete this lookup. Try again in a moment.
+          <AlertDescription className="flex flex-col items-start gap-3">
+            <p>
+              The database could not complete this lookup. Try again in a
+              moment.
+            </p>
+            <Button
+              variant="outline"
+              disabled={userQuery.isFetching}
+              onClick={() => void userQuery.refetch()}
+            >
+              {userQuery.isFetching ? "Retrying…" : "Retry lookup"}
+            </Button>
           </AlertDescription>
         </Alert>
       ) : !userQuery.data ? (
@@ -111,7 +134,8 @@ export function UsersPage() {
           <EmptyHeader>
             <EmptyTitle>No matching chat</EmptyTitle>
             <EmptyDescription>
-              No user or group exists with ID {userId}.
+              No user or group exists with ID {userId}. Check the ID and include
+              the minus sign for a group.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -122,15 +146,27 @@ export function UsersPage() {
             <Alert variant="destructive">
               <FileArchiveIcon />
               <AlertTitle>Download history unavailable</AlertTitle>
-              <AlertDescription>
-                The user was found, but their recent downloads could not be
-                loaded.
+              <AlertDescription className="flex flex-col items-start gap-3">
+                <p>
+                  The user was found, but their recent downloads could not be
+                  loaded.
+                </p>
+                <Button
+                  variant="outline"
+                  disabled={downloadsQuery.isFetching}
+                  onClick={() => void downloadsQuery.refetch()}
+                >
+                  {downloadsQuery.isFetching ? "Retrying…" : "Retry history"}
+                </Button>
               </AlertDescription>
             </Alert>
           ) : (
             <UserDownloadsTable
               data={downloadsQuery.data}
               loading={downloadsQuery.isPending}
+              refreshing={
+                downloadsQuery.isFetching && !downloadsQuery.isPending
+              }
               onPageChange={(nextPage) =>
                 navigate({
                   search: (previous) => ({ ...previous, page: nextPage }),
@@ -150,7 +186,9 @@ function UserResult({ user }: { user: UserStats }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-mono text-lg">{user.userId}</CardTitle>
+        <CardTitle>
+          <span className="font-mono break-all">{user.userId}</span>
+        </CardTitle>
         <CardDescription>Telegram chat profile</CardDescription>
         <CardAction>
           <Badge variant="outline">
@@ -163,58 +201,66 @@ function UserResult({ user }: { user: UserStats }) {
           </Badge>
         </CardAction>
       </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Detail
-          icon={CalendarClockIcon}
-          label="Registered"
-          value={
-            user.registeredAt === null
-              ? "Unknown"
-              : formatTimestamp(user.registeredAt, time)
-          }
-        />
-        <Detail
-          icon={LanguagesIcon}
-          label="Language"
-          value={<LanguageValue value={user.language} />}
-        />
-        <Detail
-          icon={LinkIcon}
-          label="Referral"
-          value={user.referral ?? "None"}
-        />
-        <Detail
-          icon={FileArchiveIcon}
-          label="File mode"
-          value={
-            <Badge variant={user.fileMode ? "default" : "secondary"}>
-              {user.fileMode ? "Enabled" : "Disabled"}
-            </Badge>
-          }
-        />
-        <Detail
-          icon={DownloadIcon}
-          label="Downloads"
-          value={BigInt(user.downloads).toLocaleString("en-US")}
-        />
-        <Detail
-          icon={ImagesIcon}
-          label="Image albums"
-          value={BigInt(user.images).toLocaleString("en-US")}
-        />
+      <CardContent className="flex flex-col gap-5">
+        <dl className="grid grid-cols-2 gap-4">
+          <div>
+            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+              <DownloadIcon className="size-4" aria-hidden="true" />
+              Downloads
+            </dt>
+            <dd className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">
+              {BigInt(user.downloads).toLocaleString("en-US")}
+            </dd>
+          </div>
+          <div>
+            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ImagesIcon className="size-4" aria-hidden="true" />
+              Image albums
+            </dt>
+            <dd className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">
+              {BigInt(user.images).toLocaleString("en-US")}
+            </dd>
+          </div>
+        </dl>
+        <Separator />
+        <dl className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+          <Detail
+            icon={CalendarClockIcon}
+            label="Registered"
+            value={
+              user.registeredAt === null
+                ? "Unknown"
+                : formatTimestamp(user.registeredAt, time)
+            }
+          />
+          <Detail
+            icon={LanguagesIcon}
+            label="Language"
+            value={<LanguageValue value={user.language} />}
+          />
+          <Detail
+            icon={LinkIcon}
+            label="Referral"
+            value={user.referral ?? "None"}
+          />
+          <Detail
+            icon={FileArchiveIcon}
+            label="File mode"
+            value={
+              <Badge variant={user.fileMode ? "default" : "secondary"}>
+                {user.fileMode ? "Enabled" : "Disabled"}
+              </Badge>
+            }
+          />
+        </dl>
       </CardContent>
       <CardFooter>
-        <Button
-          nativeButton={false}
-          render={
-            <a
-              href={`/api/users/${encodeURIComponent(user.userId)}/history.csv`}
-            />
-          }
-          variant="outline"
+        <a
+          href={`/api/users/${encodeURIComponent(user.userId)}/history.csv`}
+          className={buttonVariants({ variant: "outline", size: "lg" })}
         >
           <DownloadIcon data-icon="inline-start" /> Download CSV history
-        </Button>
+        </a>
       </CardFooter>
     </Card>
   )
@@ -230,12 +276,12 @@ function Detail({
   value: React.ReactNode
 }) {
   return (
-    <div className="rounded-lg bg-muted/50 p-3">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+    <div>
+      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Icon className="size-3.5" aria-hidden="true" />
         {label}
-      </p>
-      <div className="mt-1.5 text-sm font-medium break-all">{value}</div>
+      </dt>
+      <dd className="mt-1.5 text-sm font-medium break-words">{value}</dd>
     </div>
   )
 }

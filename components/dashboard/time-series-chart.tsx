@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react"
-import { Chart } from "@tanstack/charts/react"
-import { scaleBand } from "@tanstack/charts/scales/band"
-import { scaleLinear } from "@tanstack/charts/scales/linear"
-import { tooltip } from "@tanstack/charts/tooltip"
-import { areaY, barY, crosshair, defineChart, lineY } from "@tanstack/charts"
+import {
+  lazy,
+  memo,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import {
   BarChart3Icon,
   ChartSplineIcon,
@@ -26,10 +29,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { formatChartBucket, useBrowserTime } from "@/lib/browser-time"
+import { useBrowserTime } from "@/lib/browser-time"
 import type { StatsRange, TimeSeriesPoint } from "@/lib/stats/types"
 
-export function TimeSeriesChart({
+const TimeSeriesPlot = lazy(() => import("./time-series-plot"))
+
+export const TimeSeriesChart = memo(function TimeSeriesChart({
   title,
   description,
   points,
@@ -44,14 +49,6 @@ export function TimeSeriesChart({
 }) {
   const [view, setView] = useState<"line" | "bars">("line")
   const time = useBrowserTime()
-  const data = useMemo(
-    () =>
-      points.map((point) => ({
-        ...point,
-        label: formatChartBucket(point.bucketEpoch, range, time, true),
-      })),
-    [points, range, time]
-  )
   const summary = useMemo(() => {
     const total = points.reduce((sum, point) => sum + point.count, 0)
     const peak = points.reduce<TimeSeriesPoint | null>(
@@ -78,93 +75,37 @@ export function TimeSeriesChart({
       ? "Daily completed intervals"
       : `${days}-day grouped intervals`
   }, [points, range])
-  const definition = useMemo(() => {
-    const marks =
-      view === "bars"
-        ? [
-            barY(data, {
-              id: "interval-counts",
-              x: "bucketEpoch",
-              y: "count",
-              fill: color,
-              fillOpacity: 0.82,
-              inset: 1,
-              radius: 3,
-            }),
-          ]
-        : [
-            areaY(data, {
-              id: "interval-area",
-              x: "bucketEpoch",
-              y: "count",
-              fill: color,
-              fillOpacity: 0.12,
-            }),
-            lineY(data, {
-              id: "interval-line",
-              x: "bucketEpoch",
-              y: "count",
-              stroke: color,
-              strokeWidth: 2.5,
-              points: data.length <= 200,
-            }),
-          ]
+  const plotRef = useRef<HTMLDivElement>(null)
+  const [visible, setVisible] = useState(false)
+  const [reducedMotion, setReducedMotion] = useState(true)
 
-    return defineChart({
-      marks: [
-        ...marks,
-        crosshair<number, number>({
-          x: {
-            stroke: "var(--muted-foreground)",
-            strokeOpacity: 0.4,
-            strokeDasharray: "4 4",
-          },
-          y: false,
-          marker: {
-            radius: 4,
-            fill: "var(--background)",
-            stroke: color,
-            strokeWidth: 2,
-          },
-        }),
-      ],
-      x: {
-        scale: () => scaleBand<number>().padding(view === "bars" ? 0.16 : 0.08),
-        axis: {
-          ticks: {
-            spacing: 72,
-            format: (value) => formatChartBucket(value, range, time),
-          },
-          tickLabels: { thin: { minGap: 12, priority: "ends" } },
-        },
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)")
+    const update = () => setReducedMotion(preference.matches)
+    update()
+    preference.addEventListener("change", update)
+    return () => preference.removeEventListener("change", update)
+  }, [])
+
+  useEffect(() => {
+    const plot = plotRef.current
+    if (!plot) return
+    if (!("IntersectionObserver" in window)) {
+      setVisible(true)
+      return
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setVisible(true)
+          observer.disconnect()
+        }
       },
-      y: {
-        scale: scaleLinear,
-        nice: true,
-        grid: true,
-        axis: {
-          label: "Count",
-          ticks: { format: (value) => value.toLocaleString("en-US") },
-        },
-      },
-      focus: "nearest-x",
-      maxFocusDistance: Number.POSITIVE_INFINITY,
-      tooltip: {
-        use: tooltip,
-        sticky: true,
-        placement: ["top", "right", "left", "bottom"],
-        items: [
-          { field: "label", label: "Local interval" },
-          {
-            channel: "y",
-            label: title,
-            text: (point) => Number(point.yValue).toLocaleString("en-US"),
-          },
-        ],
-      },
-      svgAnimation: data.length <= 240,
-    })
-  }, [color, data, range, time, title, view])
+      { rootMargin: "200px" }
+    )
+    observer.observe(plot)
+    return () => observer.disconnect()
+  }, [points.length])
 
   return (
     <Card>
@@ -202,12 +143,23 @@ export function TimeSeriesChart({
           <ChartSummary label="Peak" value={summary.peak?.count ?? 0} />
         </div>
         {points.length ? (
-          <Chart
-            definition={definition}
-            height={300}
-            ariaLabel={`${title}, ${time.timeZone} time series`}
-            ariaDescription="Use the pointer or arrow keys to inspect intervals. Click or press Enter to pin a value."
-          />
+          <div ref={plotRef} className="h-[300px] min-w-0">
+            <Suspense fallback={<ChartPlaceholder title={title} />}>
+              {visible ? (
+                <TimeSeriesPlot
+                  title={title}
+                  points={points}
+                  range={range}
+                  color={color}
+                  view={view}
+                  time={time}
+                  reducedMotion={reducedMotion}
+                />
+              ) : (
+                <ChartPlaceholder title={title} />
+              )}
+            </Suspense>
+          </div>
         ) : (
           <Empty>
             <EmptyHeader>
@@ -223,6 +175,18 @@ export function TimeSeriesChart({
         )}
       </CardContent>
     </Card>
+  )
+})
+
+function ChartPlaceholder({ title }: { title: string }) {
+  return (
+    <div
+      className="flex h-full items-center justify-center rounded-lg bg-muted/20 text-sm text-muted-foreground"
+      role="status"
+      aria-label={`Loading ${title.toLowerCase()} chart`}
+    >
+      Loading chart…
+    </div>
   )
 }
 

@@ -6,7 +6,14 @@ import {
 } from "@tanstack/react-query"
 import { useHydrated, useDashboardContext } from "@/lib/dashboard-context"
 import { useTheme } from "next-themes"
-import { MonitorIcon, MoonIcon, RefreshCwIcon, SunIcon } from "lucide-react"
+import {
+  MonitorIcon,
+  MoonIcon,
+  RefreshCwIcon,
+  SunIcon,
+  SearchIcon,
+  CheckIcon,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { Badge } from "@/components/ui/badge"
@@ -14,6 +21,7 @@ import { Button } from "@/components/ui/button"
 import {
   Breadcrumb,
   BreadcrumbItem,
+  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
@@ -43,11 +51,11 @@ import { isSnapshotStale } from "@/lib/stats/staleness"
 
 const labels: Record<string, string> = {
   "/dashboard": "Overview",
-  "/dashboard/analytics": "Analytics",
-  "/dashboard/detailed": "Detailed",
+  "/dashboard/analytics": "Trends",
+  "/dashboard/detailed": "Breakdown",
   "/dashboard/users": "User lookup",
   "/dashboard/referrals": "Referrals",
-  "/dashboard/other": "Other stats",
+  "/dashboard/other": "Audience insights",
   "/dashboard/jobs": "Database jobs",
 }
 
@@ -76,19 +84,19 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
   const fetching = useIsFetching({ predicate: isSnapshotQuery }) > 0
   const refreshMutation = useMutation({
     mutationFn: () =>
-      queryClient.refetchQueries({
-        predicate: isSnapshotQuery,
-        type: "active",
-      }),
+      queryClient.refetchQueries(
+        { predicate: isSnapshotQuery, type: "active" },
+        { throwOnError: true }
+      ),
     onError: () => {
       toast.error("The refresh failed. Existing statistics remain available.")
     },
-    onSuccess: () => toast.success("Snapshot views are up to date."),
+    onSuccess: () => toast.success("Statistics updated."),
   })
   // Fetch state can change between SSR and hydration as queries settle.
   const refreshing = hydrated && (fetching || refreshMutation.isPending)
-  const { setTheme } = useTheme()
-  const label = labels[pathname] ?? "Dashboard"
+  const { theme, setTheme } = useTheme()
+  const label = labels[pathname.replace(/\/$/, "")] ?? "Dashboard"
   const latestSnapshot =
     hydrated && metadataQuery.data?.length
       ? metadataQuery.data.reduce((latest, snapshot) =>
@@ -97,16 +105,17 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
       : undefined
   const staleSnapshot =
     hydrated &&
+    !fakeMode &&
     metadataQuery.data?.find((snapshot) => isSnapshotStale(snapshot))
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur sm:px-4">
+    <header className="workspace-header sticky top-0 z-20 flex min-h-16 shrink-0 items-center gap-2 border-b bg-background px-4 md:px-8">
       <SidebarTrigger />
       <Separator orientation="vertical" className="mr-1 h-4" />
       <Breadcrumb className="min-w-0 flex-1">
         <BreadcrumbList>
           <BreadcrumbItem className="hidden sm:inline-flex">
-            Dashboard
+            <BreadcrumbLink href="/dashboard">Workspace</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator className="hidden sm:list-item" />
           <BreadcrumbItem>
@@ -118,13 +127,17 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
         <Badge variant="outline" className="hidden sm:inline-flex">
           <Spinner /> Refreshing in background
         </Badge>
-      ) : latestSnapshot ? (
+      ) : latestSnapshot && !fakeMode ? (
         <span className="hidden text-xs text-muted-foreground lg:inline">
-          Snapshot {formatTimestamp(latestSnapshot.refreshedAt, time)}
+          Updated {formatTimestamp(latestSnapshot.refreshedAt, time)}
         </span>
       ) : null}
       {staleSnapshot ? (
-        <Badge variant="destructive">
+        <Badge
+          variant="destructive"
+          render={<a href="/dashboard/jobs" />}
+          title="Statistics are overdue for an update. Check database jobs."
+        >
           <span className="sm:hidden">Stale</span>
           <span className="hidden sm:inline">
             {staleSnapshot.dataset === "rolling_24h" ? "Rolling" : "Daily"}{" "}
@@ -132,7 +145,16 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
           </span>
         </Badge>
       ) : null}
-      {fakeMode ? <Badge variant="secondary">Fake data</Badge> : null}
+      {fakeMode ? <Badge variant="secondary">Demo data</Badge> : null}
+      <Button
+        variant="outline"
+        render={<a href="/dashboard/users" />}
+        nativeButton={false}
+        className="ml-2 hidden md:inline-flex"
+      >
+        <SearchIcon data-icon="inline-start" />
+        Find a user
+      </Button>
       <Tooltip>
         <TooltipTrigger
           render={
@@ -140,7 +162,7 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
               type="button"
               variant="ghost"
               size="icon-sm"
-              disabled={refreshMutation.isPending}
+              disabled={!hydrated || refreshing}
               onClick={() => refreshMutation.mutate()}
             />
           }
@@ -148,7 +170,7 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
           <RefreshCwIcon className={refreshing ? "animate-spin" : undefined} />
           <span className="sr-only">Refresh statistics</span>
         </TooltipTrigger>
-        <TooltipContent>Re-read database snapshots</TooltipContent>
+        <TooltipContent>Refresh statistics</TooltipContent>
       </Tooltip>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" />}>
@@ -160,12 +182,21 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
             <DropdownMenuLabel>Theme</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setTheme("light")}>
               <SunIcon /> Light
+              {hydrated && theme === "light" ? (
+                <CheckIcon className="ml-auto" aria-label="Selected" />
+              ) : null}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTheme("dark")}>
               <MoonIcon /> Dark
+              {hydrated && theme === "dark" ? (
+                <CheckIcon className="ml-auto" aria-label="Selected" />
+              ) : null}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setTheme("system")}>
               <MonitorIcon /> System
+              {hydrated && theme === "system" ? (
+                <CheckIcon className="ml-auto" aria-label="Selected" />
+              ) : null}
             </DropdownMenuItem>
           </DropdownMenuGroup>
         </DropdownMenuContent>

@@ -31,7 +31,7 @@ export function AnalyticsPage() {
   return (
     <>
       <PageHeading
-        title="Analytics"
+        title="Trends"
         description={`Registrations and downloads over time. Times shown in ${time.timeZone}.`}
       />
       <StatsFilters

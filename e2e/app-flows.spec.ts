@@ -7,11 +7,11 @@ test("every Astro dashboard route loads without browser errors", async ({
   page.on("pageerror", (error) => errors.push(error.message))
   for (const [route, title, content] of [
     ["", "Overview", "Registered chats"],
-    ["analytics", "Analytics", "Cache performance"],
-    ["detailed", "Detailed statistics", "Cache misses"],
+    ["analytics", "Trends", "Cache performance"],
+    ["detailed", "Breakdown", "Cache misses"],
     ["users", "User lookup", "Enter an ID to begin"],
     ["referrals", "Referrals", "Referral ranking"],
-    ["other", "Other statistics", "Top downloaders"],
+    ["other", "Audience insights", "Top downloaders"],
     ["jobs", "Database jobs", "Controls disabled in fake-data mode"],
   ]) {
     await page.goto(`/dashboard/${route}`)
@@ -45,7 +45,7 @@ test("lookup, pagination, CSV and browser history work", async ({ page }) => {
   await input.fill("123456789")
   await expect(page).toHaveURL(/id=123456789/)
   await expect(page.getByText("Telegram chat profile")).toBeVisible()
-  const csv = page.getByRole("button", { name: "Download CSV history" })
+  const csv = page.getByRole("link", { name: "Download CSV history" })
   await expect(csv).toHaveAttribute("href", "/api/users/123456789/history.csv")
   await page.getByRole("button", { name: "Go to next page" }).click()
   await expect(page).toHaveURL(/page=2/)

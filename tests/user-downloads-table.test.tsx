@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react"
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
@@ -45,5 +51,61 @@ describe("user downloads table", () => {
     const rows = screen.getAllByRole("row").slice(1)
     expect(within(rows[0]!).getByText("Hit")).toBeTruthy()
     expect(within(rows[1]!).getByText("Miss")).toBeTruthy()
+  })
+
+  it("prevents navigating before the first page and allows the next page", () => {
+    const onPageChange = vi.fn()
+    render(
+      <UserDownloadsTable
+        data={{ ...downloads, total: "16", totalPages: 2 }}
+        loading={false}
+        onPageChange={onPageChange}
+      />
+    )
+
+    const previous = screen.getByRole("button", { name: "Go to previous page" })
+    expect((previous as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(previous)
+    expect(onPageChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Go to next page" }))
+    expect(onPageChange).toHaveBeenCalledWith(2)
+  })
+
+  it("keeps existing rows visible and blocks repeated paging while refreshing", () => {
+    const onPageChange = vi.fn()
+    render(
+      <UserDownloadsTable
+        data={{ ...downloads, page: 2, total: "24", totalPages: 3 }}
+        loading={false}
+        refreshing
+        onPageChange={onPageChange}
+      />
+    )
+
+    expect(screen.getByRole("table", { name: "Download history" })).toBeTruthy()
+    for (const name of ["Go to previous page", "Go to next page"]) {
+      const button = screen.getByRole("button", { name })
+      expect((button as HTMLButtonElement).disabled).toBe(true)
+      fireEvent.click(button)
+    }
+    expect(onPageChange).not.toHaveBeenCalled()
+  })
+
+  it("prevents navigating past the last page", () => {
+    const onPageChange = vi.fn()
+    render(
+      <UserDownloadsTable
+        data={{ ...downloads, page: 2, total: "16", totalPages: 2 }}
+        loading={false}
+        onPageChange={onPageChange}
+      />
+    )
+
+    const next = screen.getByRole("button", { name: "Go to next page" })
+    expect((next as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(next)
+    expect(onPageChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Go to previous page" }))
+    expect(onPageChange).toHaveBeenCalledWith(1)
   })
 })

@@ -34,9 +34,9 @@ export function StatsFilters({
   return (
     <Card className={cn("mb-6", className)}>
       <CardContent>
-        <FieldGroup className="sm:flex-row sm:items-end">
+        <FieldGroup className="gap-4 lg:flex-row lg:items-end lg:gap-8">
           {showScope && scope ? (
-            <Field>
+            <Field className="lg:w-auto">
               <FieldLabel>Chat scope</FieldLabel>
               <ToggleGroup
                 value={[scope]}
@@ -44,18 +44,24 @@ export function StatsFilters({
                   onScopeChange?.((values[0] as ChatScope | undefined) ?? scope)
                 }
                 variant="outline"
+                size="lg"
                 spacing={0}
                 aria-label="Chat scope"
+                className="w-full sm:w-fit"
               >
                 {scopeOptions.map((option) => (
-                  <ToggleGroupItem key={option.value} value={option.value}>
+                  <ToggleGroupItem
+                    key={option.value}
+                    value={option.value}
+                    className="min-h-11 flex-1 sm:min-w-20"
+                  >
                     {option.label}
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
             </Field>
           ) : null}
-          <Field>
+          <Field className="lg:w-auto">
             <FieldLabel>Period</FieldLabel>
             <ToggleGroup
               value={[range]}
@@ -63,12 +69,17 @@ export function StatsFilters({
                 onRangeChange((values[0] as StatsRange | undefined) ?? range)
               }
               variant="outline"
+              size="lg"
               spacing={0}
               aria-label="Statistics period"
-              className="flex-wrap"
+              className="w-full sm:w-fit"
             >
               {rangeOptions.map((option) => (
-                <ToggleGroupItem key={option.value} value={option.value}>
+                <ToggleGroupItem
+                  key={option.value}
+                  value={option.value}
+                  className="min-h-11 min-w-0 flex-1 sm:min-w-20"
+                >
                   {option.label}
                 </ToggleGroupItem>
               ))}

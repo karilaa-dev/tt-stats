@@ -1,12 +1,19 @@
 import { useEffect, useRef } from "react"
-import { useForm, useStore } from "@tanstack/react-form"
+import { useForm, useSelector } from "@tanstack/react-form"
 import { useDashboardNavigate, useHydrated } from "@/lib/dashboard-context"
 import { SearchIcon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -36,7 +43,7 @@ export function UserLookupForm({
       })
     },
   })
-  const typedId = useStore(form.store, (state) => state.values.id)
+  const typedId = useSelector(form.store, (state) => state.values.id)
 
   useEffect(() => {
     if (initialId === navigatedId.current) return
@@ -61,8 +68,16 @@ export function UserLookupForm({
 
   return (
     <Card className="mb-6">
+      <CardHeader>
+        <CardTitle>Find a chat</CardTitle>
+        <CardDescription>
+          Look up a Telegram ID to inspect activity and export download history.
+        </CardDescription>
+      </CardHeader>
       <CardContent>
         <form
+          role="search"
+          aria-label="Chat lookup"
           onSubmit={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -84,7 +99,10 @@ export function UserLookupForm({
               }}
             >
               {(field) => (
-                <Field data-invalid={!field.state.meta.isValid}>
+                <Field
+                  data-invalid={!field.state.meta.isValid}
+                  data-disabled={!hydrated}
+                >
                   <FieldLabel htmlFor={field.name}>
                     Telegram user or group ID
                   </FieldLabel>
@@ -99,16 +117,25 @@ export function UserLookupForm({
                         field.handleChange(event.target.value)
                       }
                       placeholder="123456789 or -1001234567890"
-                      inputMode="numeric"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       pattern="-?[0-9]+"
-                      className="sm:max-w-md sm:flex-1"
+                      className="h-11 sm:max-w-lg sm:flex-1"
                       aria-invalid={!field.state.meta.isValid}
-                      aria-describedby={`${field.name}-hint`}
+                      aria-describedby={
+                        field.state.meta.isValid
+                          ? `${field.name}-hint`
+                          : `${field.name}-hint ${field.name}-error`
+                      }
                     />
                     <div className="flex gap-2">
                       <Button
                         type="submit"
+                        className="h-11 min-w-28 flex-1 sm:flex-none"
                         disabled={
+                          !hydrated ||
+                          searching ||
                           !field.state.value.trim() ||
                           !parseTelegramId(field.state.value.trim())
                         }
@@ -125,7 +152,12 @@ export function UserLookupForm({
                           type="button"
                           variant="outline"
                           size="icon"
-                          onClick={() => field.handleChange("")}
+                          className="size-11"
+                          disabled={!hydrated}
+                          onClick={() => {
+                            field.handleChange("")
+                            document.getElementById(field.name)?.focus()
+                          }}
                         >
                           <XIcon />
                           <span className="sr-only">Clear lookup</span>
@@ -134,16 +166,14 @@ export function UserLookupForm({
                     </div>
                   </div>
                   {!field.state.meta.isValid ? (
-                    <FieldError>
+                    <FieldError id={`${field.name}-error`}>
                       {String(field.state.meta.errors[0] ?? "Invalid ID")}
                     </FieldError>
                   ) : null}
-                  <p
-                    id={`${field.name}-hint`}
-                    className="text-xs text-muted-foreground"
-                  >
-                    Results update automatically after you stop typing.
-                  </p>
+                  <FieldDescription id={`${field.name}-hint`}>
+                    Searches automatically as you type. Group IDs start with a
+                    minus sign.
+                  </FieldDescription>
                 </Field>
               )}
             </form.Field>

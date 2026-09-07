@@ -26,7 +26,7 @@ Astro routes live in `src/pages`. Each dashboard page hydrates its own React isl
 
 The notification monitor starts with the dev server and with `bun run start`, and closes its listeners on shutdown. `bun run build` bundles it separately as `dist/monitor.mjs`.
 
-Rare UI source is checked into `components/ui/bounce-sidebar.tsx` and `components/ui/animated-counter.tsx`. The sidebar uses native links and respects reduced motion. Counters retain exact text for counts beyond JavaScript's safe integer range. Both components are adapted from the [Rare UI registry](https://www.rareui.com/components).
+The workspace uses native sidebar links and static, exact metric values for quick scanning. Analytics loads interactive charts near the viewport and keeps chart summaries visible while the chart module loads. The original [Rare UI](https://www.rareui.com/components) sidebar and counter sources remain in `components/ui` for reference; the dashboard no longer loads their animation runtime.
 
 ## Requirements
 

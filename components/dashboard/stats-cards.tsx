@@ -1,4 +1,3 @@
-import { AnimatedCounter } from "@/components/ui/animated-counter"
 import {
   DatabaseXIcon,
   DatabaseZapIcon,
@@ -18,20 +17,6 @@ import {
 } from "@/components/ui/card"
 import type { StatsBreakdown } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
-
-function MetricValue({ value }: { value: string }) {
-  const numeric = Number(value.replaceAll(",", "").replace("%", ""))
-  // PostgreSQL bigint counts must stay exact even beyond JavaScript's safe range.
-  if (!Number.isSafeInteger(numeric * (value.endsWith("%") ? 10 : 1)))
-    return <>{value}</>
-  return (
-    <AnimatedCounter
-      value={numeric}
-      decimals={value.endsWith("%") ? 1 : 0}
-      suffix={value.endsWith("%") ? "%" : undefined}
-    />
-  )
-}
 
 function count(value: string) {
   return BigInt(value).toLocaleString("en-US")
@@ -57,6 +42,13 @@ export function StatsCards({
   ).toString()
   const metrics = [
     {
+      key: "downloads",
+      label: "Video downloads",
+      value: count(stats.downloads.total),
+      detail: `${count(stats.downloads.uniqueUsers)} unique chats`,
+      icon: DownloadIcon,
+    },
+    {
       key: "chats",
       label: "Registered chats",
       value: count(stats.chats),
@@ -69,13 +61,6 @@ export function StatsCards({
       value: count(stats.music.total),
       detail: `${count(stats.music.uniqueUsers)} unique chats`,
       icon: Music2Icon,
-    },
-    {
-      key: "downloads",
-      label: "Video downloads",
-      value: count(stats.downloads.total),
-      detail: `${count(stats.downloads.uniqueUsers)} unique chats`,
-      icon: DownloadIcon,
     },
     {
       key: "images",
@@ -115,8 +100,8 @@ export function StatsCards({
   return (
     <div
       className={cn(
-        "grid gap-4 sm:grid-cols-2",
-        cacheDisplay === "counts" && "lg:grid-cols-3 2xl:grid-cols-6"
+        "grid gap-3 sm:grid-cols-2 lg:grid-cols-3",
+        cacheDisplay === "counts" ? "2xl:grid-cols-6" : "xl:grid-cols-5"
       )}
     >
       {metrics.map((metric) => {
@@ -125,24 +110,33 @@ export function StatsCards({
           <Card
             key={metric.key}
             className={cn(
+              "min-w-0",
               cacheDisplay === "percentage" &&
-                metric.key === "cacheRate" &&
-                "sm:col-span-2"
+                metric.key === "downloads" &&
+                "sm:col-span-2 xl:col-span-1"
             )}
           >
             <CardHeader>
               <CardDescription>{metric.label}</CardDescription>
-              <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
-                <MetricValue value={metric.value} />
-              </CardTitle>
               <CardAction>
-                <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <Icon className="size-4.5" aria-hidden="true" />
-                </div>
+                <Icon
+                  className="size-4 text-muted-foreground"
+                  aria-hidden="true"
+                />
               </CardAction>
             </CardHeader>
-            <CardContent className="text-xs font-medium text-muted-foreground">
-              {metric.detail}
+            <CardContent>
+              <p
+                className={cn(
+                  "font-heading text-3xl font-semibold tracking-tight break-all tabular-nums",
+                  metric.key === "downloads" && "text-primary"
+                )}
+              >
+                {metric.value}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {metric.detail}
+              </p>
             </CardContent>
           </Card>
         )
@@ -200,7 +194,7 @@ function CacheMetric({
         {label}
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">
-        <MetricValue value={count(value)} />
+        {count(value)}
       </p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">
         {rate} of downloads
