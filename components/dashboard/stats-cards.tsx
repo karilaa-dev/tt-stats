@@ -100,10 +100,8 @@ export function StatsCards({
   return (
     <div
       className={cn(
-        "grid sm:grid-cols-2",
-        cacheDisplay === "percentage"
-          ? "gap-3"
-          : "gap-4 lg:grid-cols-3 2xl:grid-cols-6"
+        "grid gap-4 sm:grid-cols-2",
+        cacheDisplay === "counts" && "lg:grid-cols-3 2xl:grid-cols-6"
       )}
     >
       {metrics.map((metric) => {
@@ -111,7 +109,6 @@ export function StatsCards({
         return (
           <Card
             key={metric.key}
-            size={cacheDisplay === "percentage" ? "sm" : "default"}
             className={cn(
               cacheDisplay === "percentage" &&
                 metric.key === "cacheRate" &&
@@ -120,14 +117,7 @@ export function StatsCards({
           >
             <CardHeader>
               <CardDescription>{metric.label}</CardDescription>
-              <CardTitle
-                className={cn(
-                  "font-semibold tabular-nums",
-                  cacheDisplay === "percentage"
-                    ? "text-xl sm:text-2xl"
-                    : "text-2xl sm:text-3xl"
-                )}
-              >
+              <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
                 {metric.value}
               </CardTitle>
               <CardAction>
@@ -190,7 +180,7 @@ function CacheMetric({
   rate: string
 }) {
   return (
-    <div className="flex min-h-32 flex-col justify-center rounded-lg bg-muted/50 p-4">
+    <div className="flex flex-col justify-center rounded-lg bg-muted/50 p-4">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>

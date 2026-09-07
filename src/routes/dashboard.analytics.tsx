@@ -49,16 +49,16 @@ function AnalyticsPage() {
 
   return (
     <>
-      <div className="mb-6 grid gap-4 xl:grid-cols-[minmax(16rem,1fr)_auto] xl:items-end">
+      <div className="mb-6 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <PageHeading
           title="Analytics"
           description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
-          className="mb-0"
+          className="mb-0 xl:min-w-0"
         />
         <StatsFilters
           range={range}
           showScope={false}
-          className="mb-0"
+          className="mb-0 w-full xl:w-auto xl:min-w-max xl:shrink-0"
           onRangeChange={(nextRange) =>
             navigate({ search: { range: nextRange } })
           }
@@ -74,29 +74,33 @@ function AnalyticsPage() {
       ) : loading ? (
         <DashboardLoading variant="charts" />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <TimeSeriesChart
-            title="Registrations"
-            description="New private users and groups"
-            points={usersQuery.data ?? []}
-            range={range}
-            color="var(--chart-1)"
-          />
-          <TimeSeriesChart
-            title="Video downloads"
-            description="Video and image deliveries"
-            points={videosQuery.data ?? []}
-            range={range}
-            color="var(--chart-2)"
-          />
-          <TimeSeriesChart
-            title="Music downloads"
-            description="Music download history"
-            points={musicQuery.data ?? []}
-            range={range}
-            color="var(--chart-3)"
-          />
+        <div className="flex flex-col gap-6">
           <CachePerformanceCard stats={cacheQuery.data!} />
+          <div className="grid gap-6 xl:grid-cols-2">
+            <TimeSeriesChart
+              title="Registrations"
+              description="New private users and groups"
+              points={usersQuery.data ?? []}
+              range={range}
+              color="var(--chart-1)"
+            />
+            <TimeSeriesChart
+              title="Video downloads"
+              description="Video and image deliveries"
+              points={videosQuery.data ?? []}
+              range={range}
+              color="var(--chart-2)"
+            />
+            <div className="xl:col-span-2">
+              <TimeSeriesChart
+                title="Music downloads"
+                description="Music download history"
+                points={musicQuery.data ?? []}
+                range={range}
+                color="var(--chart-3)"
+              />
+            </div>
+          </div>
         </div>
       )}
     </>

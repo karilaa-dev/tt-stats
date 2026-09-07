@@ -46,6 +46,7 @@ describe("statistics cards", () => {
     render(<StatsCards stats={stats} cacheDisplay="percentage" />)
 
     const rateCard = cardFor("Cache hit rate")
+    expect(rateCard.getAttribute("data-size")).toBe("default")
     expect(within(rateCard).getByText("33.3%")).toBeTruthy()
     expect(
       within(rateCard).getByText("Downloads served from cache")

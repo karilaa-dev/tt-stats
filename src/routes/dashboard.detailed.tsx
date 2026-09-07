@@ -30,16 +30,16 @@ function DetailedPage() {
   const statsQuery = useQuery(statsBreakdownQueryOptions(scope, range))
   return (
     <>
-      <div className="mb-6 grid gap-4 2xl:grid-cols-[minmax(16rem,1fr)_auto] 2xl:items-end">
+      <div className="mb-6 flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
         <PageHeading
           title="Detailed statistics"
           description="Choose a linkable chat scope and completed reporting period."
-          className="mb-0"
+          className="mb-0 2xl:min-w-0"
         />
         <StatsFilters
           scope={scope}
           range={range}
-          className="mb-0"
+          className="mb-0 w-full 2xl:w-auto 2xl:min-w-max 2xl:shrink-0"
           onScopeChange={(nextScope) =>
             navigate({
               search: (previous) => ({ ...previous, scope: nextScope }),
