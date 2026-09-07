@@ -41,3 +41,26 @@ jobs:
       - run: bun run test
       - run: bun run test:browser
       - run: bun run build
+
+  deployment-build:
+    runs-on: ubuntu-latest
+    env:
+      RAILPACK_VERSION: "0.15.4"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: Install the Railpack version used by Dokploy
+        run: |
+          curl --fail --silent --show-error --location \
+            "https://github.com/railwayapp/railpack/releases/download/v${RAILPACK_VERSION}/railpack-v${RAILPACK_VERSION}-x86_64-unknown-linux-musl.tar.gz" \
+            --output "$RUNNER_TEMP/railpack.tar.gz"
+          mkdir -p "$RUNNER_TEMP/railpack-bin"
+          tar -xzf "$RUNNER_TEMP/railpack.tar.gz" -C "$RUNNER_TEMP/railpack-bin"
+          echo "$RUNNER_TEMP/railpack-bin" >> "$GITHUB_PATH"
+      - name: Build the deployment image without production secrets
+        run: |
+          railpack prepare . --plan-out "$RUNNER_TEMP/railpack-plan.json"
+          docker buildx build \
+            --build-arg "BUILDKIT_SYNTAX=ghcr.io/railwayapp/railpack-frontend:v${RAILPACK_VERSION}" \
+            --file "$RUNNER_TEMP/railpack-plan.json" \
+            --output type=docker,name=tt-stats:ci .

@@ -254,7 +254,7 @@ Keep the application origin private and make the reverse proxy the only network 
 
 Connect this repository as a Bun application. `bun run build` builds Astro and the notification monitor. `bun run start` starts the monitor and Astro's standalone server on Bun from `dist/server/entry.mjs`. Set `HOST=0.0.0.0` and the platform-provided `PORT`. Supply production secrets through the platform environment. Bun automatically loads `.env` files, including `.env.local`, so keep local secret files out of the deployment image.
 
-Railpack detects Bun from `packageManager` and `bun.lock`. The checked-in `railpack.json` installs the frozen lockfile with development dependencies for the Astro build and starts the application with Bun.
+Railpack detects Bun from `packageManager` and `bun.lock`. Keep its generated install step: it copies the package manifest and lockfile before running `bun install --frozen-lockfile`, including the development dependencies needed by Astro. Replacing `steps.install.commands` also removes those copy commands and causes a missing `package.json` error. The checked-in `railpack.json` only sets the Bun start command. CI builds the deployment image with Railpack 0.15.4, matching Dokploy.
 
 Set the health check path to `/api/health`. Keep PostgreSQL private where possible and allow only the deployment network to reach it.
 
