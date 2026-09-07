@@ -1,4 +1,5 @@
 import {
+  DatabaseXIcon,
   DatabaseZapIcon,
   DownloadIcon,
   ImagesIcon,
@@ -34,11 +35,16 @@ const metrics = [
   { key: "downloads", label: "Video downloads", icon: DownloadIcon },
   { key: "images", label: "Image albums", icon: ImagesIcon },
   { key: "cacheHits", label: "Cache hits", icon: DatabaseZapIcon },
+  { key: "cacheMisses", label: "Cache misses", icon: DatabaseXIcon },
 ] as const
 
 export function StatsCards({ stats }: { stats: StatsBreakdown }) {
+  const cacheMisses = (
+    BigInt(stats.downloads.total) - BigInt(stats.downloads.cacheHits)
+  ).toString()
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
       {metrics.map((metric) => {
         const Icon = metric.icon
         let total = stats.chats
@@ -54,8 +60,10 @@ export function StatsCards({ stats }: { stats: StatsBreakdown }) {
           detail = `${count(stats.downloads.uniqueImageUsers)} unique chats`
         } else if (metric.key === "cacheHits") {
           total = stats.downloads.cacheHits
-          const misses = BigInt(stats.downloads.total) - BigInt(total)
-          detail = `${misses.toLocaleString("en-US")} misses · ${percentage(total, stats.downloads.total)} hit rate`
+          detail = `${percentage(total, stats.downloads.total)} hit rate`
+        } else if (metric.key === "cacheMisses") {
+          total = cacheMisses
+          detail = `${percentage(total, stats.downloads.total)} miss rate`
         }
         return (
           <Card key={metric.key}>

@@ -8,7 +8,7 @@ export function DashboardLoading({
 }: {
   variant?: "cards" | "charts" | "table"
 }) {
-  const count = variant === "charts" ? 3 : variant === "table" ? 1 : 4
+  const count = variant === "charts" ? 3 : variant === "table" ? 1 : 6
 
   return (
     <div
@@ -30,7 +30,7 @@ export function DashboardLoading({
           variant === "charts"
             ? "xl:grid-cols-2"
             : variant === "cards"
-              ? "sm:grid-cols-2 xl:grid-cols-4"
+              ? "sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6"
               : undefined
         )}
       >
