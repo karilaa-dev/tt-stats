@@ -278,3 +278,60 @@ describe("video inactivity monitoring", () => {
     expect(fetcher).toHaveBeenCalledOnce()
   })
 })
+
+describe("video monitor connection safety", () => {
+  const env = { provider: "webhook" as const, url: "https://example.test/hook" }
+
+  it("waits for the latest download query before reading state on the same client", async () => {
+    let finishLatest!: (value: { rows: unknown[] }) => void
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("pg_try_advisory")) return { rows: [{ acquired: true }] }
+      if (sql.includes("max(downloaded_at)")) {
+        return new Promise<{ rows: unknown[] }>((resolve) => {
+          finishLatest = resolve
+        })
+      }
+      if (sql.includes("SELECT last_downloaded_at"))
+        return {
+          rows: [
+            {
+              last_downloaded_at: null,
+              stage: 0,
+              monitoring_started_at: new Date(),
+            },
+          ],
+        }
+      return { rows: [] }
+    })
+    const client = { query, release: vi.fn() }
+    const check = checkVideoInactivity({
+      pool: { connect: async () => client } as unknown as Pool,
+      env,
+    })
+    await vi.waitFor(() => expect(finishLatest).toBeDefined())
+    const queriedStateEarly = query.mock.calls.some(([sql]) =>
+      sql.includes("SELECT last_downloaded_at")
+    )
+    finishLatest({ rows: [] })
+    await check
+    expect(queriedStateEarly).toBe(false)
+  })
+
+  it("discards a client after a read timeout without queueing rollback behind the active query", async () => {
+    const error = new Error("Query read timeout")
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes("pg_try_advisory")) return { rows: [{ acquired: true }] }
+      if (sql.includes("max(downloaded_at)")) throw error
+      return { rows: [] }
+    })
+    const client = { query, release: vi.fn() }
+    await expect(
+      checkVideoInactivity({
+        pool: { connect: async () => client } as unknown as Pool,
+        env,
+      })
+    ).rejects.toThrow(error)
+    expect(query).not.toHaveBeenCalledWith("ROLLBACK")
+    expect(client.release).toHaveBeenCalledWith(true)
+  })
+})

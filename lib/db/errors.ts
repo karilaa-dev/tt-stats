@@ -10,9 +10,9 @@ export const DATABASE_ERROR_COPY = {
       "The database connection setting is missing or malformed. Check the server environment and restart the web process.",
   },
   snapshotSchema: {
-    title: "TT Stats database objects are not installed",
+    title: "TT Stats database objects need repair",
     description:
-      "PostgreSQL is reachable, but the snapshot schema or its read API is missing. Open Database jobs to install or repair it.",
+      "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Database jobs to install or repair it.",
   },
   snapshotsMissing: {
     title: "Statistics snapshots are not ready",

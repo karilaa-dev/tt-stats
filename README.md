@@ -24,7 +24,7 @@ TanStack Charts is currently pre-alpha. The lockfile pins the tested release use
 
 - Node.js 22.12 or newer
 - npm
-- A current tt-bot v6 PostgreSQL database
+- A tt-bot v6 PostgreSQL database, verified against v6.0.10
 - PostgreSQL 11+ with [`pg_cron`](https://github.com/citusdata/pg_cron) 1.5+ available
 - A reverse proxy that authenticates every application request except the health check
 
@@ -162,6 +162,32 @@ For rollback, first redeploy the preceding web version and then run
 `database/rollback_stats_snapshots.sql` as an administrator. It unschedules TT
 Stats jobs and drops only the additive cache schema; source indexes are retained.
 
+## Upgrading an existing deployment
+
+After deploying a new TT Stats build, open `/dashboard/jobs` and use **Update
+database definitions** when diagnostics report an update. This applies the
+additive snapshot changes, including `breakdown.cache_hits`, and queues both
+snapshot rebuilds. Wait for both rebuilds to succeed. Deploying application code
+alone does not update the installed PostgreSQL definitions.
+
+Apply `database/002_stats_snapshot_indexes.sql` separately with `psql` as the
+source-table owner, outside a transaction. The tt-bot v6.0.10 source indexes
+include a BRIN time index and a user-first history index; neither replaces TT
+Stats' time-first B-tree index for the monitor's latest-download lookup. A bot
+migration that replaces `videos` may require reapplying the TT Stats indexes.
+
+The monitor runs at most one check per web process. Failed checks discard their
+database connection so an active query or aborted transaction cannot be reused
+by dashboard requests. PostgreSQL's statement deadline precedes the client read
+deadline. Repeated timeouts after the definitions and indexes are installed still
+require checking database load and connectivity.
+
+Compatibility tests use the source-table definitions from
+[tt-bot v6.0.10](https://github.com/karilaa-dev/tt-bot/blob/v6.0.10/src/db/migrations.ts),
+including `users.richads_last_shown_at`, `video_details`, and the video history
+foreign key and delivery constraints. TT Stats reads download events from
+`videos` and does not count cache entries in `video_details` as downloads.
+
 ## Local development
 
 `DB_URL` may point to a local PostgreSQL server, for example `postgresql://tt_stats:password@127.0.0.1:5432/ttbot-db`.
@@ -183,7 +209,7 @@ npm run build
 npm start
 ```
 
-Database integration tests are opt-in locally because they recreate the `users`, `videos`, and `music` tables in the configured test database. Never target a production database:
+Database integration tests are opt-in locally because they recreate the `users`, `video_details`, `videos`, and `music` tables in the configured test database. Never target a production database:
 
 ```bash
 RUN_DATABASE_INTEGRATION=1 \

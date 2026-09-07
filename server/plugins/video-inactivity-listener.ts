@@ -41,14 +41,19 @@ export default definePlugin((nitroApp) => {
   let checkTimer: ReturnType<typeof setInterval> | null = null
   let connecting = false
   let closed = false
+  let checking = false
 
   const runCheck = async () => {
+    if (closed || checking) return
+    checking = true
     try {
       await checkVideoInactivity({ env: notificationEnv })
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown monitoring failure."
       console.error("[video-inactivity] check failed", { message })
+    } finally {
+      checking = false
     }
   }
 

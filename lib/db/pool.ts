@@ -34,8 +34,13 @@ export function classifyDatabaseError(error: unknown): DatabaseErrorKind {
   ) {
     return "connection"
   }
-  if (["ETIMEDOUT", "57014"].includes(code)) return "timeout"
-  if (["42P01", "3F000", "42883"].includes(code)) return "snapshotSchema"
+  if (
+    ["ETIMEDOUT", "57014"].includes(code) ||
+    (error instanceof Error && error.message === "Query read timeout")
+  )
+    return "timeout"
+  if (["42P01", "3F000", "42883", "42703"].includes(code))
+    return "snapshotSchema"
   if (["22003", "22008"].includes(code)) return "snapshotData"
   if (code === "42501") return "permission"
   if (error && typeof error === "object" && "issues" in error) {
@@ -62,7 +67,9 @@ export function getPool(): Pool {
     max: env.DB_POOL_SIZE,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    query_timeout: 30_000,
+    // Give PostgreSQL time to report statement cancellation before the client
+    // read deadline expires and leaves the connection state uncertain.
+    query_timeout: 35_000,
     statement_timeout: 30_000,
     application_name: "tt-stats",
   })

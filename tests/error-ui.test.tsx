@@ -41,7 +41,7 @@ describe("dashboard infrastructure failures", () => {
     render(<DashboardError error={safeError} reset={vi.fn()} />)
 
     expect(
-      screen.getByText("TT Stats database objects are not installed")
+      screen.getByText("TT Stats database objects need repair")
     ).toBeTruthy()
     expect(
       screen

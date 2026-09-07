@@ -86,6 +86,23 @@ describe("video inactivity listener lifecycle", () => {
     await close()
   })
 
+  it("does not overlap checks when a database request takes longer than the interval", async () => {
+    let finishCheck!: (value: { status: "idle" }) => void
+    runtime.check.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishCheck = resolve
+      })
+    )
+    const { close } = startPlugin()
+    await vi.advanceTimersByTimeAsync(180_000)
+    const callsWhilePending = runtime.check.mock.calls.length
+    finishCheck({ status: "idle" })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(runtime.check).toHaveBeenCalledTimes(callsWhilePending + 1)
+    await close()
+    expect(callsWhilePending).toBe(1)
+  })
+
   it("closes an in-flight connection before it can start listening", async () => {
     let finishConnect: (() => void) | undefined
     runtime.connect.mockReturnValueOnce(

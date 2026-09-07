@@ -4,7 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { useRouterState } from "@tanstack/react-router"
+import { useHydrated, useRouterState } from "@tanstack/react-router"
 import { useTheme } from "next-themes"
 import { MonitorIcon, MoonIcon, RefreshCwIcon, SunIcon } from "lucide-react"
 import { toast } from "sonner"
@@ -68,6 +68,7 @@ function isSnapshotQuery(query: { queryKey: readonly unknown[] }) {
 }
 
 export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
+  const hydrated = useHydrated()
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -86,17 +87,19 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
     },
     onSuccess: () => toast.success("Snapshot views are up to date."),
   })
-  const refreshing = fetching || refreshMutation.isPending
+  // Fetch state can change between SSR and hydration as queries settle.
+  const refreshing = hydrated && (fetching || refreshMutation.isPending)
   const { setTheme } = useTheme()
   const label = labels[pathname] ?? "Dashboard"
-  const latestSnapshot = metadataQuery.data?.length
-    ? metadataQuery.data.reduce((latest, snapshot) =>
-        snapshot.refreshedAt > latest.refreshedAt ? snapshot : latest
-      )
-    : undefined
-  const staleSnapshot = metadataQuery.data?.find((snapshot) =>
-    isSnapshotStale(snapshot)
-  )
+  const latestSnapshot =
+    hydrated && metadataQuery.data?.length
+      ? metadataQuery.data.reduce((latest, snapshot) =>
+          snapshot.refreshedAt > latest.refreshedAt ? snapshot : latest
+        )
+      : undefined
+  const staleSnapshot =
+    hydrated &&
+    metadataQuery.data?.find((snapshot) => isSnapshotStale(snapshot))
 
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b bg-background/90 px-3 backdrop-blur sm:px-4">

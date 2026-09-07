@@ -35,31 +35,13 @@ integration("PostgreSQL statistics queries", () => {
     pool = new Pool({ connectionString })
     await pool.query("DROP SCHEMA IF EXISTS tt_stats_cache CASCADE")
     await pool.query("DROP TABLE IF EXISTS music, videos, users CASCADE")
-    await pool.query(`
-      CREATE TABLE users (
-        user_id BIGINT PRIMARY KEY,
-        registered_at BIGINT,
-        lang VARCHAR NOT NULL DEFAULT 'en',
-        link VARCHAR,
-        file_mode BOOLEAN NOT NULL DEFAULT FALSE
-      );
-      CREATE TABLE videos (
-        pk_id BIGSERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES users(user_id),
-        downloaded_at BIGINT,
-        shared_link TEXT NOT NULL,
-        media_kind VARCHAR NOT NULL CHECK (media_kind IN ('video', 'images')),
-        delivery_surface VARCHAR NOT NULL CHECK (delivery_surface IN ('chat', 'inline')),
-        delivery_mode VARCHAR,
-        cache_hit BOOLEAN NOT NULL DEFAULT FALSE
-      );
-      CREATE TABLE music (
-        pk_id BIGSERIAL PRIMARY KEY,
-        user_id BIGINT NOT NULL REFERENCES users(user_id),
-        downloaded_at BIGINT,
-        video_id BIGINT NOT NULL
+    await pool.query("DROP TABLE IF EXISTS video_details CASCADE")
+    await pool.query(
+      await readFile(
+        new URL("../fixtures/tt-bot-v6.0.10.sql", import.meta.url),
+        "utf8"
       )
-    `)
+    )
     await pool.query(
       `INSERT INTO users (user_id, registered_at, lang, link, file_mode) VALUES
        (1, $1, 'en', 'alpha', TRUE),
@@ -145,6 +127,44 @@ integration("PostgreSQL statistics queries", () => {
     const allChats = await getStatsBreakdownRaw("all", "24h", pool)
     expect(allChats.chats).toBe("3")
     expect(allChats.downloads.cacheHits).toBe("1")
+  })
+
+  it("identifies an outdated snapshot column and repairs it without changing tt-bot tables", async () => {
+    const before = await pool.query(
+      "SELECT count(*)::text AS count FROM public.videos"
+    )
+    await pool.query(
+      "ALTER TABLE tt_stats_cache.breakdown DROP COLUMN cache_hits"
+    )
+    try {
+      await expect(getOverviewRaw(pool)).rejects.toMatchObject({
+        kind: "snapshotSchema",
+      })
+    } finally {
+      await pool.query(
+        await readFile(
+          new URL(
+            "../../database/001_stats_snapshot_schema.sql",
+            import.meta.url
+          ),
+          "utf8"
+        )
+      )
+      await pool.query(
+        "CALL tt_stats_cache.refresh_rolling_24h(to_timestamp($1))",
+        [now]
+      )
+      await pool.query("CALL tt_stats_cache.refresh_daily(to_timestamp($1))", [
+        now,
+      ])
+    }
+    expect(
+      (await getOverviewRaw(pool)).users.last24Hours.downloads.cacheHits
+    ).toBe("1")
+    expect(
+      (await pool.query("SELECT count(*)::text AS count FROM public.videos"))
+        .rows
+    ).toEqual(before.rows)
   })
 
   it("zero-fills analytics and excludes the zero ID", async () => {

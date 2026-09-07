@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only"
 
-import type { Pool, PoolClient } from "pg"
+import type { Pool } from "pg"
 
 import { getPool } from "@/lib/db/pool"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
@@ -195,14 +195,6 @@ export async function deliverVideoNotification(
   }
 }
 
-async function rollback(client: PoolClient): Promise<void> {
-  try {
-    await client.query("ROLLBACK")
-  } catch {
-    // Preserve the original monitoring or delivery error.
-  }
-}
-
 export async function checkVideoInactivity(
   options: {
     pool?: Pool
@@ -219,6 +211,7 @@ export async function checkVideoInactivity(
   const now = new Date(nowMs)
   const nowEpoch = Math.floor(nowMs / 1000)
   const client = await (options.pool ?? getPool()).connect()
+  let discardClient = false
   try {
     await client.query("BEGIN")
     const lock = await client.query<{ acquired: boolean }>(
@@ -229,22 +222,20 @@ export async function checkVideoInactivity(
       return { status: "locked" }
     }
 
-    const [latestResult, stateResult] = await Promise.all([
-      client.query<LatestDownloadRow>(
-        `SELECT max(downloaded_at)::text AS latest_downloaded_at
+    const latestResult = await client.query<LatestDownloadRow>(
+      `SELECT max(downloaded_at)::text AS latest_downloaded_at
          FROM public.videos
          WHERE user_id <> 0
            AND downloaded_at >= 946684800
            AND downloaded_at <= $1`,
-        [nowEpoch]
-      ),
-      client.query<MonitorStateRow>(
-        `SELECT last_downloaded_at::text, stage, monitoring_started_at
+      [nowEpoch]
+    )
+    const stateResult = await client.query<MonitorStateRow>(
+      `SELECT last_downloaded_at::text, stage, monitoring_started_at
          FROM tt_stats_cache.video_inactivity_monitor
          WHERE singleton = TRUE
          FOR UPDATE`
-      ),
-    ])
+    )
     const state = stateResult.rows[0]
     if (!state) {
       throw new Error("The video inactivity monitor state is not installed.")
@@ -325,9 +316,12 @@ export async function checkVideoInactivity(
     await client.query("COMMIT")
     return { status: "sent", stage: dueStage }
   } catch (error) {
-    await rollback(client)
+    // A read timeout can leave a query running on the server. Closing the
+    // connection rolls back the transaction without queueing more work or
+    // returning an aborted transaction to the shared pool.
+    discardClient = true
     throw error
   } finally {
-    client.release()
+    client.release(discardClient)
   }
 }
