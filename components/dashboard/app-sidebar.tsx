@@ -1,133 +1,166 @@
 import {
+  ActivityIcon,
+  ArrowUpRightIcon,
   BarChart3Icon,
   ChartNoAxesCombinedIcon,
   DatabaseZapIcon,
   LayoutDashboardIcon,
   ListFilterIcon,
+  MoreHorizontalIcon,
   SearchIcon,
   Share2Icon,
-  ActivityIcon,
-  ArrowUpRightIcon,
 } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarHeader,
-  SidebarRail,
-} from "@/components/ui/sidebar"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
+import { useSidebar } from "@/components/ui/sidebar"
 import { useDashboardContext } from "@/lib/dashboard-context"
 
 const navigation = [
   {
-    label: "Activity",
-    items: [
-      { href: "/dashboard", label: "Overview", icon: LayoutDashboardIcon },
-      {
-        href: "/dashboard/analytics",
-        label: "Trends",
-        icon: ChartNoAxesCombinedIcon,
-      },
-      { href: "/dashboard/detailed", label: "Breakdown", icon: ListFilterIcon },
-    ],
+    href: "/dashboard",
+    label: "Overview",
+    short: "Home",
+    icon: LayoutDashboardIcon,
+    description: "Your bot at a glance",
   },
   {
+    href: "/dashboard/analytics",
+    label: "Trends",
+    short: "Trends",
+    icon: ChartNoAxesCombinedIcon,
+    description: "Downloads over time",
+  },
+  {
+    href: "/dashboard/detailed",
+    label: "Breakdown",
+    short: "Breakdown",
+    icon: ListFilterIcon,
+    description: "Compare periods and audiences",
+  },
+  {
+    href: "/dashboard/users",
+    label: "User lookup",
+    short: "Lookup",
+    icon: SearchIcon,
+    description: "Find a chat and its history",
+  },
+  {
+    href: "/dashboard/referrals",
+    label: "Referrals",
+    short: "Referrals",
+    icon: Share2Icon,
+    description: "Where your audience comes from",
+  },
+  {
+    href: "/dashboard/other",
     label: "Audience",
-    items: [
-      { href: "/dashboard/users", label: "User lookup", icon: SearchIcon },
-      { href: "/dashboard/referrals", label: "Referrals", icon: Share2Icon },
-      {
-        href: "/dashboard/other",
-        label: "Audience insights",
-        icon: BarChart3Icon,
-      },
-    ],
+    short: "Audience",
+    icon: BarChart3Icon,
+    description: "Languages and download leaders",
   },
   {
+    href: "/dashboard/jobs",
     label: "Operations",
-    items: [
-      {
-        href: "/dashboard/jobs",
-        label: "Database jobs",
-        icon: DatabaseZapIcon,
-      },
-    ],
+    short: "Operations",
+    icon: DatabaseZapIcon,
+    description: "Updates, health and notifications",
   },
 ]
 
+export function DesktopNavigation() {
+  const { pathname } = useDashboardContext()
+  const current = pathname.replace(/\/$/, "")
+  return (
+    <nav aria-label="Main navigation" className="desktop-navigation">
+      {navigation.map(({ href, label, icon: Icon }) => (
+        <a
+          key={href}
+          href={href}
+          aria-current={current === href ? "page" : undefined}
+        >
+          <Icon aria-hidden="true" />
+          {label}
+        </a>
+      ))}
+    </nav>
+  )
+}
+
 export function AppSidebar() {
   const { pathname, fakeMode } = useDashboardContext()
-  const currentPath = pathname.replace(/\/$/, "")
+  const { isMobile, openMobile, setOpenMobile } = useSidebar()
+  const current = pathname.replace(/\/$/, "")
+  const quickLinks = navigation.filter((item) =>
+    ["/dashboard", "/dashboard/analytics", "/dashboard/users"].includes(
+      item.href
+    )
+  )
   return (
-    <Sidebar collapsible="offcanvas" className="workspace-sidebar">
-      <SidebarHeader>
-        <a
-          href="/dashboard"
-          className="brand-lockup"
-          aria-label="TT Stats overview"
+    <>
+      <nav aria-label="Quick navigation" className="mobile-dock">
+        {quickLinks.map(({ href, short, icon: Icon }) => (
+          <a
+            key={href}
+            href={href}
+            aria-current={current === href ? "page" : undefined}
+          >
+            <Icon aria-hidden="true" />
+            <span>{short}</span>
+          </a>
+        ))}
+        <Button
+          variant="ghost"
+          className="dock-more"
+          onClick={() => setOpenMobile(true)}
+          data-active={!quickLinks.some((item) => item.href === current)}
+          aria-label="Open all sections"
+          aria-expanded={openMobile}
         >
-          <span className="brand-mark" aria-hidden="true">
-            <BarChart3Icon />
-          </span>
-          <span>
-            <strong>
-              TT Stats<span className="brand-period">.</span>
-            </strong>
-            <small>Bot analytics workspace</small>
-          </span>
-        </a>
-      </SidebarHeader>
-      <SidebarContent>
-        <nav aria-label="Main navigation" className="workspace-navigation">
-          {navigation.map((group) => (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {group.items.map(({ href, label, icon: Icon }) => (
-                    <SidebarMenuItem key={href}>
-                      <SidebarMenuButton
-                        render={
-                          <a
-                            href={href}
-                            aria-current={
-                              currentPath === href ? "page" : undefined
-                            }
-                          />
-                        }
-                        isActive={currentPath === href}
-                        className="workspace-nav-link h-11 gap-3 px-3"
-                      >
-                        <Icon aria-hidden="true" />
-                        <span>{label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </nav>
-      </SidebarContent>
-      <SidebarFooter>
-        <a className="sidebar-status" href="/dashboard/jobs">
-          <ActivityIcon aria-hidden="true" />
-          <span>
-            {fakeMode ? "Demo workspace" : "tt-bot workspace"}
-            <small>
-              {fakeMode ? "Exploring sample data" : "Schedules & notifications"}
-            </small>
-          </span>
-          <ArrowUpRightIcon aria-hidden="true" />
-        </a>
-      </SidebarFooter>
-      <SidebarRail />
-    </Sidebar>
+          <MoreHorizontalIcon />
+          <span>More</span>
+        </Button>
+      </nav>
+      {isMobile ? (
+        <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+          <SheetContent side="bottom" className="navigation-sheet">
+            <SheetHeader>
+              <SheetTitle>Your workspace</SheetTitle>
+              <SheetDescription>
+                Explore activity, understand your audience, and keep your bot
+                running.
+              </SheetDescription>
+            </SheetHeader>
+            <nav aria-label="Main navigation" className="sheet-navigation">
+              {navigation.map(({ href, label, description, icon: Icon }) => (
+                <a
+                  key={href}
+                  href={href}
+                  aria-current={current === href ? "page" : undefined}
+                  aria-label={label}
+                  onClick={() => setOpenMobile(false)}
+                >
+                  <Icon aria-hidden="true" />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                  <ArrowUpRightIcon aria-hidden="true" />
+                </a>
+              ))}
+            </nav>
+            <div className="sheet-workspace">
+              <ActivityIcon aria-hidden="true" />
+              {fakeMode ? "Demo workspace · sample data" : "tt-bot workspace"}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+    </>
   )
 }

@@ -48,11 +48,15 @@ export function DetailedPage() {
           })
         }
       />
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-heading text-base font-semibold tracking-tight">
-          {audience}{" "}
-          <span className="font-normal text-muted-foreground">/ {period}</span>
-        </h2>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 px-1">
+        <div>
+          <h2 className="font-heading text-xl font-semibold tracking-tight">
+            {audience}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {period} · Downloads, formats, and cache usage
+          </p>
+        </div>
         <Button
           variant="ghost"
           size="sm"

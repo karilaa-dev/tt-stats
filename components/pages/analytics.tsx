@@ -52,8 +52,14 @@ export function AnalyticsPage() {
         <DashboardLoading variant="charts" />
       ) : (
         <div className="flex flex-col gap-6">
-          <CachePerformanceCard stats={cacheQuery.data!} />
-          <div className="grid gap-6 xl:grid-cols-2">
+          <TimeSeriesChart
+            title="Video downloads"
+            description="Video and image deliveries"
+            points={videosQuery.data ?? []}
+            range={range}
+            color="var(--chart-2)"
+          />
+          <div className="grid min-w-0 gap-6 xl:grid-cols-2">
             <TimeSeriesChart
               title="Registrations"
               description="New private users and groups"
@@ -62,22 +68,14 @@ export function AnalyticsPage() {
               color="var(--chart-1)"
             />
             <TimeSeriesChart
-              title="Video downloads"
-              description="Video and image deliveries"
-              points={videosQuery.data ?? []}
+              title="Music downloads"
+              description="Music download history"
+              points={musicQuery.data ?? []}
               range={range}
-              color="var(--chart-2)"
+              color="var(--chart-3)"
             />
-            <div className="xl:col-span-2">
-              <TimeSeriesChart
-                title="Music downloads"
-                description="Music download history"
-                points={musicQuery.data ?? []}
-                range={range}
-                color="var(--chart-3)"
-              />
-            </div>
           </div>
+          <CachePerformanceCard stats={cacheQuery.data!} />
         </div>
       )}
     </>

@@ -1,5 +1,4 @@
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Card, CardContent } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { ChatScope, StatsRange } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
@@ -32,61 +31,61 @@ export function StatsFilters({
   onRangeChange: (range: StatsRange) => void
 }) {
   return (
-    <Card className={cn("mb-6", className)}>
-      <CardContent>
-        <FieldGroup className="gap-4 lg:flex-row lg:items-end lg:gap-8">
-          {showScope && scope ? (
-            <Field className="lg:w-auto">
-              <FieldLabel>Chat scope</FieldLabel>
-              <ToggleGroup
-                value={[scope]}
-                onValueChange={(values) =>
-                  onScopeChange?.((values[0] as ChatScope | undefined) ?? scope)
-                }
-                variant="outline"
-                size="lg"
-                spacing={0}
-                aria-label="Chat scope"
-                className="w-full sm:w-fit"
-              >
-                {scopeOptions.map((option) => (
-                  <ToggleGroupItem
-                    key={option.value}
-                    value={option.value}
-                    className="min-h-11 flex-1 sm:min-w-20"
-                  >
-                    {option.label}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </Field>
-          ) : null}
-          <Field className="lg:w-auto">
-            <FieldLabel>Period</FieldLabel>
+    <div
+      className={cn("mb-7 rounded-2xl border bg-card p-2 sm:p-3", className)}
+    >
+      <FieldGroup className="gap-3 lg:flex-row lg:items-center lg:justify-between">
+        {showScope && scope ? (
+          <Field orientation="responsive" className="gap-2 lg:w-auto">
+            <FieldLabel className="px-2">Audience</FieldLabel>
             <ToggleGroup
-              value={[range]}
+              value={[scope]}
               onValueChange={(values) =>
-                onRangeChange((values[0] as StatsRange | undefined) ?? range)
+                onScopeChange?.((values[0] as ChatScope | undefined) ?? scope)
               }
-              variant="outline"
+              variant="default"
               size="lg"
-              spacing={0}
-              aria-label="Statistics period"
+              spacing={1}
+              aria-label="Chat scope"
               className="w-full sm:w-fit"
             >
-              {rangeOptions.map((option) => (
+              {scopeOptions.map((option) => (
                 <ToggleGroupItem
                   key={option.value}
                   value={option.value}
-                  className="min-h-11 min-w-0 flex-1 sm:min-w-20"
+                  className="min-h-11 flex-1 sm:min-w-20"
                 >
                   {option.label}
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
           </Field>
-        </FieldGroup>
-      </CardContent>
-    </Card>
+        ) : null}
+        <Field orientation="responsive" className="gap-2 lg:w-auto">
+          <FieldLabel className="px-2">Period</FieldLabel>
+          <ToggleGroup
+            value={[range]}
+            onValueChange={(values) =>
+              onRangeChange((values[0] as StatsRange | undefined) ?? range)
+            }
+            variant="default"
+            size="lg"
+            spacing={1}
+            aria-label="Statistics period"
+            className="w-full sm:w-fit"
+          >
+            {rangeOptions.map((option) => (
+              <ToggleGroupItem
+                key={option.value}
+                value={option.value}
+                className="min-h-11 min-w-0 flex-1 sm:min-w-20"
+              >
+                {option.label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
+      </FieldGroup>
+    </div>
   )
 }

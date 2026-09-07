@@ -77,7 +77,7 @@ test("theme and responsive navigation work", async ({ page, isMobile }) => {
   await page.getByRole("menuitem", { name: "Dark", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   if (isMobile)
-    await page.getByRole("button", { name: "Toggle Sidebar" }).click()
+    await page.getByRole("button", { name: "Open all sections" }).click()
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .getByRole("link", { name: "Referrals", exact: true })
@@ -109,4 +109,44 @@ test("Astro endpoints validate input and disable demo writes", async ({
   })
   expect(write.status()).toBe(400)
   expect(await write.text()).toContain("disabled while fake data is active")
+})
+
+test("mobile dock opens all sections and restores focus", async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, "The desktop uses horizontal navigation")
+  await page.goto("/dashboard")
+  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  const dock = page.getByRole("navigation", { name: "Quick navigation" })
+  await expect(
+    dock.getByRole("link", { name: "Home", exact: true })
+  ).toHaveAttribute("aria-current", "page")
+  const more = dock.getByRole("button", { name: "Open all sections" })
+  await more.click()
+  const dialog = page.getByRole("dialog", { name: "Your workspace" })
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(dialog).toBeHidden()
+  await expect(more).toBeFocused()
+  await more.click()
+  await dialog.getByRole("link", { name: "Referrals", exact: false }).click()
+  await expect(page).toHaveURL(/\/dashboard\/referrals/)
+  await expect(
+    page.getByRole("heading", { name: "Referrals", exact: true })
+  ).toBeVisible()
+})
+
+test("overview audience survives browser history", async ({ page }) => {
+  await page.goto("/dashboard")
+  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  await page.getByRole("tab", { name: "Groups", exact: true }).click()
+  await expect(page).toHaveURL(/scope=groups/)
+  await page.getByRole("tab", { name: "Private users", exact: true }).click()
+  await expect(page).toHaveURL(/scope=users/)
+  await page.goBack()
+  await expect(
+    page.getByRole("tab", { name: "Groups", exact: true })
+  ).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByText("14,797", { exact: true })).toBeVisible()
 })

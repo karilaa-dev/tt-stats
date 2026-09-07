@@ -92,8 +92,7 @@ export function UserDownloadsTable({
           <Table aria-label="Download history">
             <TableHeader>
               <TableRow>
-                <TableHead>Source</TableHead>
-                <TableHead className="hidden sm:table-cell">Type</TableHead>
+                <TableHead>Downloaded media</TableHead>
                 <TableHead>Cache</TableHead>
                 <TableHead className="hidden md:table-cell">
                   Downloaded
@@ -104,47 +103,46 @@ export function UserDownloadsTable({
               {data.items.map((download) => (
                 <TableRow key={download.id}>
                   <TableCell className="max-w-48 py-3 sm:max-w-72">
-                    <a
-                      href={download.sharedLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex min-h-8 items-center gap-1.5 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-                      title={download.sharedLink}
-                    >
-                      <span className="truncate">
-                        {linkLabel(download.sharedLink)}
+                    <div className="flex items-center gap-3">
+                      <span className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground sm:flex">
+                        {download.mediaKind === "images" ? (
+                          <ImagesIcon className="size-4" aria-hidden="true" />
+                        ) : (
+                          <VideoIcon className="size-4" aria-hidden="true" />
+                        )}
                       </span>
-                      <ExternalLinkIcon
-                        className="size-3.5 shrink-0"
-                        aria-hidden="true"
-                      />
-                      <span className="sr-only">(opens in a new tab)</span>
-                    </a>
-                    <p className="text-xs text-muted-foreground md:hidden">
-                      <span className="sm:hidden">
-                        {download.mediaKind === "images" ? "Images" : "Video"}
-                        {" · "}
-                      </span>
-                      {download.downloadedAt === null
-                        ? "Unknown time"
-                        : formatTimestamp(download.downloadedAt, time)}
-                    </p>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge
-                      variant={
-                        download.mediaKind === "images"
-                          ? "outline"
-                          : "secondary"
-                      }
-                    >
-                      {download.mediaKind === "images" ? (
-                        <ImagesIcon data-icon="inline-start" />
-                      ) : (
-                        <VideoIcon data-icon="inline-start" />
-                      )}
-                      {download.mediaKind === "images" ? "Images" : "Video"}
-                    </Badge>
+                      <div className="min-w-0">
+                        <a
+                          href={download.sharedLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex min-h-8 items-center gap-1.5 rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                          title={download.sharedLink}
+                        >
+                          <span className="truncate">
+                            {linkLabel(download.sharedLink)}
+                          </span>
+                          <ExternalLinkIcon
+                            className="size-3.5 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">(opens in a new tab)</span>
+                        </a>
+                        <p className="text-xs whitespace-normal text-muted-foreground">
+                          <span>
+                            {download.mediaKind === "images"
+                              ? "Images"
+                              : "Video"}
+                          </span>
+                          <span className="md:hidden">
+                            {" · "}
+                            {download.downloadedAt === null
+                              ? "Unknown time"
+                              : formatTimestamp(download.downloadedAt, time)}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge

@@ -41,13 +41,14 @@ export function DashboardShell({ children, ...context }: DashboardShellProps) {
                 <DashboardHeader fakeMode={context.fakeMode} />
                 <main
                   id="main-content"
-                  className="dashboard-main mx-auto flex w-full max-w-screen-2xl flex-1 flex-col px-4 py-6 md:px-8 md:py-8 lg:px-10"
+                  className="dashboard-main"
                   tabIndex={-1}
                 >
                   {children}
                 </main>
                 <footer className="dashboard-footer">
-                  TT Stats <span>Download activity. Audience. Operations.</span>
+                  <span>tt stats /</span>
+                  <span>Made for the people behind the bot.</span>
                 </footer>
               </SidebarInset>
             </SidebarProvider>

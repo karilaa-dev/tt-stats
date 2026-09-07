@@ -1,13 +1,18 @@
 import { useEffect, useRef } from "react"
 import { useForm, useSelector } from "@tanstack/react-form"
-import { useDashboardNavigate, useHydrated } from "@/lib/dashboard-context"
-import { SearchIcon, XIcon } from "lucide-react"
+import {
+  useDashboardContext,
+  useDashboardNavigate,
+  useHydrated,
+} from "@/lib/dashboard-context"
+import { ArrowUpRightIcon, SearchIcon, XIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
@@ -31,6 +36,7 @@ export function UserLookupForm({
 }) {
   const navigate = useDashboardNavigate()
   const hydrated = useHydrated()
+  const { fakeMode } = useDashboardContext()
   const navigatedId = useRef(initialId)
   const form = useForm({
     defaultValues: { id: initialId },
@@ -67,12 +73,10 @@ export function UserLookupForm({
   }, [initialId, navigate, typedId])
 
   return (
-    <Card className="mb-6">
+    <Card>
       <CardHeader>
         <CardTitle>Find a chat</CardTitle>
-        <CardDescription>
-          Look up a Telegram ID to inspect activity and export download history.
-        </CardDescription>
+        <CardDescription>Start with a Telegram ID.</CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -106,7 +110,7 @@ export function UserLookupForm({
                   <FieldLabel htmlFor={field.name}>
                     Telegram user or group ID
                   </FieldLabel>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-2">
                     <Input
                       disabled={!hydrated}
                       id={field.name}
@@ -116,12 +120,12 @@ export function UserLookupForm({
                       onChange={(event) =>
                         field.handleChange(event.target.value)
                       }
-                      placeholder="123456789 or -1001234567890"
+                      placeholder="Enter a chat ID"
                       autoComplete="off"
                       autoCapitalize="none"
                       spellCheck={false}
                       pattern="-?[0-9]+"
-                      className="h-11 sm:max-w-lg sm:flex-1"
+                      className="h-12 min-w-0 flex-1"
                       aria-invalid={!field.state.meta.isValid}
                       aria-describedby={
                         field.state.meta.isValid
@@ -129,41 +133,22 @@ export function UserLookupForm({
                           : `${field.name}-hint ${field.name}-error`
                       }
                     />
-                    <div className="flex gap-2">
+                    {field.state.value ? (
                       <Button
-                        type="submit"
-                        className="h-11 min-w-28 flex-1 sm:flex-none"
-                        disabled={
-                          !hydrated ||
-                          searching ||
-                          !field.state.value.trim() ||
-                          !parseTelegramId(field.state.value.trim())
-                        }
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="size-12"
+                        disabled={!hydrated}
+                        onClick={() => {
+                          field.handleChange("")
+                          document.getElementById(field.name)?.focus()
+                        }}
                       >
-                        {searching ? (
-                          <Spinner data-icon="inline-start" />
-                        ) : (
-                          <SearchIcon data-icon="inline-start" />
-                        )}
-                        {searching ? "Searching…" : "Search"}
+                        <XIcon />
+                        <span className="sr-only">Clear lookup</span>
                       </Button>
-                      {field.state.value ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="size-11"
-                          disabled={!hydrated}
-                          onClick={() => {
-                            field.handleChange("")
-                            document.getElementById(field.name)?.focus()
-                          }}
-                        >
-                          <XIcon />
-                          <span className="sr-only">Clear lookup</span>
-                        </Button>
-                      ) : null}
-                    </div>
+                    ) : null}
                   </div>
                   {!field.state.meta.isValid ? (
                     <FieldError id={`${field.name}-error`}>
@@ -171,15 +156,52 @@ export function UserLookupForm({
                     </FieldError>
                   ) : null}
                   <FieldDescription id={`${field.name}-hint`}>
-                    Searches automatically as you type. Group IDs start with a
-                    minus sign.
+                    Group IDs include a minus sign. Results update as you type.
                   </FieldDescription>
+                  <Button
+                    type="submit"
+                    className="mt-1 h-11 w-full"
+                    disabled={
+                      !hydrated ||
+                      searching ||
+                      !field.state.value.trim() ||
+                      !parseTelegramId(field.state.value.trim())
+                    }
+                  >
+                    {searching ? (
+                      <Spinner data-icon="inline-start" />
+                    ) : (
+                      <SearchIcon data-icon="inline-start" />
+                    )}
+                    {searching ? "Finding chat…" : "Search"}
+                  </Button>
                 </Field>
               )}
             </form.Field>
           </FieldGroup>
         </form>
       </CardContent>
+      {fakeMode ? (
+        <CardFooter className="flex-col items-start gap-2">
+          <p className="text-xs text-muted-foreground">Try a demo chat</p>
+          <div className="flex w-full flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={!hydrated}
+              onClick={() => form.setFieldValue("id", "123456789")}
+            >
+              Private user <ArrowUpRightIcon data-icon="inline-end" />
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!hydrated}
+              onClick={() => form.setFieldValue("id", "-1001234567890")}
+            >
+              Group <ArrowUpRightIcon data-icon="inline-end" />
+            </Button>
+          </div>
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }

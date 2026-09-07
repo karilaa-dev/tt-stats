@@ -57,42 +57,112 @@ export function DatabaseJobsPage() {
           </AlertDescription>
         </Alert>
       ) : null}
-      <DatabaseSetupCard
-        status={setupQuery.data}
-        checking={setupQuery.isPending || setupQuery.isFetching}
-        controlsDisabled={fakeMode}
-      />
-      <VideoInactivityCard
-        status={notificationStatus}
-        monitorDatabaseStatus={getVideoMonitorDatabaseStatus({
-          status: setupQuery.data,
-          queryFailed: setupQuery.isError,
-        })}
-        fakeMode={fakeMode}
-      />
-      {setupQuery.isError && !setupQuery.data ? (
-        <DashboardError
-          error={setupQuery.error}
-          reset={() => void setupQuery.refetch()}
-        />
-      ) : jobsQuery.isError && !jobsQuery.data ? (
-        <DashboardError
-          error={jobsQuery.error}
-          reset={() => void jobsQuery.refetch()}
-        />
-      ) : jobsQuery.data ? (
-        <div className="grid min-w-0 gap-6 2xl:grid-cols-2">
-          {jobsQuery.data.map((job) => (
-            <StatsJobCard
-              key={job.dataset}
-              job={job}
+      <div className="flex flex-col gap-8">
+        <section
+          aria-labelledby="database-health-heading"
+          className="grid items-start gap-5 xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-8"
+        >
+          <div>
+            <h2
+              id="database-health-heading"
+              className="font-heading text-lg font-semibold tracking-tight"
+            >
+              Database health
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Check the connection and required setup before changing schedules.
+            </p>
+          </div>
+          <div className="min-w-0 [&>[data-slot=card]]:mb-0">
+            <DatabaseSetupCard
+              status={setupQuery.data}
+              checking={setupQuery.isPending || setupQuery.isFetching}
               controlsDisabled={fakeMode}
             />
-          ))}
-        </div>
-      ) : canLoadJobs || fakeMode ? (
-        <DashboardLoading />
-      ) : null}
+            {setupQuery.isError && !setupQuery.data ? (
+              <DashboardError
+                error={setupQuery.error}
+                reset={() => void setupQuery.refetch()}
+              />
+            ) : null}
+          </div>
+        </section>
+        <section
+          aria-labelledby="refresh-schedules-heading"
+          className="grid items-start gap-5 border-t pt-8 xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-8"
+        >
+          <div>
+            <h2
+              id="refresh-schedules-heading"
+              className="font-heading text-lg font-semibold tracking-tight"
+            >
+              Refresh schedules
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Review the latest runs, change a schedule, or request a fresh
+              snapshot.
+            </p>
+          </div>
+          <div className="min-w-0">
+            {jobsQuery.isError && !jobsQuery.data ? (
+              <DashboardError
+                error={jobsQuery.error}
+                reset={() => void jobsQuery.refetch()}
+              />
+            ) : jobsQuery.data ? (
+              <div className="grid min-w-0 gap-6">
+                {jobsQuery.data.map((job) => (
+                  <StatsJobCard
+                    key={job.dataset}
+                    job={job}
+                    controlsDisabled={fakeMode}
+                  />
+                ))}
+              </div>
+            ) : canLoadJobs || fakeMode ? (
+              <DashboardLoading />
+            ) : (
+              <p className="rounded-2xl border border-dashed p-6 text-sm leading-relaxed text-muted-foreground">
+                Schedules will appear after the database connection, statistics
+                setup, and scheduler checks pass above.
+              </p>
+            )}
+          </div>
+        </section>
+        <section
+          aria-labelledby="delivery-monitor-heading"
+          className="grid items-start gap-5 border-t pt-8 xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-8"
+        >
+          <div>
+            <h2
+              id="delivery-monitor-heading"
+              className="font-heading text-lg font-semibold tracking-tight"
+            >
+              Delivery alerts
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Monitor interruptions in video deliveries and check notification
+              settings.
+            </p>
+          </div>
+          <div className="min-w-0 [&>[data-slot=card]]:mb-0">
+            {notificationQuery.isError && !notificationQuery.data ? (
+              <DashboardError
+                error={notificationQuery.error}
+                reset={() => void notificationQuery.refetch()}
+              />
+            ) : null}
+            <VideoInactivityCard
+              status={notificationStatus}
+              monitorDatabaseStatus={getVideoMonitorDatabaseStatus({
+                status: setupQuery.data,
+                queryFailed: setupQuery.isError,
+              })}
+              fakeMode={fakeMode}
+            />
+          </div>
+        </section>
+      </div>
     </>
   )
 }

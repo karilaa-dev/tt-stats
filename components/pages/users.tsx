@@ -9,6 +9,7 @@ import {
   DownloadIcon,
   FileArchiveIcon,
   ImagesIcon,
+  HistoryIcon,
   LanguagesIcon,
   LinkIcon,
   UserIcon,
@@ -71,111 +72,160 @@ export function UsersPage() {
     <>
       <PageHeading
         title="User lookup"
-        description="Investigate a chat's activity, preferences, and download history."
+        description="A closer look at the people and groups using your bot."
       />
-      <UserLookupForm
-        initialId={requested}
-        searching={Boolean(userId) && userQuery.isFetching}
-      />
-      {!requested ? (
-        <Empty className="min-h-72 border">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <UserRoundSearchIcon />
-            </EmptyMedia>
-            <EmptyTitle>Enter an ID to begin</EmptyTitle>
-            <EmptyDescription>
-              Paste a Telegram user or group ID above. You'll see their chat
-              profile, recent downloads, and a CSV export of their history.
-            </EmptyDescription>
-          </EmptyHeader>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Badge variant="outline">
-              <UserIcon data-icon="inline-start" />
-              Private users
-            </Badge>
-            <Badge variant="outline">
-              <UsersIcon data-icon="inline-start" />
-              Groups
-            </Badge>
-          </div>
-        </Empty>
-      ) : !userId ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyTitle>Invalid Telegram ID</EmptyTitle>
-            <EmptyDescription>
-              Use a signed integer without spaces or decimals.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : userQuery.isPending ? (
-        <UserResultLoading />
-      ) : userQuery.isError ? (
-        <Alert variant="destructive">
-          <UserRoundSearchIcon />
-          <AlertTitle>Lookup failed</AlertTitle>
-          <AlertDescription className="flex flex-col items-start gap-3">
-            <p>
-              The database could not complete this lookup. Try again in a
-              moment.
+      <div className="grid items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)] xl:gap-8">
+        <aside
+          className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-44"
+          aria-label="Lookup controls"
+        >
+          <UserLookupForm
+            initialId={requested}
+            searching={Boolean(userId) && userQuery.isFetching}
+          />
+          <div className="hidden flex-col gap-3 px-2 lg:flex">
+            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+              About chat IDs
             </p>
-            <Button
-              variant="outline"
-              disabled={userQuery.isFetching}
-              onClick={() => void userQuery.refetch()}
-            >
-              {userQuery.isFetching ? "Retrying…" : "Retry lookup"}
-            </Button>
-          </AlertDescription>
-        </Alert>
-      ) : !userQuery.data ? (
-        <Empty className="border">
-          <EmptyHeader>
-            <EmptyTitle>No matching chat</EmptyTitle>
-            <EmptyDescription>
-              No user or group exists with ID {userId}. Check the ID and include
-              the minus sign for a group.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <UserResult user={userQuery.data} />
-          {downloadsQuery.isError ? (
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Use the numeric ID from your bot's records. Usernames, phone
+              numbers, and invite links can't be searched here.
+            </p>
+            <Separator />
+            <div className="flex items-start gap-3">
+              <UserIcon
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  Private users
+                </span>
+                <br />A positive number
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <UsersIcon
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">Groups</span>
+                <br />A number starting with a minus sign
+              </p>
+            </div>
+          </div>
+        </aside>
+        <section
+          className="min-w-0"
+          aria-label="Chat results"
+          aria-busy={Boolean(userId) && userQuery.isPending}
+        >
+          {!requested ? (
+            <Card>
+              <Empty className="px-5 py-6 lg:min-h-80 lg:py-12">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <UserRoundSearchIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>Enter an ID to begin</EmptyTitle>
+                  <EmptyDescription>
+                    Find a chat to see their profile and what they've
+                    downloaded.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+              <CardFooter className="hidden justify-center gap-6 lg:flex">
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <HistoryIcon className="size-4" aria-hidden="true" />
+                  Download history
+                </p>
+                <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <DownloadIcon className="size-4" aria-hidden="true" />
+                  CSV export
+                </p>
+              </CardFooter>
+            </Card>
+          ) : !userId ? (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>Invalid Telegram ID</EmptyTitle>
+                <EmptyDescription>
+                  Use a signed integer without spaces or decimals.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : userQuery.isPending ? (
+            <UserResultLoading />
+          ) : userQuery.isError ? (
             <Alert variant="destructive">
-              <FileArchiveIcon />
-              <AlertTitle>Download history unavailable</AlertTitle>
+              <UserRoundSearchIcon />
+              <AlertTitle>Lookup failed</AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-3">
                 <p>
-                  The user was found, but their recent downloads could not be
-                  loaded.
+                  The database could not complete this lookup. Try again in a
+                  moment.
                 </p>
                 <Button
                   variant="outline"
-                  disabled={downloadsQuery.isFetching}
-                  onClick={() => void downloadsQuery.refetch()}
+                  disabled={userQuery.isFetching}
+                  onClick={() => void userQuery.refetch()}
                 >
-                  {downloadsQuery.isFetching ? "Retrying…" : "Retry history"}
+                  {userQuery.isFetching ? "Retrying…" : "Retry lookup"}
                 </Button>
               </AlertDescription>
             </Alert>
+          ) : !userQuery.data ? (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>No matching chat</EmptyTitle>
+                <EmptyDescription>
+                  No user or group exists with ID {userId}. Check the ID and
+                  include the minus sign for a group.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
-            <UserDownloadsTable
-              data={downloadsQuery.data}
-              loading={downloadsQuery.isPending}
-              refreshing={
-                downloadsQuery.isFetching && !downloadsQuery.isPending
-              }
-              onPageChange={(nextPage) =>
-                navigate({
-                  search: (previous) => ({ ...previous, page: nextPage }),
-                })
-              }
-            />
+            <div className="flex flex-col gap-6">
+              <UserResult user={userQuery.data} />
+              {downloadsQuery.isError ? (
+                <Alert variant="destructive">
+                  <FileArchiveIcon />
+                  <AlertTitle>Download history unavailable</AlertTitle>
+                  <AlertDescription className="flex flex-col items-start gap-3">
+                    <p>
+                      The user was found, but their recent downloads could not
+                      be loaded.
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={downloadsQuery.isFetching}
+                      onClick={() => void downloadsQuery.refetch()}
+                    >
+                      {downloadsQuery.isFetching
+                        ? "Retrying…"
+                        : "Retry history"}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <UserDownloadsTable
+                  data={downloadsQuery.data}
+                  loading={downloadsQuery.isPending}
+                  refreshing={
+                    downloadsQuery.isFetching && !downloadsQuery.isPending
+                  }
+                  onPageChange={(nextPage) =>
+                    navigate({
+                      search: (previous) => ({ ...previous, page: nextPage }),
+                    })
+                  }
+                />
+              )}
+            </div>
           )}
-        </div>
-      )}
+        </section>
+      </div>
     </>
   )
 }
@@ -185,25 +235,32 @@ function UserResult({ user }: { user: UserStats }) {
   const time = useBrowserTime()
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="gap-y-2">
         <CardTitle>
-          <span className="font-mono break-all">{user.userId}</span>
+          <span className="flex items-center gap-3">
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              {group ? (
+                <UsersIcon className="size-5" aria-hidden="true" />
+              ) : (
+                <UserIcon className="size-5" aria-hidden="true" />
+              )}
+            </span>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span>{group ? "Group" : "Private user"}</span>
+              <span className="font-mono text-sm font-normal break-all text-muted-foreground">
+                {user.userId}
+              </span>
+            </span>
+          </span>
         </CardTitle>
         <CardDescription>Telegram chat profile</CardDescription>
         <CardAction>
-          <Badge variant="outline">
-            {group ? (
-              <UsersIcon data-icon="inline-start" />
-            ) : (
-              <UserIcon data-icon="inline-start" />
-            )}
-            {group ? "Group" : "Private user"}
-          </Badge>
+          <Badge variant="secondary">Chat profile</Badge>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <dl className="grid grid-cols-2 gap-4">
-          <div>
+        <dl className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-muted/60 p-4">
             <dt className="flex items-center gap-2 text-sm text-muted-foreground">
               <DownloadIcon className="size-4" aria-hidden="true" />
               Downloads
@@ -212,7 +269,7 @@ function UserResult({ user }: { user: UserStats }) {
               {BigInt(user.downloads).toLocaleString("en-US")}
             </dd>
           </div>
-          <div>
+          <div className="rounded-2xl bg-muted/60 p-4">
             <dt className="flex items-center gap-2 text-sm text-muted-foreground">
               <ImagesIcon className="size-4" aria-hidden="true" />
               Image albums
@@ -223,7 +280,7 @@ function UserResult({ user }: { user: UserStats }) {
           </div>
         </dl>
         <Separator />
-        <dl className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="grid grid-cols-2 gap-5 xl:grid-cols-4">
           <Detail
             icon={CalendarClockIcon}
             label="Registered"
@@ -254,7 +311,10 @@ function UserResult({ user }: { user: UserStats }) {
           />
         </dl>
       </CardContent>
-      <CardFooter>
+      <CardFooter className="justify-between gap-3">
+        <p className="hidden text-xs text-muted-foreground sm:block">
+          Export this chat's full download history.
+        </p>
         <a
           href={`/api/users/${encodeURIComponent(user.userId)}/history.csv`}
           className={buttonVariants({ variant: "outline", size: "lg" })}

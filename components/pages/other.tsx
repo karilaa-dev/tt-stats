@@ -48,62 +48,89 @@ export function OtherPage() {
       ) : !stats ? (
         <DashboardLoading />
       ) : (
-        <div className="grid gap-6 xl:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardDescription>Users with file mode enabled</CardDescription>
-              <CardTitle className="text-3xl tabular-nums">
+        <div className="flex flex-col gap-6">
+          <dl className="grid gap-5 rounded-2xl border bg-card p-6 sm:grid-cols-3 sm:gap-8">
+            <div>
+              <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+                <FilesIcon className="size-4" aria-hidden="true" />
+                Users with file mode enabled
+              </dt>
+              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
                 {BigInt(stats.fileModeUsers).toLocaleString("en-US")}
-              </CardTitle>
-              <CardAction>
-                <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <FilesIcon className="size-5" aria-hidden="true" />
-                </div>
-              </CardAction>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Top downloaders</CardTitle>
-              <CardDescription>
-                Private users and groups by video history count.
-              </CardDescription>
-              <CardAction>
-                <TrophyIcon className="size-5 text-muted-foreground" />
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <RankedTable
-                rows={stats.topDownloaders}
-                valueLabel="Telegram ID"
-                countLabel="Downloads"
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Languages</CardTitle>
-              <CardDescription>
-                All stored language values, highest count first.
-              </CardDescription>
-              <CardAction>
-                <LanguagesIcon className="size-5 text-muted-foreground" />
-              </CardAction>
-            </CardHeader>
-            <CardContent>
-              <RankedTable
-                rows={stats.languages}
-                valueLabel="Language"
-                page={page}
-                pageSize={PAGE_SIZE}
-                onPageChange={(nextPage) =>
-                  navigate({ search: { page: nextPage } })
-                }
-                renderValue={(value) => <LanguageValue value={value} />}
-              />
-            </CardContent>
-          </Card>
-          <BotstatCard />
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-muted-foreground">Language values</dt>
+              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
+                {stats.languages.length.toLocaleString("en-US")}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-sm text-muted-foreground">
+                Most common language
+              </dt>
+              <dd className="mt-2 text-xl font-semibold tracking-tight">
+                {stats.languages[0] ? (
+                  <LanguageValue value={stats.languages[0].value} />
+                ) : (
+                  "No language data"
+                )}
+              </dd>
+            </div>
+          </dl>
+          <div className="grid items-start gap-6 xl:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Languages</CardTitle>
+                <CardDescription>
+                  How your audience is distributed by stored language.
+                </CardDescription>
+                <CardAction>
+                  <LanguagesIcon
+                    className="size-5 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </CardAction>
+              </CardHeader>
+              <CardContent>
+                <RankedTable
+                  rows={stats.languages}
+                  valueLabel="Language"
+                  countLabel="Chats"
+                  page={page}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={(nextPage) =>
+                    navigate({ search: { page: nextPage } })
+                  }
+                  renderValue={(value) => <LanguageValue value={value} />}
+                />
+              </CardContent>
+            </Card>
+            <div className="flex min-w-0 flex-col gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top downloaders</CardTitle>
+                  <CardDescription>
+                    Private users and groups by video history count.
+                  </CardDescription>
+                  <CardAction>
+                    <TrophyIcon
+                      className="size-5 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <RankedTable
+                    rows={stats.topDownloaders}
+                    valueLabel="Telegram ID"
+                    countLabel="Downloads"
+                  />
+                </CardContent>
+              </Card>
+              <BotstatCard />
+            </div>
+          </div>
         </div>
       )}
     </>
