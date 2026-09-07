@@ -42,36 +42,51 @@ function OverviewPage() {
               Groups
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="users" className="mt-6 flex flex-col gap-8">
+          <TabsContent value="users" className="mt-6 grid gap-6 xl:grid-cols-2">
             <section>
               <SectionHeading
                 title="All time"
                 description="Private-user history through the last completed UTC day"
               />
-              <StatsCards stats={overview.users.all} />
+              <StatsCards
+                stats={overview.users.all}
+                cacheDisplay="percentage"
+              />
             </section>
             <section>
               <SectionHeading
                 title="Last 24 hours"
                 description="Latest 48 completed half-hour buckets"
               />
-              <StatsCards stats={overview.users.last24Hours} />
+              <StatsCards
+                stats={overview.users.last24Hours}
+                cacheDisplay="percentage"
+              />
             </section>
           </TabsContent>
-          <TabsContent value="groups" className="mt-6 flex flex-col gap-8">
+          <TabsContent
+            value="groups"
+            className="mt-6 grid gap-6 xl:grid-cols-2"
+          >
             <section>
               <SectionHeading
                 title="All time"
                 description="Group history through the last completed UTC day"
               />
-              <StatsCards stats={overview.groups.all} />
+              <StatsCards
+                stats={overview.groups.all}
+                cacheDisplay="percentage"
+              />
             </section>
             <section>
               <SectionHeading
                 title="Last 24 hours"
                 description="Latest 48 completed half-hour buckets"
               />
-              <StatsCards stats={overview.groups.last24Hours} />
+              <StatsCards
+                stats={overview.groups.last24Hours}
+                cacheDisplay="percentage"
+              />
             </section>
           </TabsContent>
         </Tabs>

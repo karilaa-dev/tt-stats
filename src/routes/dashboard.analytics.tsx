@@ -4,10 +4,14 @@ import { createFileRoute } from "@tanstack/react-router"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
+import { CachePerformanceCard } from "@/components/dashboard/stats-cards"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
 import { TimeSeriesChart } from "@/components/dashboard/time-series-chart"
 import { useBrowserTime } from "@/lib/browser-time"
-import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
+import {
+  statsBreakdownQueryOptions,
+  timeSeriesQueryOptions,
+} from "@/lib/stats/query-options"
 import { parseStatsRange } from "@/lib/stats/validation"
 
 export const Route = createFileRoute("/dashboard/analytics")({
@@ -24,6 +28,9 @@ export const Route = createFileRoute("/dashboard/analytics")({
     void context.queryClient.prefetchQuery(
       timeSeriesQueryOptions("music", range)
     )
+    void context.queryClient.prefetchQuery(
+      statsBreakdownQueryOptions("all", range)
+    )
   },
   component: AnalyticsPage,
 })
@@ -35,23 +42,28 @@ function AnalyticsPage() {
   const usersQuery = useQuery(timeSeriesQueryOptions("users", range))
   const videosQuery = useQuery(timeSeriesQueryOptions("videos", range))
   const musicQuery = useQuery(timeSeriesQueryOptions("music", range))
-  const queries = [usersQuery, videosQuery, musicQuery]
+  const cacheQuery = useQuery(statsBreakdownQueryOptions("all", range))
+  const queries = [usersQuery, videosQuery, musicQuery, cacheQuery]
   const failed = queries.some((query) => query.isError && !query.data)
   const loading = queries.some((query) => !query.data)
 
   return (
     <>
-      <PageHeading
-        title="Analytics"
-        description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
-      />
-      <StatsFilters
-        range={range}
-        showScope={false}
-        onRangeChange={(nextRange) =>
-          navigate({ search: { range: nextRange } })
-        }
-      />
+      <div className="mb-6 grid gap-4 xl:grid-cols-[minmax(16rem,1fr)_auto] xl:items-end">
+        <PageHeading
+          title="Analytics"
+          description={`Completed UTC-duration buckets displayed in ${time.timeZone}.`}
+          className="mb-0"
+        />
+        <StatsFilters
+          range={range}
+          showScope={false}
+          className="mb-0"
+          onRangeChange={(nextRange) =>
+            navigate({ search: { range: nextRange } })
+          }
+        />
+      </div>
       {failed ? (
         <DashboardError
           error={queries.find((query) => query.isError)?.error}
@@ -84,6 +96,7 @@ function AnalyticsPage() {
             range={range}
             color="var(--chart-3)"
           />
+          <CachePerformanceCard stats={cacheQuery.data!} />
         </div>
       )}
     </>

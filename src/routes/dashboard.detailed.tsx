@@ -30,24 +30,28 @@ function DetailedPage() {
   const statsQuery = useQuery(statsBreakdownQueryOptions(scope, range))
   return (
     <>
-      <PageHeading
-        title="Detailed statistics"
-        description="Choose a linkable chat scope and completed reporting period."
-      />
-      <StatsFilters
-        scope={scope}
-        range={range}
-        onScopeChange={(nextScope) =>
-          navigate({
-            search: (previous) => ({ ...previous, scope: nextScope }),
-          })
-        }
-        onRangeChange={(nextRange) =>
-          navigate({
-            search: (previous) => ({ ...previous, range: nextRange }),
-          })
-        }
-      />
+      <div className="mb-6 grid gap-4 2xl:grid-cols-[minmax(16rem,1fr)_auto] 2xl:items-end">
+        <PageHeading
+          title="Detailed statistics"
+          description="Choose a linkable chat scope and completed reporting period."
+          className="mb-0"
+        />
+        <StatsFilters
+          scope={scope}
+          range={range}
+          className="mb-0"
+          onScopeChange={(nextScope) =>
+            navigate({
+              search: (previous) => ({ ...previous, scope: nextScope }),
+            })
+          }
+          onRangeChange={(nextRange) =>
+            navigate({
+              search: (previous) => ({ ...previous, range: nextRange }),
+            })
+          }
+        />
+      </div>
       {statsQuery.isError && !statsQuery.data ? (
         <DashboardError
           error={statsQuery.error}

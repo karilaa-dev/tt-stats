@@ -8,7 +8,7 @@ export function DashboardLoading({
 }: {
   variant?: "cards" | "charts" | "table"
 }) {
-  const count = variant === "charts" ? 3 : variant === "table" ? 1 : 6
+  const count = variant === "charts" ? 4 : variant === "table" ? 1 : 6
 
   return (
     <div

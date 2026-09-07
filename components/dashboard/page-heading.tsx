@@ -1,12 +1,16 @@
+import { cn } from "@/lib/utils"
+
 export function PageHeading({
   title,
   description,
+  className,
 }: {
   title: string
   description: string
+  className?: string
 }) {
   return (
-    <div className="mb-6 max-w-3xl">
+    <div className={cn("mb-6 max-w-3xl", className)}>
       <p className="mb-1 text-xs font-medium tracking-widest text-primary uppercase">
         TT Stats
       </p>

@@ -2,6 +2,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Card, CardContent } from "@/components/ui/card"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import type { ChatScope, StatsRange } from "@/lib/stats/types"
+import { cn } from "@/lib/utils"
 
 const scopeOptions: Array<{ value: ChatScope; label: string }> = [
   { value: "users", label: "Users" },
@@ -19,17 +20,19 @@ export function StatsFilters({
   scope,
   range,
   showScope = true,
+  className,
   onScopeChange,
   onRangeChange,
 }: {
   scope?: ChatScope
   range: StatsRange
   showScope?: boolean
+  className?: string
   onScopeChange?: (scope: ChatScope) => void
   onRangeChange: (range: StatsRange) => void
 }) {
   return (
-    <Card className="mb-6">
+    <Card className={cn("mb-6", className)}>
       <CardContent>
         <FieldGroup className="sm:flex-row sm:items-end">
           {showScope && scope ? (

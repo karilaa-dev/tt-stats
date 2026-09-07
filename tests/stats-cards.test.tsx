@@ -3,7 +3,10 @@
 import { cleanup, render, screen, within } from "@testing-library/react"
 import { afterEach, describe, expect, it } from "vitest"
 
-import { StatsCards } from "@/components/dashboard/stats-cards"
+import {
+  CachePerformanceCard,
+  StatsCards,
+} from "@/components/dashboard/stats-cards"
 import type { StatsBreakdown } from "@/lib/stats/types"
 
 const stats: StatsBreakdown = {
@@ -37,6 +40,35 @@ describe("statistics cards", () => {
     const missesCard = cardFor("Cache misses")
     expect(within(missesCard).getByText("2")).toBeTruthy()
     expect(within(missesCard).getByText("66.7% miss rate")).toBeTruthy()
+  })
+
+  it("shows only the cache hit percentage in overview mode", () => {
+    render(<StatsCards stats={stats} cacheDisplay="percentage" />)
+
+    const rateCard = cardFor("Cache hit rate")
+    expect(within(rateCard).getByText("33.3%")).toBeTruthy()
+    expect(
+      within(rateCard).getByText("Downloads served from cache")
+    ).toBeTruthy()
+    expect(screen.queryByText("Cache hits")).toBeNull()
+    expect(screen.queryByText("Cache misses")).toBeNull()
+  })
+
+  it("shows cache hit and miss totals in the analytics card", () => {
+    render(<CachePerformanceCard stats={stats} />)
+
+    expect(
+      within(cardFor("Cache performance")).getByText("Cache hits")
+    ).toBeTruthy()
+    expect(
+      within(cardFor("Cache performance")).getByText("Cache misses")
+    ).toBeTruthy()
+    expect(
+      within(cardFor("Cache performance")).getByText("33.3% of downloads")
+    ).toBeTruthy()
+    expect(
+      within(cardFor("Cache performance")).getByText("66.7% of downloads")
+    ).toBeTruthy()
   })
 
   it("shows zero rates when there are no downloads", () => {
