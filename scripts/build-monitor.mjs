@@ -1,15 +1,19 @@
-import { build } from "esbuild"
+import { build, write } from "bun"
 
 export async function buildMonitor(outfile) {
-  await build({
-    entryPoints: ["server/plugins/video-inactivity-listener.ts"],
-    outfile,
-    bundle: true,
-    platform: "node",
+  const result = await build({
+    entrypoints: ["server/plugins/video-inactivity-listener.ts"],
+    target: "bun",
     format: "esm",
-    target: "node22",
     packages: "external",
   })
+  if (!result.success) {
+    throw new AggregateError(
+      result.logs,
+      "Failed to bundle the notification monitor"
+    )
+  }
+  await write(outfile, result.outputs[0])
 }
 if (process.argv[1]?.endsWith("build-monitor.mjs")) {
   await buildMonitor("dist/monitor.mjs")

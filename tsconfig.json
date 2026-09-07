@@ -5,7 +5,7 @@
     "jsxImportSource": "react",
     "target": "ES2022",
     "paths": { "@/*": ["./*"] },
-    "types": ["node"]
+    "types": ["bun"]
   },
   "include": [".astro/types.d.ts", "**/*"],
   "exclude": ["node_modules", "dist"]

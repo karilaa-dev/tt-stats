@@ -8,6 +8,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // Transform Zod's exports to avoid Vitest's external-module interop on Bun.
+    server: { deps: { inline: ["zod"] } },
     include: ["tests/**/*.test.{ts,tsx}"],
     restoreMocks: true,
   },

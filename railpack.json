@@ -2,9 +2,10 @@
   "$schema": "https://schema.railpack.com",
   "steps": {
     "install": {
-      "variables": {
-        "NPM_CONFIG_INCLUDE": "dev"
-      }
+      "commands": ["bun install --frozen-lockfile"]
     }
+  },
+  "deploy": {
+    "startCommand": "bun run start"
   }
 }

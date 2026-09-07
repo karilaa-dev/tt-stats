@@ -59,7 +59,8 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
       () => checkedOutClient.release()
     )
 
-    return new Response(Readable.toWeb(output) as ReadableStream, {
+    // Node and Bun declare different reader overloads for the same web stream.
+    return new Response(Readable.toWeb(output) as unknown as ReadableStream, {
       headers: csvHeaders(parsedId),
     })
   } catch {

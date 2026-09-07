@@ -176,7 +176,10 @@ export function buildNotificationRequest(
 export async function deliverVideoNotification(
   notification: VideoNotification,
   env: VideoMonitorEnv,
-  fetcher: typeof fetch = fetch
+  fetcher: (
+    input: RequestInfo | URL,
+    init?: RequestInit
+  ) => Promise<Response> = fetch
 ): Promise<void> {
   const request = buildNotificationRequest(notification, env)
   let response: Response
@@ -198,7 +201,10 @@ export async function deliverVideoNotification(
 export async function checkVideoInactivity(
   options: {
     pool?: Pool
-    fetcher?: typeof fetch
+    fetcher?: (
+      input: RequestInfo | URL,
+      init?: RequestInit
+    ) => Promise<Response>
     nowMs?: number
     env?: VideoMonitorEnv | null
   } = {}

@@ -4,5 +4,4 @@ node_modules/
 .turbo/
 coverage/
 src/routeTree.gen.ts
-pnpm-lock.yaml
-.pnpm-store/
+bun.lock

@@ -20,7 +20,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "TT_STATS_FAKE_DATA=true node scripts/browser-server.mjs",
+    command: "TT_STATS_FAKE_DATA=true bun scripts/browser-server.mjs",
     url: "http://127.0.0.1:4175/dashboard/",
     reuseExistingServer: !process.env.CI,
   },

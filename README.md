@@ -24,14 +24,13 @@ TanStack Charts is currently pre-alpha. The lockfile pins the tested release use
 
 Astro routes live in `src/pages`. Each dashboard page hydrates its own React island, sharing the shell in `components/dashboard/dashboard-shell.tsx`. Filters and lookup pagination stay in the URL and support browser back/forward. `src/actions` validates server inputs and calls the existing PostgreSQL query layer. Database and credential modules are blocked from browser builds.
 
-The notification monitor starts with the dev server and with `npm start`, and closes its listeners on shutdown. `npm run build` bundles it separately as `dist/monitor.mjs`.
+The notification monitor starts with the dev server and with `bun run start`, and closes its listeners on shutdown. `bun run build` bundles it separately as `dist/monitor.mjs`.
 
 Rare UI source is checked into `components/ui/bounce-sidebar.tsx` and `components/ui/animated-counter.tsx`. The sidebar uses native links and respects reduced motion. Counters retain exact text for counts beyond JavaScript's safe integer range. Both components are adapted from the [Rare UI registry](https://www.rareui.com/components).
 
 ## Requirements
 
-- Node.js 22.12 or newer
-- npm
+- [Bun](https://bun.sh/) 1.4.2, pinned in `.bun-version` and `package.json`
 - A tt-bot v6 PostgreSQL database, verified against v6.0.10
 - PostgreSQL 11+ with [`pg_cron`](https://github.com/citusdata/pg_cron) 1.5+ available
 - A reverse proxy that authenticates every application request except the health check
@@ -201,20 +200,24 @@ foreign key and delivery constraints. TT Stats reads download events from
 `DB_URL` may point to a local PostgreSQL server, for example `postgresql://tt_stats:password@127.0.0.1:5432/ttbot-db`.
 
 ```bash
-npm install
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 ```
 
 Open <http://localhost:3000>. To run the interface without PostgreSQL in development, set `TT_STATS_FAKE_DATA=true`; example lookup IDs are `123456789`, `-1009876543210`, and `9007199254740993`.
 
+All scripts explicitly use Bun as their runtime. Astro retains its Vite pipeline and `@astrojs/node` adapter, whose standalone output runs on Bun. The notification monitor uses `Bun.build`. PostgreSQL pooling, LISTEN/NOTIFY, and cursor-based CSV streaming retain `pg` and `pg-query-stream`.
+
+The test suite runs Vitest on Bun to preserve per-file jsdom environments, hoisted mocks, and asynchronous fake timers. Use `bun run test`, which invokes the configured suite, rather than Bun's separate `bun test` runner.
+
 Useful commands:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npm start
+bun run lint
+bun run typecheck
+bun run test
+bun run build
+bun run start
 ```
 
 Database integration tests are opt-in locally because they recreate the `users`, `video_details`, `videos`, and `music` tables in the configured test database. Never target a production database:
@@ -222,7 +225,7 @@ Database integration tests are opt-in locally because they recreate the `users`,
 ```bash
 RUN_DATABASE_INTEGRATION=1 \
 TEST_DB_URL=postgresql://postgres:postgres@127.0.0.1:5432/tt_stats_test \
-npm test
+bun run test
 ```
 
 Full job-management integration tests additionally require a pg_cron-enabled
@@ -245,13 +248,13 @@ The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"
 
 The application contains no login page, credentials, cookies, sessions, middleware guards, or authorization checks. The CSV endpoint and Astro Actions at `/_actions/*` are also unguarded at the application layer.
 
-Keep the application origin private and make the reverse proxy the only network path to it. Protect the entire origin, not only `/dashboard`; if the health check must remain public, exempt only `/api/health`. Forward the original host/protocol headers and do not expose the Node listener directly to an untrusted network.
+Keep the application origin private and make the reverse proxy the only network path to it. Protect the entire origin, not only `/dashboard`; if the health check must remain public, exempt only `/api/health`. Forward the original host/protocol headers and do not expose the Bun listener directly to an untrusted network.
 
 ## Dokploy and Railpack
 
-Connect this repository as a Node.js application. `npm run build` builds Astro and the notification monitor. `npm start` starts the monitor and Astro's standalone Node server from `dist/server/entry.mjs`. Set `HOST=0.0.0.0` and the platform-provided `PORT`. Supply production secrets through the platform environment; the standalone server does not read `.env.local`.
+Connect this repository as a Bun application. `bun run build` builds Astro and the notification monitor. `bun run start` starts the monitor and Astro's standalone server on Bun from `dist/server/entry.mjs`. Set `HOST=0.0.0.0` and the platform-provided `PORT`. Supply production secrets through the platform environment. Bun automatically loads `.env` files, including `.env.local`, so keep local secret files out of the deployment image.
 
-The checked-in `railpack.json` keeps development dependencies available during the image build, even when the deployment environment sets npm's legacy `production` option. Vite and the Tailwind/Vite plugins are build-time dependencies and must be installed before `npm run build`.
+Railpack detects Bun from `packageManager` and `bun.lock`. The checked-in `railpack.json` installs the frozen lockfile with development dependencies for the Astro build and starts the application with Bun.
 
 Set the health check path to `/api/health`. Keep PostgreSQL private where possible and allow only the deployment network to reach it.
 
