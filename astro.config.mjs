@@ -22,6 +22,11 @@ const allowedHosts = process.env.DEV_ALLOWED_ORIGINS?.split(",")
 let stopMonitor
 
 export default defineConfig({
+  site: "https://tt-stats.karilaa.dev",
+  security: {
+    // Dokploy terminates HTTPS before forwarding requests to the Bun server.
+    allowedDomains: [{ protocol: "https", hostname: "tt-stats.karilaa.dev" }],
+  },
   output: "server",
   adapter: node({ mode: "standalone" }),
   integrations: [
