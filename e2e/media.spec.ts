@@ -39,7 +39,7 @@ test("history opens media and links cache-hit downloads to other chats", async (
   await expect(others.getByRole("table")).toBeVisible()
   await others.getByRole("link", { name: "9007199254740993" }).click()
   await expect(page).toHaveURL(/id=9007199254740993/)
-  await expect(page.getByText("Telegram chat profile")).toBeVisible()
+  await expect(page.getByText("Saved bot records")).toBeVisible()
 })
 
 test("top videos show ranked counts and preserve page navigation", async ({
