@@ -22,7 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
+import { getSafeDatabaseError } from "@/lib/db/errors"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Empty,
   EmptyHeader,
@@ -39,6 +41,7 @@ import {
 export function VideosPage() {
   const { page: requestedPage } = useDashboardSearch()
   const page = Math.min(requestedPage, 1_000_000)
+  const time = useBrowserTime()
   const navigate = useDashboardNavigate()
   const query = useQuery(popularVideosQueryOptions(page))
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
@@ -54,11 +57,14 @@ export function VideosPage() {
       />
       <Card aria-busy={query.isFetching}>
         <CardHeader>
-          <CardTitle>Top videos</CardTitle>
+          <CardTitle>Top 1,000 videos</CardTitle>
           <CardDescription>
             Includes cache hits and misses. Older records without a video
             identity are grouped by their exact saved link. Image albums are
-            excluded.
+            excluded. Rankings update daily.
+            {query.data
+              ? ` Last updated ${formatTimestamp(query.data.refreshedAt, time)}.`
+              : ""}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -66,8 +72,17 @@ export function VideosPage() {
             <Spinner aria-label="Loading top videos" />
           ) : query.isError ? (
             <Alert variant="destructive">
+              <AlertTitle>{getSafeDatabaseError(query.error).title}</AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-2">
-                Could not load the video ranking.
+                <p>{getSafeDatabaseError(query.error).description}</p>
+                <p>
+                  If the ranking has not been installed, open Operations, update
+                  database definitions, then wait for the daily refresh to
+                  finish.
+                </p>
+                <a href="/dashboard/jobs" className="underline">
+                  Open Operations
+                </a>
                 <Button variant="outline" onClick={() => void query.refetch()}>
                   Try again
                 </Button>

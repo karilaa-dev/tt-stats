@@ -276,11 +276,21 @@ video identity. It lists other users and groups sharing that identity, including
 their cache hits and misses, and links to their user lookup pages. The selected
 chat is excluded.
 
-**Top videos** at `/dashboard/videos` ranks all video download events, including
-repeat downloads, with a separate unique-chat count. It excludes image albums.
+**Top videos** at `/dashboard/videos` shows the 1,000 most-downloaded videos.
+Ranking counts include all video download events, including repeat downloads,
+with a separate unique-chat count. It excludes image albums.
 Linked events are grouped by `video_details_id`; unlinked legacy events are
 grouped by exact shared URL and cannot be merged across URL aliases. This is a
-live, paginated query and requires admin access.
+daily snapshot and requires admin access. Page reads use the stored rank index;
+opening or paging this view does not scan download history. The daily job builds
+the top 1,000 in the background, calculating distinct-chat counts only for those
+winners and keeping the previous snapshot readable
+until the new one commits.
+
+After upgrading, open Operations and use **Update database definitions**, which
+queues the daily rebuild. Wait for that rebuild to finish. Until then, Top videos
+shows setup instructions. The page displays its own snapshot timestamp. Separate
+runtime roles also need the updated grants in `003_stats_snapshot_grants.sql`.
 
 Existing runtime roles need `SELECT` on `public.video_details`. Reapply
 `database/003_stats_snapshot_grants.sql` as the database administrator with

@@ -47,6 +47,79 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.rankings (
   PRIMARY KEY (category, position)
 );
 
+-- Ranking pages read this table by position instead of grouping live history.
+CREATE TABLE IF NOT EXISTS tt_stats_cache.popular_videos (
+  position BIGINT PRIMARY KEY CHECK (position > 0),
+  download_id BIGINT NOT NULL,
+  shared_link TEXT NOT NULL,
+  downloads BIGINT NOT NULL CHECK (downloads > 0),
+  unique_chats BIGINT NOT NULL CHECK (unique_chats > 0)
+);
+
+CREATE TABLE IF NOT EXISTS tt_stats_cache.popular_videos_metadata (
+  singleton BOOLEAN PRIMARY KEY DEFAULT TRUE CHECK (singleton),
+  refreshed_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE OR REPLACE FUNCTION tt_stats_cache._refresh_popular_videos(p_now TIMESTAMPTZ)
+RETURNS VOID
+LANGUAGE plpgsql
+SET search_path = pg_catalog, tt_stats_cache
+AS $$
+BEGIN
+  -- The daily job owns the refresh lock and transaction. Readers retain the
+  -- previous complete ranking until both the data and timestamp commit.
+  DELETE FROM tt_stats_cache.popular_videos;
+  INSERT INTO tt_stats_cache.popular_videos (
+    position, download_id, shared_link, downloads, unique_chats
+  )
+  WITH candidates AS (
+    -- Rank by the inexpensive event count first. Only the top 1,000 need
+    -- distinct-chat counts, links, and persisted ranks, even with millions
+    -- of distinct posts in the source history.
+    SELECT video_details_id,
+           CASE WHEN video_details_id IS NULL THEN shared_link END AS legacy_link,
+           min(pk_id) AS download_id, count(*) AS downloads
+    FROM public.videos
+    WHERE media_kind = 'video'
+    GROUP BY video_details_id,
+             CASE WHEN video_details_id IS NULL THEN shared_link END
+    ORDER BY count(*) DESC, min(pk_id)
+    LIMIT 1000
+  ),
+  winners AS (
+    SELECT row_number() OVER (ORDER BY downloads DESC, download_id) AS position,
+           candidates.*
+    FROM candidates
+  ),
+  chats AS (
+    -- Separate equality joins let PostgreSQL use the existing details index
+    -- or a hash join. An OR join here could scan history once per winner.
+    SELECT winners.download_id, count(DISTINCT videos.user_id) AS unique_chats
+    FROM winners
+    JOIN public.videos ON videos.video_details_id = winners.video_details_id
+    WHERE videos.media_kind = 'video'
+    GROUP BY winners.download_id
+    UNION ALL
+    SELECT winners.download_id, count(DISTINCT videos.user_id) AS unique_chats
+    FROM winners
+    JOIN public.videos ON videos.shared_link = winners.legacy_link
+      AND videos.video_details_id IS NULL
+    WHERE winners.video_details_id IS NULL AND videos.media_kind = 'video'
+    GROUP BY winners.download_id
+  )
+  SELECT winners.position, winners.download_id, source.shared_link,
+         winners.downloads, chats.unique_chats
+  FROM winners
+  JOIN chats USING (download_id)
+  JOIN public.videos source ON source.pk_id = winners.download_id;
+
+  INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at)
+  VALUES (TRUE, p_now)
+  ON CONFLICT (singleton) DO UPDATE SET refreshed_at = excluded.refreshed_at;
+END;
+$$;
+
 CREATE TABLE IF NOT EXISTS tt_stats_cache.scalars (
   name TEXT PRIMARY KEY CHECK (name IN ('file_mode_users')),
   value BIGINT NOT NULL CHECK (value >= 0)
@@ -546,6 +619,8 @@ BEGIN
   DELETE FROM tt_stats_cache.time_series WHERE range IN ('7d', '31d', 'all');
   INSERT INTO tt_stats_cache.time_series SELECT * FROM tt_stats_series_stage;
 
+  PERFORM tt_stats_cache._refresh_popular_videos(p_now);
+
   DELETE FROM tt_stats_cache.rankings;
   INSERT INTO tt_stats_cache.rankings SELECT * FROM tt_stats_rankings_stage;
 
@@ -863,6 +938,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:4';
+  IS 'tt-stats-schema-version:5';
 
 COMMIT;

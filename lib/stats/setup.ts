@@ -103,6 +103,8 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AND to_regclass('tt_stats_cache.breakdown') IS NOT NULL
              AND to_regclass('tt_stats_cache.time_series') IS NOT NULL
              AND to_regclass('tt_stats_cache.rankings') IS NOT NULL
+             AND to_regclass('tt_stats_cache.popular_videos') IS NOT NULL
+             AND to_regclass('tt_stats_cache.popular_videos_metadata') IS NOT NULL
              AND to_regclass('tt_stats_cache.scalars') IS NOT NULL
              AS tables_installed,
            to_regprocedure('tt_stats_cache.list_stats_jobs()') IS NOT NULL
@@ -111,7 +113,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              obj_description(
                to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
                'pg_proc'
-             ) = 'tt-stats-schema-version:4',
+             ) = 'tt-stats-schema-version:5',
              false
            ) AS definitions_current,
            coalesce(
@@ -127,6 +129,8 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.breakdown'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.time_series'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.rankings'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.popular_videos'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.popular_videos_metadata'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.scalars'), 'SELECT'), false)
              AS app_can_read,
            coalesce(has_function_privilege(current_user, to_regprocedure('tt_stats_cache.list_stats_jobs()'), 'EXECUTE'), false)
@@ -360,6 +364,8 @@ export async function configureDatabaseJobsRaw(input: {
                         tt_stats_cache.breakdown,
                         tt_stats_cache.time_series,
                         tt_stats_cache.rankings,
+                        tt_stats_cache.popular_videos,
+                        tt_stats_cache.popular_videos_metadata,
                         tt_stats_cache.scalars
         TO ${role};
         GRANT SELECT, UPDATE ON tt_stats_cache.video_inactivity_monitor

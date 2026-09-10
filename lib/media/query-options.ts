@@ -17,6 +17,8 @@ export const popularVideosQueryOptions = (page: number) =>
   queryOptions({
     queryKey: ["stats", "popular-videos", page],
     queryFn: () => actions.getPopularVideos.orThrow({ page }),
+    retry: false,
+    refetchInterval: 60_000,
     staleTime: 60_000,
     placeholderData: keepPreviousData,
   })

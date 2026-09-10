@@ -97,3 +97,40 @@ test("media endpoints reject invalid IDs and pages", async ({
     ).status()
   ).toBe(400)
 })
+
+test("an unbuilt ranking shows setup instructions without automatic retries", async ({
+  page,
+}) => {
+  let requests = 0
+  const routePattern = "**/_actions/getPopularVideos/**"
+  await page.route(routePattern, async (route) => {
+    requests += 1
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({
+        type: "AstroActionError",
+        code: "INTERNAL_SERVER_ERROR",
+        message:
+          "The TT Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
+      }),
+    })
+  })
+  await page.goto("/dashboard/videos")
+  await expect(page.getByRole("alert")).toContainText(
+    "Statistics snapshots are not ready"
+  )
+  await expect(
+    page.getByRole("link", { name: "Open Operations" })
+  ).toHaveAttribute("href", "/dashboard/jobs")
+  await expect(page.getByLabel("Loading top videos")).toHaveCount(0)
+  expect(requests).toBe(1)
+  await page.unroute(routePattern)
+  await page.getByRole("button", { name: "Try again", exact: true }).click()
+  await expect(
+    page.getByRole("table", { name: "Most downloaded videos" })
+  ).toBeVisible()
+  await expect(page.getByText(/Rankings update daily/)).toContainText(
+    "Last updated"
+  )
+})

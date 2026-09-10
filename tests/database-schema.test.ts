@@ -10,7 +10,7 @@ describe("database schema", () => {
 
     expect(schema).toContain("ADD COLUMN IF NOT EXISTS cache_hits")
     expect(schema).toContain("count(*) FILTER (WHERE cache_hit)")
-    expect(schema).toContain("tt-stats-schema-version:4")
+    expect(schema).toContain("tt-stats-schema-version:5")
   })
 
   it("installs monitor state without reading source tables", async () => {

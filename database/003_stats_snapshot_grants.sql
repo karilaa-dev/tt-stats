@@ -14,6 +14,8 @@ GRANT SELECT ON tt_stats_cache.refresh_metadata,
                 tt_stats_cache.breakdown,
                 tt_stats_cache.time_series,
                 tt_stats_cache.rankings,
+                tt_stats_cache.popular_videos,
+                tt_stats_cache.popular_videos_metadata,
                 tt_stats_cache.scalars
 TO :"app_role";
 

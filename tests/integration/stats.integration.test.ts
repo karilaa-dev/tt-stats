@@ -345,6 +345,14 @@ integration("PostgreSQL statistics queries", () => {
       expect((await getDownloadersRaw("101", 1, db)).items).toEqual([])
       expect((await getDownloadersRaw("104", 1, db)).items).toEqual([])
       expect((await getDownloadersRaw("100", 2, db)).items).toEqual([])
+      await client.query(
+        "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1))",
+        [now]
+      )
+      // Cached pages remain readable even when the source table is unavailable.
+      await client.query(
+        "ALTER TABLE public.videos RENAME TO videos_unavailable"
+      )
       const ranked = await getPopularVideosRaw(1, db)
       expect(ranked.items[0]).toMatchObject({
         downloadId: "100",
@@ -357,6 +365,58 @@ integration("PostgreSQL statistics queries", () => {
         uniqueChats: "2",
       })
       expect((await getPopularVideosRaw(2, db)).items).toEqual([])
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("bounds persisted video rankings and stops pagination at 1,000 videos", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      await client.query(`INSERT INTO videos (user_id, shared_link, media_kind, delivery_surface)
+        SELECT 1, 'https://example.test/ranking/' || n, 'video', 'chat'
+        FROM generate_series(1, 1100) n`)
+      await client.query(
+        "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1))",
+        [now]
+      )
+      const count = await client.query(
+        "SELECT count(*)::int AS count FROM tt_stats_cache.popular_videos"
+      )
+      expect(count.rows[0].count).toBe(1000)
+      const lastPage = await getPopularVideosRaw(50, db)
+      expect(lastPage.items).toHaveLength(20)
+      expect(lastPage.hasMore).toBe(false)
+      expect((await getPopularVideosRaw(51, db)).items).toEqual([])
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("distinguishes an unbuilt video ranking from a completed empty snapshot", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      await client.query("DELETE FROM tt_stats_cache.popular_videos_metadata")
+      await expect(getPopularVideosRaw(1, db)).rejects.toMatchObject({
+        kind: "snapshotsMissing",
+      })
+      await client.query("DELETE FROM tt_stats_cache.popular_videos")
+      await client.query(
+        "INSERT INTO tt_stats_cache.popular_videos_metadata VALUES (TRUE, to_timestamp($1))",
+        [now]
+      )
+      expect(await getPopularVideosRaw(1, db)).toEqual({
+        items: [],
+        page: 1,
+        hasMore: false,
+        refreshedAt: now,
+      })
     } finally {
       await client.query("ROLLBACK")
       client.release()

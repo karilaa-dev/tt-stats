@@ -87,6 +87,7 @@ export const getPopularVideos = defineAction({
       items: items.slice((page - 1) * 20, page * 20),
       page,
       hasMore: items.length > page * 20,
+      refreshedAt: 1_800_000_000,
     }
   }),
 })

@@ -62,16 +62,12 @@ export async function getDownloadersRaw(
     [downloadId, (page - 1) * 20]
   )
   return {
-    items: rows
-      .slice(0, 20)
-      .map((row) => ({
-        userId: row.user_id,
-        downloads: row.downloads,
-        lastDownloadedAt:
-          row.last_downloaded_at === null
-            ? null
-            : Number(row.last_downloaded_at),
-      })),
+    items: rows.slice(0, 20).map((row) => ({
+      userId: row.user_id,
+      downloads: row.downloads,
+      lastDownloadedAt:
+        row.last_downloaded_at === null ? null : Number(row.last_downloaded_at),
+    })),
     page,
     hasMore: rows.length > 20,
   }
@@ -81,33 +77,46 @@ export async function getPopularVideosRaw(
   page: number,
   pool = getPool()
 ): Promise<PopularVideos> {
-  // Unlinked legacy events can only be grouped by their exact stored URL.
   const rows = await read<{
-    download_id: string
-    shared_link: string
-    downloads: string
-    unique_chats: string
+    download_id: string | null
+    shared_link: string | null
+    downloads: string | null
+    unique_chats: string | null
+    refreshed_at: string
   }>(
     pool,
-    `SELECT min(pk_id)::text AS download_id, min(shared_link) AS shared_link,
-            count(*)::text AS downloads, count(DISTINCT user_id)::text AS unique_chats
-     FROM public.videos
-     WHERE media_kind = 'video'
-     GROUP BY video_details_id, CASE WHEN video_details_id IS NULL THEN shared_link END
-     ORDER BY count(*) DESC, min(pk_id)
-     LIMIT 21 OFFSET $1`,
+    `SELECT ranking.download_id::text, ranking.shared_link,
+            ranking.downloads::text, ranking.unique_chats::text,
+            extract(epoch FROM metadata.refreshed_at)::text AS refreshed_at
+     FROM tt_stats_cache.popular_videos_metadata metadata
+     LEFT JOIN LATERAL (
+       SELECT download_id, shared_link, downloads, unique_chats, position
+       FROM tt_stats_cache.popular_videos
+       WHERE position > $1::bigint
+       ORDER BY position
+       LIMIT 21
+     ) ranking ON true
+     WHERE metadata.singleton
+     ORDER BY ranking.position`,
     [(page - 1) * 20]
   )
+  if (!rows.length) throw new DataAccessError(undefined, "snapshotsMissing")
+  const items = rows.flatMap((row) =>
+    row.download_id === null
+      ? []
+      : [
+          {
+            downloadId: row.download_id,
+            sharedLink: row.shared_link!,
+            downloads: row.downloads!,
+            uniqueChats: row.unique_chats!,
+          },
+        ]
+  )
   return {
-    items: rows
-      .slice(0, 20)
-      .map((row) => ({
-        downloadId: row.download_id,
-        sharedLink: row.shared_link,
-        downloads: row.downloads,
-        uniqueChats: row.unique_chats,
-      })),
+    items: items.slice(0, 20),
     page,
-    hasMore: rows.length > 20,
+    hasMore: items.length > 20,
+    refreshedAt: Number(rows[0]!.refreshed_at),
   }
 }

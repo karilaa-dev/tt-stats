@@ -14,6 +14,7 @@ export interface Downloaders {
 }
 
 export interface PopularVideos {
+  refreshedAt: number
   items: {
     downloadId: string
     sharedLink: string
