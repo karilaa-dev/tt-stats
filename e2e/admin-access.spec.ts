@@ -47,7 +47,11 @@ test("search asks for a token without querying user data beforehand", async ({
 }) => {
   const privateRequests: string[] = []
   page.on("request", (request) => {
-    if (/\/_actions\/getUser(Stats|Downloads)/u.test(request.url()))
+    if (
+      /\/_actions\/(getUser(Stats|Downloads)|getTelegramChat)/u.test(
+        request.url()
+      )
+    )
       privateRequests.push(request.url())
   })
   await page.goto("/dashboard/users")
@@ -61,16 +65,16 @@ test("search asks for a token without querying user data beforehand", async ({
   ).toBeVisible()
   expect(privateRequests).toEqual([])
   await page.getByRole("button", { name: "Cancel", exact: true }).click()
-  await expect(page.getByText("Telegram chat profile")).toBeHidden()
+  await expect(page.getByText("Saved bot records")).toBeHidden()
   await page.getByRole("button", { name: "Search", exact: true }).click()
   await page.getByLabel("Admin token", { exact: true }).fill(token)
   await page
     .getByRole("button", { name: "Unlock admin access", exact: true })
     .click()
-  await expect(page.getByText("Telegram chat profile")).toBeVisible()
+  await expect(page.getByText("Saved bot records")).toBeVisible()
   expect(privateRequests.length).toBeGreaterThan(0)
   await page.reload()
-  await expect(page.getByText("Telegram chat profile")).toBeVisible()
+  await expect(page.getByText("Saved bot records")).toBeVisible()
 })
 
 test("deep links prompt and hide private content", async ({ page }) => {
@@ -79,7 +83,7 @@ test("deep links prompt and hide private content", async ({ page }) => {
     await expect(
       page.getByRole("dialog", { name: "Admin access", exact: true })
     ).toBeVisible()
-    await expect(page.getByText("Telegram chat profile")).toBeHidden()
+    await expect(page.getByText("Saved bot records")).toBeHidden()
     await expect(
       page.getByText("Controls disabled in fake-data mode")
     ).toBeHidden()
@@ -91,6 +95,7 @@ test("server denies every private action and CSV without a session", async ({
   baseURL,
 }) => {
   for (const action of [
+    "getTelegramChat",
     "getUserStats",
     "getUserDownloads",
     "getDownloadMedia",

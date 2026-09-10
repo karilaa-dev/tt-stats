@@ -255,6 +255,24 @@ Set `ADMIN_TOKEN` to a random secret of at least 32 characters, for example with
 
 Server middleware protects all actions except the explicit public statistics allowlist, and protects `/api/users/*` exports. A missing or short token leaves admin access locked while public statistics remain available. Keep origin checking enabled and forward the original host/protocol through the reverse proxy. Remove any blanket proxy login requirement if statistics should be publicly viewable.
 
+## Telegram chat details
+
+Opening a specific user or group in `/dashboard/users` fetches its name, chat
+type, and optional `@username` through Telegram's
+[`getChat`](https://core.telegram.org/bots/api#getchat). Set `BOT_TOKEN` to the
+bot that has access to those chats. No `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`,
+or personal login is required. The lookup uses the existing admin session.
+
+Telegram details load independently of saved chat records and download history.
+Missing usernames, inaccessible chats, missing configuration, and temporary
+failures have explicit fallback messages. IDs remain visible. Successful reads
+are cached for one hour per bot and chat in server memory, with up to 500 cached
+entries; concurrent reads for the same chat share a request. Failures are cached
+for one minute, or longer when Telegram requests a retry delay. Requests time out
+after eight seconds. Only display fields reach the browser; bot credentials and
+raw Telegram errors stay on the server. Fake-data mode displays labeled sample
+profiles without calling Telegram.
+
 ## Saved media and popular videos
 
 User download history includes **View media** for videos and image albums.

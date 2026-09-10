@@ -27,6 +27,7 @@ import { LanguageValue } from "@/components/dashboard/language-value"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
+import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -136,10 +137,13 @@ export function UsersPage() {
           </div>
         </aside>
         <section
-          className="min-w-0"
+          className="flex min-w-0 flex-col gap-6"
           aria-label="Chat results"
           aria-busy={Boolean(userId) && userQuery.isPending}
         >
+          {authenticated && userId ? (
+            <TelegramChatCard chatId={userId} />
+          ) : null}
           {!requested ? (
             <Card>
               <Empty className="px-5 py-6 lg:min-h-80 lg:py-12">
@@ -210,9 +214,9 @@ export function UsersPage() {
           ) : !userQuery.data ? (
             <Empty className="border">
               <EmptyHeader>
-                <EmptyTitle>No matching chat</EmptyTitle>
+                <EmptyTitle>No saved chat records</EmptyTitle>
                 <EmptyDescription>
-                  No user or group exists with ID {userId}. Check the ID and
+                  No user or group is saved with ID {userId}. Check the ID and
                   include the minus sign for a group.
                 </EmptyDescription>
               </EmptyHeader>
@@ -286,9 +290,9 @@ function UserResult({ user }: { user: UserStats }) {
             </span>
           </span>
         </CardTitle>
-        <CardDescription>Telegram chat profile</CardDescription>
+        <CardDescription>Saved bot records</CardDescription>
         <CardAction>
-          <Badge variant="secondary">Chat profile</Badge>
+          <Badge variant="secondary">Chat activity</Badge>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">

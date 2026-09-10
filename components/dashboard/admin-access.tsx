@@ -90,6 +90,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authenticated) {
       const privateQuery = (query: { queryKey: readonly unknown[] }) =>
+        query.queryKey[0] === "telegram-chat" ||
         query.queryKey[0] === "video-notification-status" ||
         (query.queryKey[0] === "stats" &&
           ["user", "jobs", "database-setup", "media", "downloaders"].includes(

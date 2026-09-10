@@ -55,7 +55,12 @@ test("lookup, pagination, CSV and browser history work", async ({ page }) => {
   const input = page.getByRole("textbox", { name: "Telegram user or group ID" })
   await input.fill("123456789")
   await expect(page).toHaveURL(/id=123456789/)
-  await expect(page.getByText("Telegram chat profile")).toBeVisible()
+  await expect(page.getByText("Saved bot records")).toBeVisible()
+  const profile = page.getByLabel("Telegram chat details", { exact: true })
+  await expect(profile.getByText("Alex Example", { exact: true })).toBeVisible()
+  await expect(
+    profile.getByText("@alex_example", { exact: true })
+  ).toBeVisible()
   const csv = page.getByRole("link", { name: "Download CSV history" })
   await expect(csv).toHaveAttribute("href", "/api/users/123456789/history.csv")
   await page.getByRole("button", { name: "Go to next page" }).click()
@@ -66,6 +71,15 @@ test("lookup, pagination, CSV and browser history work", async ({ page }) => {
   await expect(
     page.getByText("Invalid Telegram ID", { exact: true })
   ).toBeVisible()
+  await expect(profile).toBeHidden()
+  await input.fill("-1001234567890")
+  await expect(profile.getByText("Demo group", { exact: true })).toBeVisible()
+  await expect(profile.getByText("@demo_group", { exact: true })).toBeVisible()
+  await expect(profile.getByText("Alex Example", { exact: true })).toBeHidden()
+  await page
+    .getByRole("button", { name: "Lock admin access", exact: true })
+    .click()
+  await expect(profile).toBeHidden()
 })
 
 test("filters restore with browser back", async ({ page }) => {
