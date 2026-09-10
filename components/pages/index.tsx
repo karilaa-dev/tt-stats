@@ -11,7 +11,6 @@ import {
   useDashboardSearch,
 } from "@/lib/dashboard-context"
 import { overviewQueryOptions } from "@/lib/stats/query-options"
-import { TelegramMauCard } from "@/components/dashboard/telegram-mau-card"
 
 export function OverviewPage() {
   const overviewQuery = useQuery(overviewQueryOptions())
@@ -26,7 +25,6 @@ export function OverviewPage() {
         title="Overview"
         description="A little perspective on everything your bot is doing."
       />
-      <TelegramMauCard />
       {overviewQuery.isError && !overview ? (
         <DashboardError
           error={overviewQuery.error}

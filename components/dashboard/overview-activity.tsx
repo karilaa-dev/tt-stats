@@ -25,6 +25,7 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { Skeleton } from "@/components/ui/skeleton"
+import { TelegramMauCard } from "./telegram-mau-card"
 import { formatEpoch, useBrowserTime } from "@/lib/browser-time"
 import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
 import type { StatsBreakdown, TimeSeriesPoint } from "@/lib/stats/types"
@@ -162,35 +163,38 @@ export function OverviewActivity({
       </div>
       <div className="overview-context-grid">
         <TrafficCard />
-        <Card className="overview-lifetime-card">
-          <CardHeader>
-            <CardTitle>All time</CardTitle>
-            <CardDescription>
-              {scope === "users" ? "Private users" : "Groups"} · through
-              completed UTC days
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <dl className="overview-lifetime-ledger">
-              {lifetimeMetrics.map(({ label, value }) => (
-                <div key={label}>
-                  <dt>{label}</dt>
-                  <dd>{count(value)}</dd>
-                </div>
-              ))}
-            </dl>
-            <Button
-              variant="outline"
-              nativeButton={false}
-              render={
-                <a href={`/dashboard/detailed?scope=${scope}&range=all`} />
-              }
-              className="overview-ledger-link"
-            >
-              See full breakdown <ArrowUpRightIcon data-icon="inline-end" />
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="overview-lifetime-stack">
+          <TelegramMauCard />
+          <Card className="overview-lifetime-card">
+            <CardHeader>
+              <CardTitle>All time</CardTitle>
+              <CardDescription>
+                {scope === "users" ? "Private users" : "Groups"} · through
+                completed UTC days
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="overview-lifetime-ledger">
+                {lifetimeMetrics.map(({ label, value }) => (
+                  <div key={label}>
+                    <dt>{label}</dt>
+                    <dd>{count(value)}</dd>
+                  </div>
+                ))}
+              </dl>
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={
+                  <a href={`/dashboard/detailed?scope=${scope}&range=all`} />
+                }
+                className="overview-ledger-link"
+              >
+                See full breakdown <ArrowUpRightIcon data-icon="inline-end" />
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
       </div>
       <div className="overview-shortcuts" aria-label="Explore your statistics">
         <a href="/dashboard/analytics?range=24h">

@@ -42,7 +42,9 @@ test("every Astro dashboard route loads without browser errors", async ({
 test("overview switches between users and groups", async ({ page }) => {
   await page.goto("/dashboard")
   await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
-  await expect(page.getByText("92,480", { exact: true })).toBeAttached()
+  await expect(
+    page.getByRole("tabpanel").getByText("92,480", { exact: true })
+  ).toBeAttached()
   await page.getByRole("tab", { name: "Groups", exact: true }).click()
   await expect(page.getByText("14,797", { exact: true })).toBeAttached()
 })

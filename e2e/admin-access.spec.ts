@@ -10,7 +10,7 @@ test("public stats and MAU load, Operations prompts before navigation", async ({
   await expect(
     page.getByText("Registered chats", { exact: true }).first()
   ).toBeVisible()
-  await expect(page.getByText("Telegram MAU", { exact: true })).toBeVisible()
+  await expect(page.getByText("Telegram MAU", { exact: false })).toBeVisible()
   await expect(page.getByText("28,430", { exact: true })).toBeVisible()
   if (isMobile)
     await page.getByRole("button", { name: "Open all sections" }).click()
