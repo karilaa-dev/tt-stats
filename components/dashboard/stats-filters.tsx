@@ -19,6 +19,7 @@ export function StatsFilters({
   scope,
   range,
   showScope = true,
+  allRangeLabel = "All time",
   className,
   onScopeChange,
   onRangeChange,
@@ -26,6 +27,7 @@ export function StatsFilters({
   scope?: ChatScope
   range: StatsRange
   showScope?: boolean
+  allRangeLabel?: string
   className?: string
   onScopeChange?: (scope: ChatScope) => void
   onRangeChange: (range: StatsRange) => void
@@ -80,7 +82,7 @@ export function StatsFilters({
                 value={option.value}
                 className="min-h-11 min-w-0 flex-1 sm:min-w-20"
               >
-                {option.label}
+                {option.value === "all" ? allRangeLabel : option.label}
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

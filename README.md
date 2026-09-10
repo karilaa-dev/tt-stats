@@ -241,7 +241,7 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard/analytics` — registration, video, and music time series
 - `/dashboard/detailed` — linkable scope and range filters
 - `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
-- `/dashboard/videos` — admin-only most-downloaded videos, with download counts and unique chats
+- `/dashboard/videos` — public most-downloaded videos by period, with download counts and unique chats
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, and top downloaders
 - `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
@@ -276,20 +276,24 @@ video identity. It lists other users and groups sharing that identity, including
 their cache hits and misses, and links to their user lookup pages. The selected
 chat is excluded.
 
-**Top videos** at `/dashboard/videos` shows the 1,000 most-downloaded videos.
+**Top videos** at `/dashboard/videos` is public and shows up to 1,000 videos per
+period: 24 hours, 7 days, 31 days, and Total. Saved-media previews and individual
+user lookups still require admin access.
 Ranking counts include all video download events, including repeat downloads,
 with a separate unique-chat count. It excludes image albums.
 Linked events are grouped by `video_details_id`; unlinked legacy events are
 grouped by exact shared URL and cannot be merged across URL aliases. This is a
-daily snapshot and requires admin access. Page reads use the stored rank index;
-opening or paging this view does not scan download history. The daily job builds
-the top 1,000 in the background, calculating distinct-chat counts only for those
-winners and keeping the previous snapshot readable
-until the new one commits.
+snapshot for each period. The 24-hour ranking updates every five minutes and
+ends at the last completed half-hour. The 7- and 31-day rankings use complete UTC
+days and refresh daily, together with Total. Records with missing timestamps
+appear only in Total. Page reads use the stored rank index; opening or paging
+this view does not scan download history. The background jobs calculate
+distinct-chat counts only for the top 1,000 and keep the previous snapshot
+readable until the new one commits.
 
 After upgrading, open Operations and use **Update database definitions**, which
-queues the daily rebuild. Wait for that rebuild to finish. Until then, Top videos
-shows setup instructions. The page displays its own snapshot timestamp. Separate
+queues both rolling and daily rebuilds. Wait for the selected period to finish.
+Until then, visitors see an unavailable message and admins see setup instructions. The page displays its own snapshot timestamp. Separate
 runtime roles also need the updated grants in `003_stats_snapshot_grants.sql`.
 
 Existing runtime roles need `SELECT` on `public.video_details`. Reapply

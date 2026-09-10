@@ -93,7 +93,7 @@ export function DesktopNavigation() {
           key={href}
           href={href}
           onClick={async (event) => {
-            if (!["/dashboard/jobs", "/dashboard/videos"].includes(href)) return
+            if (href !== "/dashboard/jobs") return
             event.preventDefault()
             if (await requireAdmin()) window.location.assign(href)
           }}
@@ -161,10 +161,7 @@ export function AppSidebar() {
                   aria-label={label}
                   onClick={async (event) => {
                     setOpenMobile(false)
-                    if (
-                      !["/dashboard/jobs", "/dashboard/videos"].includes(href)
-                    )
-                      return
+                    if (href !== "/dashboard/jobs") return
                     event.preventDefault()
                     if (await requireAdmin()) window.location.assign(href)
                   }}

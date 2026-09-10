@@ -384,7 +384,7 @@ integration("PostgreSQL statistics queries", () => {
         [now]
       )
       const count = await client.query(
-        "SELECT count(*)::int AS count FROM tt_stats_cache.popular_videos"
+        "SELECT count(*)::int AS count FROM tt_stats_cache.popular_videos WHERE range = 'all'"
       )
       expect(count.rows[0].count).toBe(1000)
       const lastPage = await getPopularVideosRaw(50, db)
@@ -408,7 +408,7 @@ integration("PostgreSQL statistics queries", () => {
       })
       await client.query("DELETE FROM tt_stats_cache.popular_videos")
       await client.query(
-        "INSERT INTO tt_stats_cache.popular_videos_metadata VALUES (TRUE, to_timestamp($1))",
+        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at) VALUES (TRUE, to_timestamp($1))",
         [now]
       )
       expect(await getPopularVideosRaw(1, db)).toEqual({
@@ -416,7 +416,72 @@ integration("PostgreSQL statistics queries", () => {
         page: 1,
         hasMore: false,
         refreshedAt: now,
+        range: "all",
       })
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("counts downloads and unique chats within each ranking period without replacing other periods", async () => {
+    const client = await pool.connect()
+    const end = Math.floor(now / 86400) * 86400
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      await client.query("DELETE FROM public.videos")
+      await client.query(
+        "INSERT INTO video_details (pk_id, platform, platform_video_id) VALUES (900, 'tiktok', 'period-test')"
+      )
+      await client.query(
+        `INSERT INTO videos (user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        SELECT user_id, 900, CASE WHEN age IS NULL THEN NULL ELSE $1::bigint - age END,
+          'https://example.test/period-linked/' || user_id, 'video', 'chat'
+        FROM (VALUES (1, 1), (1, 2), (2, 86400), (3, 86401), (-10, 604800),
+          (-20, 604801), (0, 2678400), (4, 2678401), (5, NULL), (6, 0)) events(user_id, age)`,
+        [end]
+      )
+      await client.query(
+        `INSERT INTO videos (user_id, downloaded_at, shared_link, media_kind, delivery_surface) VALUES
+        (1, $1::bigint - 1, 'https://example.test/period-legacy', 'video', 'chat'),
+        (2, $1::bigint - 86401, 'https://example.test/period-legacy', 'video', 'chat'),
+        (1, $1::bigint - 1, 'https://example.test/period-legacy', 'images', 'chat')`,
+        [end]
+      )
+      const cases = [
+        ["24h", "3", "2", "1"],
+        ["7d", "5", "4", "2"],
+        ["31d", "7", "6", "2"],
+        ["all", "10", "9", "2"],
+      ] as const
+      for (const [range] of cases) {
+        await client.query(
+          "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1), $2)",
+          [end + 600, range]
+        )
+      }
+      for (const [range, downloads, uniqueChats, legacyDownloads] of cases) {
+        const ranking = await getPopularVideosRaw(1, db, range)
+        expect(ranking.range).toBe(range)
+        expect(ranking.items[0]).toMatchObject({ downloads, uniqueChats })
+        expect(ranking.items[1]).toMatchObject({
+          sharedLink: "https://example.test/period-legacy",
+          downloads: legacyDownloads,
+          uniqueChats: legacyDownloads,
+        })
+        expect(ranking.items).toHaveLength(2)
+      }
+      await client.query(
+        "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1), '24h')",
+        [end + 1800]
+      )
+      expect((await getPopularVideosRaw(1, db, "all")).refreshedAt).toBe(
+        end + 600
+      )
+      expect((await getPopularVideosRaw(1, db, "24h")).refreshedAt).toBe(
+        end + 1800
+      )
     } finally {
       await client.query("ROLLBACK")
       client.release()

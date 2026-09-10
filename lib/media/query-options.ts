@@ -1,4 +1,5 @@
 import { queryOptions, keepPreviousData } from "@tanstack/react-query"
+import type { StatsRange } from "@/lib/stats/types"
 import { actions } from "astro:actions"
 
 export const mediaQueryOptions = (downloadId: string) =>
@@ -13,12 +14,13 @@ export const downloadersQueryOptions = (downloadId: string, page: number) =>
     queryFn: () => actions.getDownloaders.orThrow({ downloadId, page }),
     staleTime: 60_000,
   })
-export const popularVideosQueryOptions = (page: number) =>
+export const popularVideosQueryOptions = (page: number, range: StatsRange) =>
   queryOptions({
-    queryKey: ["stats", "popular-videos", page],
-    queryFn: () => actions.getPopularVideos.orThrow({ page }),
+    queryKey: ["stats", "popular-videos", range, page],
+    queryFn: () => actions.getPopularVideos.orThrow({ page, range }),
     retry: false,
     refetchInterval: 60_000,
     staleTime: 60_000,
-    placeholderData: keepPreviousData,
+    placeholderData: (previous) =>
+      previous?.range === range ? keepPreviousData(previous) : undefined,
   })

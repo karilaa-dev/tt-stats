@@ -47,6 +47,7 @@ const snapshotQuerySections = new Set([
   "time-series",
   "referrals",
   "other",
+  "popular-videos",
   "metadata",
 ])
 

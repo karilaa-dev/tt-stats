@@ -1,6 +1,7 @@
 import "@/lib/server-only"
 import type { Pool, QueryResultRow } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
+import type { StatsRange } from "@/lib/stats/types"
 import type { Downloaders, PopularVideos } from "./types"
 
 async function read<T extends QueryResultRow>(
@@ -75,7 +76,8 @@ export async function getDownloadersRaw(
 
 export async function getPopularVideosRaw(
   page: number,
-  pool = getPool()
+  pool = getPool(),
+  range: StatsRange = "all"
 ): Promise<PopularVideos> {
   const rows = await read<{
     download_id: string | null
@@ -92,13 +94,13 @@ export async function getPopularVideosRaw(
      LEFT JOIN LATERAL (
        SELECT download_id, shared_link, downloads, unique_chats, position
        FROM tt_stats_cache.popular_videos
-       WHERE position > $1::bigint
+       WHERE range = $2 AND position > $1::bigint
        ORDER BY position
        LIMIT 21
      ) ranking ON true
-     WHERE metadata.singleton
+     WHERE metadata.singleton AND metadata.range = $2
      ORDER BY ranking.position`,
-    [(page - 1) * 20]
+    [(page - 1) * 20, range]
   )
   if (!rows.length) throw new DataAccessError(undefined, "snapshotsMissing")
   const items = rows.flatMap((row) =>
@@ -118,5 +120,6 @@ export async function getPopularVideosRaw(
     page,
     hasMore: items.length > 20,
     refreshedAt: Number(rows[0]!.refreshed_at),
+    range,
   }
 }

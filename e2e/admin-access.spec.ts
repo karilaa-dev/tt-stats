@@ -74,7 +74,7 @@ test("search asks for a token without querying user data beforehand", async ({
 })
 
 test("deep links prompt and hide private content", async ({ page }) => {
-  for (const route of ["jobs", "videos", "users?id=123456789"]) {
+  for (const route of ["jobs", "users?id=123456789"]) {
     await page.goto(`/dashboard/${route}`)
     await expect(
       page.getByRole("dialog", { name: "Admin access", exact: true })
@@ -95,7 +95,6 @@ test("server denies every private action and CSV without a session", async ({
     "getUserDownloads",
     "getDownloadMedia",
     "getDownloaders",
-    "getPopularVideos",
     "getStatsJobs",
     "getDatabaseSetupStatus",
     "configureDatabaseJobs",

@@ -11,6 +11,7 @@ const publicActions = new Set([
   "getTimeSeries",
   "getReferralStats",
   "getOtherStats",
+  "getPopularVideos",
   "getTelegramMau",
 ])
 

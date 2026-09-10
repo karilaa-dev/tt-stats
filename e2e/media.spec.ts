@@ -45,7 +45,7 @@ test("history opens media and links cache-hit downloads to other chats", async (
 test("top videos show ranked counts and preserve page navigation", async ({
   page,
 }) => {
-  await page.goto("/dashboard/videos")
+  await page.goto("/dashboard/videos?range=all")
   const table = page.getByRole("table", { name: "Most downloaded videos" })
   await expect(table).toBeVisible()
   await expect(table.getByRole("row").nth(1)).toContainText("120")
@@ -70,7 +70,7 @@ test("top videos show ranked counts and preserve page navigation", async ({
   await expect(
     table.getByRole("row").nth(1).getByRole("cell").first()
   ).toHaveText("21")
-  await page.goto("/dashboard/videos?page=3")
+  await page.goto("/dashboard/videos?range=all&page=3")
   await expect(page.getByText("No videos found")).toBeVisible()
 })
 
@@ -116,7 +116,7 @@ test("an unbuilt ranking shows setup instructions without automatic retries", as
       }),
     })
   })
-  await page.goto("/dashboard/videos")
+  await page.goto("/dashboard/videos?range=all")
   await expect(page.getByRole("alert")).toContainText(
     "Statistics snapshots are not ready"
   )

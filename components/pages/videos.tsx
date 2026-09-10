@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { StatsFilters } from "@/components/dashboard/stats-filters"
+import { useAdminAccess } from "@/components/dashboard/admin-access"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import {
   DownloadDialog,
@@ -39,17 +41,27 @@ import {
 } from "@/lib/dashboard-context"
 
 export function VideosPage() {
-  const { page: requestedPage } = useDashboardSearch()
+  const { page: requestedPage, range } = useDashboardSearch()
   const page = Math.min(requestedPage, 1_000_000)
   const time = useBrowserTime()
   const navigate = useDashboardNavigate()
-  const query = useQuery(popularVideosQueryOptions(page))
+  const { authenticated, requireAdmin } = useAdminAccess()
+  const query = useQuery(popularVideosQueryOptions(page, range))
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
   return (
     <>
       <PageHeading
         title="Most downloaded videos"
-        description="All-time downloads, ranked from most to least. Repeated downloads by the same chat count each time."
+        description="Ranked by downloads in the selected period. Repeated downloads by the same chat count each time."
+      />
+      <StatsFilters
+        range={range}
+        showScope={false}
+        allRangeLabel="Total"
+        onRangeChange={(nextRange) => {
+          setSelection(null)
+          void navigate({ search: { range: nextRange, page: 1 } })
+        }}
       />
       <DownloadDialog
         selection={selection}
@@ -61,7 +73,12 @@ export function VideosPage() {
           <CardDescription>
             Includes cache hits and misses. Older records without a video
             identity are grouped by their exact saved link. Image albums are
-            excluded. Rankings update daily.
+            excluded.{" "}
+            {range === "24h"
+              ? "24 hours through the last completed half-hour. Rankings update every five minutes."
+              : range === "all"
+                ? "All recorded downloads. Rankings update daily."
+                : `${range === "7d" ? "7" : "31"} complete days in UTC. Rankings update daily.`}
             {query.data
               ? ` Last updated ${formatTimestamp(query.data.refreshedAt, time)}.`
               : ""}
@@ -72,17 +89,30 @@ export function VideosPage() {
             <Spinner aria-label="Loading top videos" />
           ) : query.isError ? (
             <Alert variant="destructive">
-              <AlertTitle>{getSafeDatabaseError(query.error).title}</AlertTitle>
+              <AlertTitle>
+                {authenticated
+                  ? getSafeDatabaseError(query.error).title
+                  : "Rankings are unavailable"}
+              </AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-2">
-                <p>{getSafeDatabaseError(query.error).description}</p>
-                <p>
-                  If the ranking has not been installed, open Operations, update
-                  database definitions, then wait for the daily refresh to
-                  finish.
-                </p>
-                <a href="/dashboard/jobs" className="underline">
-                  Open Operations
-                </a>
+                {authenticated ? (
+                  <>
+                    <p>{getSafeDatabaseError(query.error).description}</p>
+                    <p>
+                      If the ranking has not been installed, open Operations,
+                      update database definitions, then wait for the selected
+                      period to refresh.
+                    </p>
+                    <a href="/dashboard/jobs" className="underline">
+                      Open Operations
+                    </a>
+                  </>
+                ) : (
+                  <p>
+                    The ranking for this period is not available yet. Please try
+                    again later.
+                  </p>
+                )}
                 <Button variant="outline" onClick={() => void query.refetch()}>
                   Try again
                 </Button>
@@ -119,13 +149,14 @@ export function VideosPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
+                          onClick={async () => {
+                            if (!(await requireAdmin())) return
                             setSelection({
                               id: item.downloadId,
                               sharedLink: item.sharedLink,
                               mode: "media",
                             })
-                          }
+                          }}
                         >
                           View media
                         </Button>
@@ -158,7 +189,7 @@ export function VideosPage() {
           <Button
             variant="outline"
             disabled={page <= 1 || query.isFetching}
-            onClick={() => void navigate({ search: { page: page - 1 } })}
+            onClick={() => void navigate({ search: { range, page: page - 1 } })}
           >
             Previous
           </Button>
@@ -173,7 +204,7 @@ export function VideosPage() {
               query.isError ||
               page >= 1_000_000
             }
-            onClick={() => void navigate({ search: { page: page + 1 } })}
+            onClick={() => void navigate({ search: { range, page: page + 1 } })}
           >
             Next
           </Button>

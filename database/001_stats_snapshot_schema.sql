@@ -61,17 +61,51 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.popular_videos_metadata (
   refreshed_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE OR REPLACE FUNCTION tt_stats_cache._refresh_popular_videos(p_now TIMESTAMPTZ)
+-- Preserve the installed total ranking while adding independently refreshed periods.
+ALTER TABLE tt_stats_cache.popular_videos
+  ADD COLUMN IF NOT EXISTS range TEXT NOT NULL DEFAULT 'all'
+  CHECK (range IN ('24h', '7d', '31d', 'all'));
+ALTER TABLE tt_stats_cache.popular_videos DROP CONSTRAINT IF EXISTS popular_videos_pkey;
+ALTER TABLE tt_stats_cache.popular_videos ADD PRIMARY KEY (range, position);
+ALTER TABLE tt_stats_cache.popular_videos_metadata
+  ADD COLUMN IF NOT EXISTS range TEXT NOT NULL DEFAULT 'all'
+  CHECK (range IN ('24h', '7d', '31d', 'all'));
+ALTER TABLE tt_stats_cache.popular_videos_metadata DROP CONSTRAINT IF EXISTS popular_videos_metadata_pkey;
+ALTER TABLE tt_stats_cache.popular_videos_metadata ADD PRIMARY KEY (range);
+
+DROP FUNCTION IF EXISTS tt_stats_cache._refresh_popular_videos(TIMESTAMPTZ);
+CREATE OR REPLACE FUNCTION tt_stats_cache._refresh_popular_videos(
+  p_now TIMESTAMPTZ, p_range TEXT DEFAULT 'all'
+)
 RETURNS VOID
 LANGUAGE plpgsql
 SET search_path = pg_catalog, tt_stats_cache
 AS $$
+DECLARE
+  v_end BIGINT;
+  v_start BIGINT;
+  v_period_filter TEXT := '';
 BEGIN
-  -- The daily job owns the refresh lock and transaction. Readers retain the
-  -- previous complete ranking until both the data and timestamp commit.
-  DELETE FROM tt_stats_cache.popular_videos;
+  IF p_range IS NULL OR p_range NOT IN ('24h', '7d', '31d', 'all') THEN
+    RAISE EXCEPTION 'unknown ranking period' USING ERRCODE = '22023';
+  END IF;
+  v_end := CASE WHEN p_range = '24h'
+    THEN floor(extract(epoch FROM p_now) / 1800)::bigint * 1800
+    ELSE floor(extract(epoch FROM p_now) / 86400)::bigint * 86400 END;
+  v_start := v_end - CASE p_range WHEN '24h' THEN 86400
+    WHEN '7d' THEN 604800 WHEN '31d' THEN 2678400 ELSE 0 END;
+  IF p_range <> 'all' THEN
+    v_period_filter := ' AND downloaded_at >= $2 AND downloaded_at < $3';
+  END IF;
+
+  -- Refresh jobs share an advisory lock and transaction. Updating one period
+  -- leaves all other periods untouched and preserves the previous read snapshot.
+  DELETE FROM tt_stats_cache.popular_videos WHERE range = p_range;
+  -- Plan each period with explicit time bounds, avoiding a generic OR predicate
+  -- that could scan all 50 million events for a short-window ranking.
+  EXECUTE format($query$
   INSERT INTO tt_stats_cache.popular_videos (
-    position, download_id, shared_link, downloads, unique_chats
+    range, position, download_id, shared_link, downloads, unique_chats
   )
   WITH candidates AS (
     -- Rank by the inexpensive event count first. Only the top 1,000 need
@@ -81,7 +115,7 @@ BEGIN
            CASE WHEN video_details_id IS NULL THEN shared_link END AS legacy_link,
            min(pk_id) AS download_id, count(*) AS downloads
     FROM public.videos
-    WHERE media_kind = 'video'
+    WHERE media_kind = 'video'%1$s
     GROUP BY video_details_id,
              CASE WHEN video_details_id IS NULL THEN shared_link END
     ORDER BY count(*) DESC, min(pk_id)
@@ -98,25 +132,27 @@ BEGIN
     SELECT winners.download_id, count(DISTINCT videos.user_id) AS unique_chats
     FROM winners
     JOIN public.videos ON videos.video_details_id = winners.video_details_id
-    WHERE videos.media_kind = 'video'
+    WHERE videos.media_kind = 'video'%1$s
     GROUP BY winners.download_id
     UNION ALL
     SELECT winners.download_id, count(DISTINCT videos.user_id) AS unique_chats
     FROM winners
     JOIN public.videos ON videos.shared_link = winners.legacy_link
       AND videos.video_details_id IS NULL
-    WHERE winners.video_details_id IS NULL AND videos.media_kind = 'video'
+    WHERE winners.video_details_id IS NULL AND videos.media_kind = 'video'%1$s
     GROUP BY winners.download_id
   )
-  SELECT winners.position, winners.download_id, source.shared_link,
+  SELECT $1, winners.position, winners.download_id, source.shared_link,
          winners.downloads, chats.unique_chats
   FROM winners
   JOIN chats USING (download_id)
   JOIN public.videos source ON source.pk_id = winners.download_id;
 
-  INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at)
-  VALUES (TRUE, p_now)
-  ON CONFLICT (singleton) DO UPDATE SET refreshed_at = excluded.refreshed_at;
+  $query$, v_period_filter) USING p_range, v_start, v_end;
+
+  INSERT INTO tt_stats_cache.popular_videos_metadata (range, singleton, refreshed_at)
+  VALUES (p_range, TRUE, p_now)
+  ON CONFLICT (range) DO UPDATE SET refreshed_at = excluded.refreshed_at;
 END;
 $$;
 
@@ -365,6 +401,8 @@ BEGIN
   SELECT * FROM tt_stats_cache._series_rows(
     'music', '24h', v_start_epoch, v_end_epoch, 1800
   );
+
+  PERFORM tt_stats_cache._refresh_popular_videos(p_now, '24h');
 
   DELETE FROM tt_stats_cache.breakdown WHERE range = '24h';
   INSERT INTO tt_stats_cache.breakdown SELECT * FROM tt_stats_breakdown_stage;
@@ -619,7 +657,9 @@ BEGIN
   DELETE FROM tt_stats_cache.time_series WHERE range IN ('7d', '31d', 'all');
   INSERT INTO tt_stats_cache.time_series SELECT * FROM tt_stats_series_stage;
 
-  PERFORM tt_stats_cache._refresh_popular_videos(p_now);
+  PERFORM tt_stats_cache._refresh_popular_videos(p_now, '7d');
+  PERFORM tt_stats_cache._refresh_popular_videos(p_now, '31d');
+  PERFORM tt_stats_cache._refresh_popular_videos(p_now, 'all');
 
   DELETE FROM tt_stats_cache.rankings;
   INSERT INTO tt_stats_cache.rankings SELECT * FROM tt_stats_rankings_stage;
@@ -938,6 +978,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:5';
+  IS 'tt-stats-schema-version:6';
 
 COMMIT;

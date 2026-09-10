@@ -1,3 +1,5 @@
+import type { StatsRange } from "@/lib/stats/types"
+
 export interface DownloadMedia {
   items: { position: number; mediaType: "photo" | "video"; url: string }[]
   unavailableReason: string | null
@@ -14,6 +16,7 @@ export interface Downloaders {
 }
 
 export interface PopularVideos {
+  range: StatsRange
   refreshedAt: number
   items: {
     downloadId: string

@@ -92,14 +92,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const privateQuery = (query: { queryKey: readonly unknown[] }) =>
         query.queryKey[0] === "video-notification-status" ||
         (query.queryKey[0] === "stats" &&
-          [
-            "user",
-            "jobs",
-            "database-setup",
-            "media",
-            "downloaders",
-            "popular-videos",
-          ].includes(String(query.queryKey[1])))
+          ["user", "jobs", "database-setup", "media", "downloaders"].includes(
+            String(query.queryKey[1])
+          ))
       void client
         .cancelQueries({ predicate: privateQuery })
         .then(() => client.removeQueries({ predicate: privateQuery }))
