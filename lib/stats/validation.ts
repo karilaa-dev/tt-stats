@@ -1,5 +1,3 @@
-import { z } from "zod"
-
 import {
   CHAT_SCOPES,
   SERIES_METRICS,
@@ -9,34 +7,34 @@ import {
   type StatsRange,
 } from "@/lib/stats/types"
 
-const chatScopeSchema = z.enum(CHAT_SCOPES)
-const statsRangeSchema = z.enum(STATS_RANGES)
-const seriesMetricSchema = z.enum(SERIES_METRICS)
-const telegramIdSchema = z
-  .string()
-  .regex(/^-?\d+$/u)
-  .refine((value) => {
-    try {
-      BigInt(value)
-      return true
-    } catch {
-      return false
-    }
-  })
+// These parsers also run in the browser. Keep URL validation independent of
+// the schema library used by server actions.
+function parseOption<T extends string>(
+  value: unknown,
+  options: readonly T[],
+  fallback: T
+): T {
+  return options.find((option) => option === value) ?? fallback
+}
 
 export function parseChatScope(value: unknown): ChatScope {
-  return chatScopeSchema.catch("all").parse(value)
+  return parseOption(value, CHAT_SCOPES, "all")
 }
 
 export function parseStatsRange(value: unknown): StatsRange {
-  return statsRangeSchema.catch("24h").parse(value)
+  return parseOption(value, STATS_RANGES, "24h")
 }
 
 export function parseSeriesMetric(value: unknown): SeriesMetric {
-  return seriesMetricSchema.catch("users").parse(value)
+  return parseOption(value, SERIES_METRICS, "users")
 }
 
 export function parseTelegramId(value: unknown): string | null {
-  const parsed = telegramIdSchema.safeParse(value)
-  return parsed.success ? parsed.data : null
+  if (typeof value !== "string" || !/^-?\d+$/u.test(value)) return null
+  try {
+    BigInt(value)
+    return value
+  } catch {
+    return null
+  }
 }

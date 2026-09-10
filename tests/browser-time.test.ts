@@ -1,11 +1,43 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
-import { formatChartBucket, formatTimestamp } from "@/lib/browser-time"
+import {
+  formatChartBucket,
+  formatEpoch,
+  formatTimestamp,
+} from "@/lib/browser-time"
 import { isSnapshotStale } from "@/lib/stats/staleness"
 import type { SnapshotMetadata } from "@/lib/stats/types"
 
 describe("visitor timezone formatting", () => {
   const epoch = Date.parse("2026-08-12T00:00:00Z") / 1000
+
+  it("reuses a formatter across chart points with equivalent options", () => {
+    const OriginalDateTimeFormat = Intl.DateTimeFormat
+    const constructor = vi
+      .spyOn(Intl, "DateTimeFormat")
+      .mockImplementation(function (...args) {
+        return new OriginalDateTimeFormat(...args)
+      })
+    const settings = { locale: "en-NZ", timeZone: "Pacific/Auckland" }
+    for (let index = 0; index < 48; index++) {
+      formatEpoch(epoch + index * 1800, settings, {
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    }
+    const label = formatEpoch(epoch, settings, {
+      minute: "2-digit",
+      hour: "2-digit",
+    })
+    expect(label).toBe(
+      new OriginalDateTimeFormat(settings.locale, {
+        timeZone: settings.timeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(epoch * 1000)
+    )
+    expect(constructor).toHaveBeenCalledTimes(1)
+  })
 
   it("renders the same epoch in UTC, New York, and Kathmandu", () => {
     expect(

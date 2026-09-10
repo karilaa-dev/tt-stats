@@ -1,17 +1,10 @@
 import { useQuery } from "@tanstack/react-query"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getTelegramMau } from "@/lib/telegram/functions"
-import { TELEGRAM_MAU_CHECK_INTERVAL_MS } from "@/lib/telegram/types"
+import { telegramMauQueryOptions } from "@/lib/telegram/query-options"
 
 export function TelegramMauCard() {
-  const query = useQuery({
-    queryKey: ["telegram-mau"],
-    queryFn: getTelegramMau,
-    staleTime: TELEGRAM_MAU_CHECK_INTERVAL_MS,
-    refetchInterval: TELEGRAM_MAU_CHECK_INTERVAL_MS,
-    retry: false,
-  })
+  const query = useQuery(telegramMauQueryOptions())
   const count = query.data?.status === "available" ? query.data.count : null
 
   return (

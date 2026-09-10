@@ -9,6 +9,7 @@ import {
 } from "@/lib/stats/time-series"
 import {
   parseChatScope,
+  parseSeriesMetric,
   parseStatsRange,
   parseTelegramId,
 } from "@/lib/stats/validation"
@@ -19,6 +20,17 @@ describe("statistics validation", () => {
     expect(parseChatScope("unknown")).toBe("all")
     expect(parseStatsRange("31d")).toBe("31d")
     expect(parseStatsRange("yesterday")).toBe("24h")
+    for (const value of ["users", "groups", "all"] as const)
+      expect(parseChatScope(value)).toBe(value)
+    for (const value of ["24h", "7d", "31d", "all"] as const)
+      expect(parseStatsRange(value)).toBe(value)
+    for (const value of ["users", "videos", "music"] as const)
+      expect(parseSeriesMetric(value)).toBe(value)
+    for (const value of [undefined, null, 24, {}, ["users"], "", "ALL"]) {
+      expect(parseChatScope(value)).toBe("all")
+      expect(parseStatsRange(value)).toBe("24h")
+      expect(parseSeriesMetric(value)).toBe("users")
+    }
   })
 
   it("preserves signed and very large Telegram IDs as strings", () => {
@@ -28,6 +40,8 @@ describe("statistics validation", () => {
     expect(parseTelegramId("9223372036854775807")).toBe("9223372036854775807")
     expect(parseTelegramId("12.5")).toBeNull()
     expect(parseTelegramId(" 12")).toBeNull()
+    for (const value of [null, undefined, 123, {}, "", "-", "+12", "1e3"])
+      expect(parseTelegramId(value)).toBeNull()
   })
 })
 

@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Clock3Icon } from "lucide-react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
@@ -10,10 +11,21 @@ import {
   useDashboardNavigate,
   useDashboardSearch,
 } from "@/lib/dashboard-context"
-import { overviewQueryOptions } from "@/lib/stats/query-options"
+import {
+  overviewQueryOptions,
+  timeSeriesQueryOptions,
+} from "@/lib/stats/query-options"
+import { telegramMauQueryOptions } from "@/lib/telegram/query-options"
 
 export function OverviewPage() {
+  const queryClient = useQueryClient()
   const overviewQuery = useQuery(overviewQueryOptions())
+  useEffect(() => {
+    // These cards do not depend on the totals. Start their requests on mount
+    // while keeping their own loading, error, and refresh behavior.
+    void queryClient.prefetchQuery(timeSeriesQueryOptions("videos", "24h"))
+    void queryClient.prefetchQuery(telegramMauQueryOptions())
+  }, [queryClient])
   const overview = overviewQuery.data
   const { scope } = useDashboardSearch()
   const navigate = useDashboardNavigate()

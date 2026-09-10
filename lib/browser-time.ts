@@ -10,6 +10,11 @@ const serverFallback: BrowserTimeSettings = {
   timeZone: "UTC",
 }
 
+// A chart formats many epochs with the same options. Bound the shared cache
+// because server rendering can encounter different visitor locales.
+const formatters = new Map<string, Intl.DateTimeFormat>()
+const MAX_FORMATTERS = 32
+
 export function useBrowserTime(): BrowserTimeSettings {
   const [settings, setSettings] = useState(serverFallback)
 
@@ -30,10 +35,25 @@ export function formatEpoch(
   settings: BrowserTimeSettings,
   options: Intl.DateTimeFormatOptions = {}
 ): string {
-  return new Intl.DateTimeFormat(settings.locale, {
+  const resolvedOptions = {
     timeZone: settings.timeZone,
     ...options,
-  }).format(new Date(epoch * 1000))
+  }
+  const key = JSON.stringify([
+    settings.locale,
+    Object.entries(resolvedOptions)
+      .filter(([, value]) => value !== undefined)
+      .sort(([left], [right]) => left.localeCompare(right)),
+  ])
+  let formatter = formatters.get(key)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(settings.locale, resolvedOptions)
+    if (formatters.size >= MAX_FORMATTERS) {
+      formatters.delete(formatters.keys().next().value!)
+    }
+    formatters.set(key, formatter)
+  }
+  return formatter.format(epoch * 1000)
 }
 
 export function formatTimestamp(
