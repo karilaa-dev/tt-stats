@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { parseTelegramId } from "@/lib/stats/validation"
+import { useAdminAccess } from "./admin-access"
 
 export function UserLookupForm({
   initialId,
@@ -35,6 +36,7 @@ export function UserLookupForm({
   searching: boolean
 }) {
   const navigate = useDashboardNavigate()
+  const { authenticated, requireAdmin } = useAdminAccess()
   const hydrated = useHydrated()
   const { fakeMode } = useDashboardContext()
   const navigatedId = useRef(initialId)
@@ -43,6 +45,7 @@ export function UserLookupForm({
     onSubmit: async ({ value }) => {
       const id = value.id.trim()
       if (!parseTelegramId(id)) return
+      if (!(await requireAdmin())) return
       navigatedId.current = id
       await navigate({
         search: { id, page: 1 },
@@ -59,6 +62,7 @@ export function UserLookupForm({
 
   useEffect(() => {
     const id = typedId.trim()
+    if (!authenticated) return
     if (id === initialId) return
 
     const timeout = window.setTimeout(() => {
@@ -70,7 +74,7 @@ export function UserLookupForm({
     }, 350)
 
     return () => window.clearTimeout(timeout)
-  }, [initialId, navigate, typedId])
+  }, [authenticated, initialId, navigate, typedId])
 
   return (
     <Card>
@@ -156,7 +160,10 @@ export function UserLookupForm({
                     </FieldError>
                   ) : null}
                   <FieldDescription id={`${field.name}-hint`}>
-                    Group IDs include a minus sign. Results update as you type.
+                    Group IDs include a minus sign.{" "}
+                    {authenticated
+                      ? "Results update as you type."
+                      : "Searching requires the admin token."}
                   </FieldDescription>
                   <Button
                     type="submit"

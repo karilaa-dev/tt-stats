@@ -277,6 +277,8 @@
   margin: 0 auto;
   padding: 1.3rem 3rem;
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   font-size: 0.7rem;

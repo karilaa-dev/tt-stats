@@ -15,6 +15,7 @@ const server = spawn(["bun", "dist/server/entry.mjs"], {
     NODE_ENV: "production",
     HOST: "127.0.0.1",
     PORT: String(port),
+    ADMIN_TOKEN: "proxy-test-admin-token-at-least-32-characters",
   },
   stdout: "ignore",
   stderr: "inherit",
@@ -44,6 +45,52 @@ try {
     headers,
   })
   assert.equal(response.status, 200, await response.text())
+  const login = await fetch(`${base}/api/admin-session`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      token: "proxy-test-admin-token-at-least-32-characters",
+    }),
+  })
+  assert.equal(
+    login.status,
+    200,
+    "Admin login must work behind the HTTPS proxy"
+  )
+  const cookie = login.headers.get("set-cookie")
+  assert.ok(
+    cookie?.includes("Secure"),
+    "Proxied HTTPS sessions must use Secure cookies"
+  )
+  assert.ok(cookie?.includes("HttpOnly"))
+  const sessionCookie = cookie.split(";")[0]
+  const authenticated = await fetch(`${base}/_actions/getUserStats`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      Cookie: sessionCookie,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ userId: "invalid" }),
+  })
+  assert.equal(
+    authenticated.status,
+    400,
+    "Authenticated calls must reach input validation"
+  )
+  const privateRequest = await fetch(`${base}/_actions/getStatsJobs`, {
+    method: "POST",
+    headers,
+  })
+  assert.equal(
+    privateRequest.status,
+    401,
+    "Direct private actions require a session"
+  )
+  const exportRequest = await fetch(`${base}/api/users/123/history.csv`, {
+    headers,
+  })
+  assert.equal(exportRequest.status, 401, "CSV exports require a session")
   for (const override of [
     { Origin: "https://untrusted.example" },
     {

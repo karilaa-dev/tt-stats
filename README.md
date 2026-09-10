@@ -5,8 +5,9 @@ An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/t
 The normal statistics read path is read-only. Guided setup can use the same
 non-superuser `DB_URL` for the fixed TT Stats schema and schedules after an
 explicit confirmation. Narrow `SECURITY DEFINER` functions let authenticated
-operators manage only the two fixed TT Stats `pg_cron` jobs. The application
-intentionally has no login system; access control belongs at the reverse proxy.
+operators manage only the two fixed TT Stats `pg_cron` jobs. Aggregate statistics
+are public. A shared admin token protects Operations, individual user lookups,
+download history, and CSV exports.
 
 ## Stack
 
@@ -33,7 +34,7 @@ The workspace uses horizontal desktop navigation and a mobile bottom dock with a
 - [Bun](https://bun.sh/) 1.4.2, pinned in `.bun-version` and `package.json`
 - A tt-bot v6 PostgreSQL database, verified against v6.0.10
 - PostgreSQL 11+ with [`pg_cron`](https://github.com/citusdata/pg_cron) 1.5+ available
-- A reverse proxy that authenticates every application request except the health check
+- HTTPS for production admin sessions
 
 Copy the example environment file and replace every placeholder:
 
@@ -46,16 +47,18 @@ Required runtime variables:
 ```dotenv
 DB_URL=postgresql://database-user:password@host:5432/ttbot-db
 
-BOT_TOKEN=12345:telegram-bot-token
-BOTSTAT_ACCESS_KEY=botstat-access-key
-BOTSTAT_NOTIFY_ID=1234567
+# Required only to enable admin access; use a random token of at least 32 characters.
+ADMIN_TOKEN=
 ```
 
 Optional variables:
 
 ```dotenv
 DB_POOL_SIZE=5
-BOTSTAT_BASE_URL=https://www.botstat.io
+# Optional Telegram-calculated MAU; configure all three:
+BOT_TOKEN=12345:telegram-bot-token
+TELEGRAM_API_ID=123456
+TELEGRAM_API_HASH=your-32-character-api-hash
 
 # Configure exactly one video-inactivity notification destination:
 VIDEO_INACTIVITY_WEBHOOK_URL=https://example.com/webhooks/tt-stats
@@ -92,8 +95,8 @@ is never sent to the browser.
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
 tables every minute or every 15 minutes, depending on the dataset, while keeping
-the previous result visible. User lookup, paginated history, CSV export, and
-Botstat remain live operations.
+the previous result visible. Admin-only user lookup, paginated history, and CSV
+export remain live operations.
 
 The rolling charts use 48 completed 30-minute buckets. All-time snapshots keep
 daily history, while the read API groups unusually long histories to at most 720
@@ -238,17 +241,25 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard/detailed` — linkable scope and range filters
 - `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
 - `/dashboard/referrals` — top referral values
-- `/dashboard/other` — file mode, languages, top downloaders, and Botstat
+- `/dashboard/other` — file mode, languages, and top downloaders
 - `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
 - `/api/health` — detail-free database/configuration health check
 
 The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"unavailable"}` with HTTP 503.
 
-## Reverse-proxy authentication
+## Admin access
 
-The application contains no login page, credentials, cookies, sessions, middleware guards, or authorization checks. The CSV endpoint and Astro Actions at `/_actions/*` are also unguarded at the application layer.
+Set `ADMIN_TOKEN` to a random secret of at least 32 characters, for example with `openssl rand -hex 32`. Visitors can view aggregate statistics without signing in. Opening Operations or submitting a user search prompts for the token. Successful entry creates an eight-hour signed, HttpOnly, SameSite=Strict cookie, marked Secure on HTTPS. The token is never stored in browser storage or URLs. Use **Lock admin access** to end the browser session; changing `ADMIN_TOKEN` invalidates all sessions.
 
-Keep the application origin private and make the reverse proxy the only network path to it. Protect the entire origin, not only `/dashboard`; if the health check must remain public, exempt only `/api/health`. Forward the original host/protocol headers and do not expose the Bun listener directly to an untrusted network.
+Server middleware protects all actions except the explicit public statistics allowlist, and protects `/api/users/*` exports. A missing or short token leaves admin access locked while public statistics remain available. Keep origin checking enabled and forward the original host/protocol through the reverse proxy. Remove any blanket proxy login requirement if statistics should be publicly viewable.
+
+## Telegram MAU
+
+Overview shows Telegram's own monthly active user count, fetched through MTProto using `users.getUsers` with `inputUserSelf`. Telegram documents the count as `user.bot_active_users`, which can be absent for small bots. The HTTP Bot API does not expose this field. This metric is independent of the dashboard's audience and period filters.
+
+Configure `BOT_TOKEN`, `TELEGRAM_API_ID`, and `TELEGRAM_API_HASH`. Obtain the API ID/hash at [my.telegram.org/apps](https://my.telegram.org/apps). No personal Telegram session or phone login is needed. Authorization is kept only in server memory; the integration does not call `getUpdates`, change webhooks, or send messages. Reads are coalesced and cached for 12 hours per app instance, including failures. The browser also checks every 12 hours while the dashboard is open. Telegram updates the underlying count once every 24 hours. Missing configuration, unpublished counts, and failures have separate states and never display as zero. Fake-data mode shows a labeled sample count. Optional Telegram configuration does not affect database health checks.
+
+References: [Telegram user fields](https://core.telegram.org/constructor/user), [bot-accessible users.getUsers](https://core.telegram.org/method/users.getUsers), and [bot authorization](https://core.telegram.org/method/auth.importBotAuthorization).
 
 ## Dokploy and Railpack
 
@@ -263,12 +274,11 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 ## Security and privacy
 
 - The database connection should use the constrained PostgreSQL role described above.
-- Reverse-proxy authentication is required because every data route is public inside the application.
+- Server authorization protects mutations and individual user data, including direct action and CSV requests.
 - Aggregate browser queries read database snapshots without blocking navigation; user lookups remain live and fresh for one minute.
 - Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two TT Stats jobs.
 - The optional notification monitor can update only its singleton escalation-state row; webhook and ntfy credentials remain server-only.
-- Botstat verification sends every stored `users.user_id`, including private users and negative group IDs, to the configured Botstat.io endpoint. The UI requires explicit confirmation.
-- Treat `BOT_TOKEN`, `BOTSTAT_ACCESS_KEY`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
+- Treat `ADMIN_TOKEN`, `BOT_TOKEN`, `TELEGRAM_API_HASH`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
 
 ## Attribution and license
 

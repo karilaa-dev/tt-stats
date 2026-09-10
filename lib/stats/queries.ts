@@ -515,13 +515,3 @@ export async function getManualRefreshRequestRaw(
       }
     : null
 }
-
-export async function getBotstatUserIdsRaw(
-  pool: Pool = getPool()
-): Promise<string[]> {
-  const result = await safeQuery<{ user_id: string }>(
-    pool,
-    "SELECT user_id::text FROM public.users ORDER BY users.user_id ASC"
-  )
-  return result.rows.map((row) => row.user_id)
-}

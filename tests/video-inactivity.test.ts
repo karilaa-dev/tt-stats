@@ -62,9 +62,6 @@ describe("video inactivity notification configuration", () => {
     expect(() =>
       validateRuntimeConfiguration({
         DB_URL: "postgresql://app:secret@database.test/ttbot",
-        BOT_TOKEN: "12345:secret",
-        BOTSTAT_ACCESS_KEY: "access-key",
-        BOTSTAT_NOTIFY_ID: "1234567",
         VIDEO_INACTIVITY_WEBHOOK_URL: "https://example.test/hook",
         VIDEO_INACTIVITY_NTFY_URL: "not-a-valid-url",
       })

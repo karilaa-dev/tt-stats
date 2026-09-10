@@ -321,16 +321,6 @@ export function getFakeOtherStats(): OtherStats {
   }
 }
 
-export function getFakeBotstatUserIds(): string[] {
-  return [
-    "-1009876543210",
-    "-1005566778899",
-    "123456789",
-    "839201756",
-    "9007199254740993",
-  ]
-}
-
 export function getFakeHistory(): HistoryCsvRow[] {
   return fakeHistory
 }

@@ -2,6 +2,7 @@ import { dev } from "astro"
 
 // Run in the foreground even when Astro's CLI detects an agent environment.
 const server = await dev({
+  devToolbar: { enabled: false },
   server: { host: "127.0.0.1", port: 4175 },
   vite: {
     cacheDir: ".astro/browser-vite",

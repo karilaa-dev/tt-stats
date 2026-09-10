@@ -5,7 +5,6 @@ import {
 import { useQuery } from "@tanstack/react-query"
 import { FilesIcon, LanguagesIcon, TrophyIcon } from "lucide-react"
 
-import { BotstatCard } from "@/components/dashboard/botstat-card"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
@@ -128,7 +127,6 @@ export function OtherPage() {
                   />
                 </CardContent>
               </Card>
-              <BotstatCard />
             </div>
           </div>
         </div>

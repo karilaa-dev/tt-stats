@@ -7,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { DashboardHeader } from "./dashboard-header"
 import { DashboardContext } from "@/lib/dashboard-context"
+import { AdminLockButton, AdminProvider } from "./admin-access"
 
 export interface DashboardShellProps {
   pathname: string
@@ -32,27 +33,30 @@ export function DashboardShell({ children, ...context }: DashboardShellProps) {
       <DashboardContext.Provider value={context}>
         <ThemeProvider>
           <TooltipProvider>
-            <SidebarProvider>
-              <a className="skip-link" href="#main-content">
-                Skip to content
-              </a>
-              <AppSidebar />
-              <SidebarInset>
-                <DashboardHeader fakeMode={context.fakeMode} />
-                <main
-                  id="main-content"
-                  className="dashboard-main"
-                  tabIndex={-1}
-                >
-                  {children}
-                </main>
-                <footer className="dashboard-footer">
-                  <span>tt stats /</span>
-                  <span>Made for the people behind the bot.</span>
-                </footer>
-              </SidebarInset>
-            </SidebarProvider>
-            <Toaster richColors closeButton />
+            <AdminProvider>
+              <SidebarProvider>
+                <a className="skip-link" href="#main-content">
+                  Skip to content
+                </a>
+                <AppSidebar />
+                <SidebarInset>
+                  <DashboardHeader fakeMode={context.fakeMode} />
+                  <main
+                    id="main-content"
+                    className="dashboard-main"
+                    tabIndex={-1}
+                  >
+                    {children}
+                  </main>
+                  <footer className="dashboard-footer">
+                    <span>tt stats /</span>
+                    <span>Made for the people behind the bot.</span>
+                    <AdminLockButton />
+                  </footer>
+                </SidebarInset>
+              </SidebarProvider>
+              <Toaster richColors closeButton />
+            </AdminProvider>
           </TooltipProvider>
         </ThemeProvider>
       </DashboardContext.Provider>

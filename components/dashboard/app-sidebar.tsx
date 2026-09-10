@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sheet"
 import { useSidebar } from "@/components/ui/sidebar"
 import { useDashboardContext } from "@/lib/dashboard-context"
+import { useAdminAccess } from "./admin-access"
 
 const navigation = [
   {
@@ -74,6 +75,7 @@ const navigation = [
 ]
 
 export function DesktopNavigation() {
+  const { requireAdmin } = useAdminAccess()
   const { pathname } = useDashboardContext()
   const current = pathname.replace(/\/$/, "")
   return (
@@ -82,6 +84,11 @@ export function DesktopNavigation() {
         <a
           key={href}
           href={href}
+          onClick={async (event) => {
+            if (href !== "/dashboard/jobs") return
+            event.preventDefault()
+            if (await requireAdmin()) window.location.assign(href)
+          }}
           aria-current={current === href ? "page" : undefined}
         >
           <Icon aria-hidden="true" />
@@ -93,6 +100,7 @@ export function DesktopNavigation() {
 }
 
 export function AppSidebar() {
+  const { requireAdmin } = useAdminAccess()
   const { pathname, fakeMode } = useDashboardContext()
   const { isMobile, openMobile, setOpenMobile } = useSidebar()
   const current = pathname.replace(/\/$/, "")
@@ -143,7 +151,12 @@ export function AppSidebar() {
                   href={href}
                   aria-current={current === href ? "page" : undefined}
                   aria-label={label}
-                  onClick={() => setOpenMobile(false)}
+                  onClick={async (event) => {
+                    setOpenMobile(false)
+                    if (href !== "/dashboard/jobs") return
+                    event.preventDefault()
+                    if (await requireAdmin()) window.location.assign(href)
+                  }}
                 >
                   <Icon aria-hidden="true" />
                   <span>

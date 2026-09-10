@@ -2,6 +2,8 @@ import {
   useDashboardSearch,
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
+import { useEffect, useRef } from "react"
+import { useAdminAccess } from "@/components/dashboard/admin-access"
 import { useQuery } from "@tanstack/react-query"
 import type { LucideIcon } from "lucide-react"
 import {
@@ -53,17 +55,25 @@ import { parseTelegramId } from "@/lib/stats/validation"
 const DOWNLOADS_PAGE_SIZE = 8
 
 export function UsersPage() {
+  const { authenticated, ready, requireAdmin } = useAdminAccess()
+  const prompted = useRef(false)
   const { id, page } = useDashboardSearch()
   const navigate = useDashboardNavigate()
   const requested = id.trim()
   const userId = requested ? parseTelegramId(requested) : null
+  useEffect(() => {
+    if (userId && ready && !authenticated && !prompted.current) {
+      prompted.current = true
+      void requireAdmin()
+    }
+  }, [userId, ready, authenticated, requireAdmin])
   const userQuery = useQuery({
     ...userStatsQueryOptions(userId ?? "0"),
-    enabled: Boolean(userId),
+    enabled: authenticated && Boolean(userId),
   })
   const downloadsQuery = useQuery({
     ...userDownloadsQueryOptions(userId ?? "0", page, DOWNLOADS_PAGE_SIZE),
-    enabled: Boolean(userId),
+    enabled: authenticated && Boolean(userId),
     placeholderData: (previousData, previousQuery) =>
       previousQuery?.queryKey[2] === userId ? previousData : undefined,
   })
@@ -154,6 +164,19 @@ export function UsersPage() {
                   Use a signed integer without spaces or decimals.
                 </EmptyDescription>
               </EmptyHeader>
+            </Empty>
+          ) : !authenticated ? (
+            <Empty className="border">
+              <EmptyHeader>
+                <EmptyTitle>Admin access required</EmptyTitle>
+                <EmptyDescription>
+                  Enter the admin token to view this chat and its download
+                  history.
+                </EmptyDescription>
+              </EmptyHeader>
+              <Button disabled={!ready} onClick={() => void requireAdmin()}>
+                Enter admin token
+              </Button>
             </Empty>
           ) : userQuery.isPending ? (
             <UserResultLoading />

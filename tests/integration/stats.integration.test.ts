@@ -6,7 +6,6 @@ import { getHistoryCsvResponse } from "@/lib/csv/history"
 import { getPool } from "@/lib/db/pool"
 
 import {
-  getBotstatUserIdsRaw,
   getOtherStatsRaw,
   getOverviewRaw,
   getReferralStatsRaw,
@@ -329,17 +328,6 @@ integration("PostgreSQL statistics queries", () => {
     expect(other.fileModeUsers).toBe("2")
     expect(other.languages[0]).toEqual({ value: "en", count: "2" })
     expect(other.topDownloaders[0]).toEqual({ value: "1", count: "3" })
-    expect(await getBotstatUserIdsRaw(pool)).toEqual([
-      "-20",
-      "-10",
-      "0",
-      "1",
-      "2",
-      "3",
-      "4",
-      "5",
-      "6",
-    ])
   })
 
   it.runIf(runPgCron)(

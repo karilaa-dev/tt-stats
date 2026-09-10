@@ -21,15 +21,10 @@ const dbEnvSchema = z.object({
   DB_POOL_SIZE: z.coerce.number().int().min(1).max(50).default(5),
 })
 
-const botstatEnvSchema = z.object({
+const telegramEnvSchema = z.object({
   BOT_TOKEN: z.string().min(1),
-  BOTSTAT_ACCESS_KEY: z.string().min(1),
-  BOTSTAT_NOTIFY_ID: z.string().regex(/^\d+$/u),
-  BOTSTAT_BASE_URL: z
-    .string()
-    .url()
-    .refine((value) => ["http:", "https:"].includes(new URL(value).protocol))
-    .default("https://www.botstat.io"),
+  TELEGRAM_API_ID: z.coerce.number().int().positive(),
+  TELEGRAM_API_HASH: z.string().regex(/^[a-fA-F0-9]{32}$/u),
 })
 
 const optionalHttpUrl = z.preprocess(
@@ -75,7 +70,7 @@ const videoMonitorEnvSchema = z
   })
 
 export type DbEnv = z.output<typeof dbEnvSchema>
-export type BotstatEnv = z.output<typeof botstatEnvSchema>
+export type TelegramEnv = z.output<typeof telegramEnvSchema>
 export type VideoMonitorEnv =
   | { provider: "webhook"; url: string }
   | { provider: "ntfy"; url: string; token?: string }
@@ -84,14 +79,12 @@ export function getDbEnv(source: NodeJS.ProcessEnv = process.env): DbEnv {
   return dbEnvSchema.parse(source)
 }
 
-export function getBotstatEnv(
+export function getTelegramEnv(
   source: NodeJS.ProcessEnv = process.env
-): BotstatEnv {
-  const parsed = botstatEnvSchema.parse(source)
-  return {
-    ...parsed,
-    BOTSTAT_BASE_URL: parsed.BOTSTAT_BASE_URL.replace(/\/+$/u, ""),
-  }
+): TelegramEnv | null {
+  if (!source.TELEGRAM_API_ID?.trim() && !source.TELEGRAM_API_HASH?.trim())
+    return null
+  return telegramEnvSchema.parse(source)
 }
 
 export function getVideoMonitorEnv(
@@ -115,5 +108,4 @@ export function validateRuntimeConfiguration(
   source: NodeJS.ProcessEnv = process.env
 ): void {
   getDbEnv(source)
-  getBotstatEnv(source)
 }
