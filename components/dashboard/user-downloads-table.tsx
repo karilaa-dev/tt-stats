@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
+import type { SelectedDownload } from "./download-dialog"
 import type { PaginatedUserDownloads } from "@/lib/stats/types"
 
 function linkLabel(link: string): string {
@@ -56,10 +57,12 @@ export function UserDownloadsTable({
   loading,
   refreshing = false,
   onPageChange,
+  onView,
 }: {
   data?: PaginatedUserDownloads
   loading: boolean
   refreshing?: boolean
+  onView?: (selection: SelectedDownload) => void
   onPageChange: (page: number) => void
 }) {
   const time = useBrowserTime()
@@ -141,6 +144,38 @@ export function UserDownloadsTable({
                               : formatTimestamp(download.downloadedAt, time)}
                           </span>
                         </p>
+                        {onView ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                onView({
+                                  id: download.id,
+                                  sharedLink: download.sharedLink,
+                                  mode: "media",
+                                })
+                              }
+                            >
+                              View media
+                            </Button>
+                            {download.cacheHit && download.videoDetailsId ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  onView({
+                                    id: download.id,
+                                    sharedLink: download.sharedLink,
+                                    mode: "downloaders",
+                                  })
+                                }
+                              >
+                                Other downloaders
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </TableCell>

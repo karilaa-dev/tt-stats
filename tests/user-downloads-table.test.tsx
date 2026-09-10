@@ -20,6 +20,7 @@ const downloads: PaginatedUserDownloads = {
       sharedLink: "https://example.test/cached",
       mediaKind: "video",
       cacheHit: true,
+      videoDetailsId: "1",
     },
     {
       id: "1",
@@ -27,6 +28,7 @@ const downloads: PaginatedUserDownloads = {
       sharedLink: "https://example.test/downloaded",
       mediaKind: "video",
       cacheHit: false,
+      videoDetailsId: "2",
     },
   ],
   page: 1,
@@ -51,6 +53,41 @@ describe("user downloads table", () => {
     const rows = screen.getAllByRole("row").slice(1)
     expect(within(rows[0]!).getByText("Hit")).toBeTruthy()
     expect(within(rows[1]!).getByText("Miss")).toBeTruthy()
+  })
+
+  it("offers previews for all downloads and other downloaders only for linked cache hits", () => {
+    const onView = vi.fn()
+    render(
+      <UserDownloadsTable
+        data={{
+          ...downloads,
+          items: [
+            ...downloads.items,
+            { ...downloads.items[0]!, id: "3", videoDetailsId: null },
+          ],
+        }}
+        loading={false}
+        onPageChange={vi.fn()}
+        onView={onView}
+      />
+    )
+    expect(screen.getAllByRole("button", { name: "View media" })).toHaveLength(
+      3
+    )
+    const others = screen.getAllByRole("button", { name: "Other downloaders" })
+    expect(others).toHaveLength(1)
+    fireEvent.click(others[0]!)
+    expect(onView).toHaveBeenCalledWith({
+      id: "2",
+      sharedLink: downloads.items[0]!.sharedLink,
+      mode: "downloaders",
+    })
+    fireEvent.click(screen.getAllByRole("button", { name: "View media" })[1]!)
+    expect(onView).toHaveBeenLastCalledWith({
+      id: "1",
+      sharedLink: downloads.items[1]!.sharedLink,
+      mode: "media",
+    })
   })
 
   it("prevents navigating before the first page and allows the next page", () => {

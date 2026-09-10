@@ -88,6 +88,7 @@ const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
       : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
     mediaKind: images ? "images" : "video",
     cacheHit: index % 3 !== 0,
+    videoDetailsId: index % 4 === 3 ? null : String(index + 1),
   }
 })
 

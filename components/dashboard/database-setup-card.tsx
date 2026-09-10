@@ -90,7 +90,7 @@ function missingRuntimePrivileges(status: DatabaseSetupStatus): string[] {
       : "TEMPORARY on this database",
     status.databaseRole.canReadSourceTables
       ? null
-      : "USAGE on public and SELECT on users, videos, and music",
+      : "USAGE on public and SELECT on users, videos, music, and video_details",
     status.databaseRole.canUseCron ? null : "USAGE on the cron schema",
   ].filter((value): value is string => Boolean(value))
 }

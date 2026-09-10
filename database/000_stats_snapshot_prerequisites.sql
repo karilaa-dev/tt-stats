@@ -14,4 +14,4 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 -- TEMPORARY is also needed at runtime by the snapshot refresh procedures.
 GRANT CONNECT, CREATE, TEMPORARY ON DATABASE :"DBNAME" TO :"app_role";
 GRANT USAGE ON SCHEMA public, cron TO :"app_role";
-GRANT SELECT ON TABLE public.users, public.videos, public.music TO :"app_role";
+GRANT SELECT ON TABLE public.users, public.videos, public.music, public.video_details TO :"app_role";

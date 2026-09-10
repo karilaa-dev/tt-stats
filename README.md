@@ -132,8 +132,9 @@ The role needs only these database-scoped privileges:
 - `CONNECT` on the tt-bot database.
 - `TEMPORARY` because refresh procedures build transaction-local staging
   tables.
-- `USAGE` on `public` and `SELECT` on `public.users`, `public.videos`, and
-  `public.music` for snapshots, live lookup, history, and CSV export.
+- `USAGE` on `public` and `SELECT` on `public.users`, `public.videos`,
+  `public.music`, and `public.video_details` for media previews, snapshots,
+  live lookup, history, and CSV export.
 - `USAGE` on `cron` so its own fixed jobs can be scheduled and managed.
 - `CREATE` on the tt-bot database only for the initial guided install or to
   recreate a missing schema. It can be revoked after installation; updating
@@ -240,6 +241,7 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard/analytics` — registration, video, and music time series
 - `/dashboard/detailed` — linkable scope and range filters
 - `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
+- `/dashboard/videos` — admin-only most-downloaded videos, with download counts and unique chats
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, and top downloaders
 - `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
@@ -252,6 +254,37 @@ The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"
 Set `ADMIN_TOKEN` to a random secret of at least 32 characters, for example with `openssl rand -hex 32`. Visitors can view aggregate statistics without signing in. Opening Operations or submitting a user search prompts for the token. Successful entry creates an eight-hour signed, HttpOnly, SameSite=Strict cookie, marked Secure on HTTPS. The token is never stored in browser storage or URLs. Use **Lock admin access** to end the browser session; changing `ADMIN_TOKEN` invalidates all sessions.
 
 Server middleware protects all actions except the explicit public statistics allowlist, and protects `/api/users/*` exports. A missing or short token leaves admin access locked while public statistics remain available. Keep origin checking enabled and forward the original host/protocol through the reverse proxy. Remove any blanket proxy login requirement if statistics should be publicly viewable.
+
+## Saved media and popular videos
+
+User download history includes **View media** for videos and image albums.
+Previews use the current `video_details.telegram_files` cache, so older events
+without linked or saved media show an unavailable message and retain the original
+post link. Cache entries may change after a download; previews are not an archive
+of the exact file originally delivered.
+
+Set `BOT_TOKEN` to the same bot that owns the saved files. Previewing media does
+not require `TELEGRAM_API_ID` or `TELEGRAM_API_HASH`. The app checks the stored
+`telegram_bot_id` before retrieving files. Media streams through an authenticated
+endpoint; credentials and Telegram file URLs never reach the browser. Telegram's
+[hosted Bot API](https://core.telegram.org/bots/api#getfile) limits downloads to
+20 MB. Larger, expired, or unsupported files can still be opened at the original
+post.
+
+**Other downloaders** is available only on cache-hit history entries with a
+video identity. It lists other users and groups sharing that identity, including
+their cache hits and misses, and links to their user lookup pages. The selected
+chat is excluded.
+
+**Top videos** at `/dashboard/videos` ranks all video download events, including
+repeat downloads, with a separate unique-chat count. It excludes image albums.
+Linked events are grouped by `video_details_id`; unlinked legacy events are
+grouped by exact shared URL and cannot be merged across URL aliases. This is a
+live, paginated query and requires admin access.
+
+Existing runtime roles need `SELECT` on `public.video_details`. Reapply
+`database/003_stats_snapshot_grants.sql` as the database administrator with
+`app_role` set to the runtime role. Setup diagnostics check this permission.
 
 ## Telegram MAU
 

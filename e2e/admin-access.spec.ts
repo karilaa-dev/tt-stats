@@ -74,7 +74,7 @@ test("search asks for a token without querying user data beforehand", async ({
 })
 
 test("deep links prompt and hide private content", async ({ page }) => {
-  for (const route of ["jobs", "users?id=123456789"]) {
+  for (const route of ["jobs", "videos", "users?id=123456789"]) {
     await page.goto(`/dashboard/${route}`)
     await expect(
       page.getByRole("dialog", { name: "Admin access", exact: true })
@@ -93,6 +93,9 @@ test("server denies every private action and CSV without a session", async ({
   for (const action of [
     "getUserStats",
     "getUserDownloads",
+    "getDownloadMedia",
+    "getDownloaders",
+    "getPopularVideos",
     "getStatsJobs",
     "getDatabaseSetupStatus",
     "configureDatabaseJobs",
@@ -121,6 +124,7 @@ test("server denies every private action and CSV without a session", async ({
       })
     ).status()
   ).toBe(200)
+  expect((await request.get("/api/media/100/0")).status()).toBe(401)
   const wrong = await request.post("/api/admin-session", {
     data: { token: "wrong" },
     headers: { origin: baseURL! },

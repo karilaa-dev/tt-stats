@@ -92,9 +92,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       const privateQuery = (query: { queryKey: readonly unknown[] }) =>
         query.queryKey[0] === "video-notification-status" ||
         (query.queryKey[0] === "stats" &&
-          ["user", "jobs", "database-setup"].includes(
-            String(query.queryKey[1])
-          ))
+          [
+            "user",
+            "jobs",
+            "database-setup",
+            "media",
+            "downloaders",
+            "popular-videos",
+          ].includes(String(query.queryKey[1])))
       void client
         .cancelQueries({ predicate: privateQuery })
         .then(() => client.removeQueries({ predicate: privateQuery }))
@@ -220,7 +225,7 @@ export function AdminGate({ children }: { children: ReactNode }) {
         Admin access required
       </h1>
       <p className="text-muted-foreground">
-        Unlock Operations with the shared admin token.
+        Enter the shared admin token to view this page.
       </p>
       <Button disabled={!ready} onClick={() => void requireAdmin()}>
         {ready ? "Enter admin token" : "Checking access…"}

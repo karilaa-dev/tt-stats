@@ -274,9 +274,10 @@ export async function getUserDownloadsRaw(
     shared_link: string
     media_kind: "video" | "images"
     cache_hit: boolean
+    video_details_id: string | null
   }>(
     pool,
-    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind, cache_hit
+    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind, cache_hit, video_details_id::text
      FROM public.videos
      WHERE user_id = $1::bigint
      ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC
@@ -291,6 +292,7 @@ export async function getUserDownloadsRaw(
       sharedLink: row.shared_link,
       mediaKind: row.media_kind,
       cacheHit: row.cache_hit,
+      videoDetailsId: row.video_details_id,
     })),
     page,
     pageSize,

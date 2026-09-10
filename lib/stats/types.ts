@@ -94,6 +94,7 @@ export interface UserDownload {
   sharedLink: string
   mediaKind: "video" | "images"
   cacheHit: boolean
+  videoDetailsId: string | null
 }
 
 export interface PaginatedUserDownloads {

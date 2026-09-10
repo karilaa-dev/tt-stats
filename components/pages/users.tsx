@@ -2,7 +2,11 @@ import {
   useDashboardSearch,
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
-import { useEffect, useRef } from "react"
+import {
+  DownloadDialog,
+  type SelectedDownload,
+} from "@/components/dashboard/download-dialog"
+import { useEffect, useRef, useState } from "react"
 import { useAdminAccess } from "@/components/dashboard/admin-access"
 import { useQuery } from "@tanstack/react-query"
 import type { LucideIcon } from "lucide-react"
@@ -55,6 +59,7 @@ import { parseTelegramId } from "@/lib/stats/validation"
 const DOWNLOADS_PAGE_SIZE = 8
 
 export function UsersPage() {
+  const [selection, setSelection] = useState<SelectedDownload | null>(null)
   const { authenticated, ready, requireAdmin } = useAdminAccess()
   const prompted = useRef(false)
   const { id, page } = useDashboardSearch()
@@ -80,6 +85,10 @@ export function UsersPage() {
 
   return (
     <>
+      <DownloadDialog
+        selection={selection}
+        onClose={() => setSelection(null)}
+      />
       <PageHeading
         title="User lookup"
         description="A closer look at the people and groups using your bot."
@@ -233,6 +242,7 @@ export function UsersPage() {
                 </Alert>
               ) : (
                 <UserDownloadsTable
+                  onView={setSelection}
                   data={downloadsQuery.data}
                   loading={downloadsQuery.isPending}
                   refreshing={

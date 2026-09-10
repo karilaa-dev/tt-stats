@@ -92,6 +92,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              AND coalesce(has_table_privilege(current_user, to_regclass('public.users'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('public.videos'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('public.music'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('public.video_details'), 'SELECT'), false)
              AS can_read_source_tables,
            coalesce(has_schema_privilege(current_user, to_regnamespace('cron'), 'USAGE'), false)
              AS can_use_cron,
@@ -322,7 +323,7 @@ export async function configureDatabaseJobsRaw(input: {
       : "TEMPORARY on this database",
     capabilities.can_read_source_tables
       ? null
-      : "USAGE on public and SELECT on users, videos, and music",
+      : "USAGE on public and SELECT on users, videos, music, and video_details",
     capabilities.can_use_cron ? null : "USAGE on the cron schema",
   ].filter((value): value is string => Boolean(value))
   if (missingPrivileges.length) {
@@ -434,7 +435,7 @@ export async function updateDatabaseDefinitionsRaw(input: {
       : "TEMPORARY on this database",
     capabilities.can_read_source_tables
       ? null
-      : "USAGE on public and SELECT on users, videos, and music",
+      : "USAGE on public and SELECT on users, videos, music, and video_details",
     capabilities.can_use_cron ? null : "USAGE on the cron schema",
   ].filter((value): value is string => Boolean(value))
   if (missingPrivileges.length) {

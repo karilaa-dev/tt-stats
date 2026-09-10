@@ -7,7 +7,7 @@
 
 GRANT CONNECT, TEMPORARY ON DATABASE :"DBNAME" TO :"app_role";
 GRANT USAGE ON SCHEMA public, cron TO :"app_role";
-GRANT SELECT ON TABLE public.users, public.videos, public.music TO :"app_role";
+GRANT SELECT ON TABLE public.users, public.videos, public.music, public.video_details TO :"app_role";
 
 GRANT USAGE ON SCHEMA tt_stats_cache TO :"app_role";
 GRANT SELECT ON tt_stats_cache.refresh_metadata,

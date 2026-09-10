@@ -9,6 +9,7 @@ import {
   MoreHorizontalIcon,
   SearchIcon,
   Share2Icon,
+  VideoIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -52,6 +53,13 @@ const navigation = [
     description: "Find a chat and its history",
   },
   {
+    href: "/dashboard/videos",
+    label: "Top videos",
+    short: "Videos",
+    icon: VideoIcon,
+    description: "Most downloaded videos",
+  },
+  {
     href: "/dashboard/referrals",
     label: "Referrals",
     short: "Referrals",
@@ -85,7 +93,7 @@ export function DesktopNavigation() {
           key={href}
           href={href}
           onClick={async (event) => {
-            if (href !== "/dashboard/jobs") return
+            if (!["/dashboard/jobs", "/dashboard/videos"].includes(href)) return
             event.preventDefault()
             if (await requireAdmin()) window.location.assign(href)
           }}
@@ -153,7 +161,10 @@ export function AppSidebar() {
                   aria-label={label}
                   onClick={async (event) => {
                     setOpenMobile(false)
-                    if (href !== "/dashboard/jobs") return
+                    if (
+                      !["/dashboard/jobs", "/dashboard/videos"].includes(href)
+                    )
+                      return
                     event.preventDefault()
                     if (await requireAdmin()) window.location.assign(href)
                   }}

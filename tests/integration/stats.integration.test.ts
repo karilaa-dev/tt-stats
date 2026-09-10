@@ -20,6 +20,12 @@ import {
   updateStatsJobScheduleRaw,
 } from "@/lib/stats/queries"
 
+import {
+  getDownloadersRaw,
+  getPopularVideosRaw,
+  getStoredMedia,
+} from "@/lib/media/queries"
+
 const run = process.env.RUN_DATABASE_INTEGRATION === "1"
 const runPgCron = process.env.RUN_PG_CRON_INTEGRATION === "1"
 const integration = describe.runIf(run)
@@ -303,6 +309,58 @@ integration("PostgreSQL statistics queries", () => {
     const clampedPage = await getUserDownloadsRaw("1", 99, 2, pool)
     expect(clampedPage.page).toBe(2)
     expect(clampedPage.items[0]?.sharedLink).toBe("https://example.test/old")
+  })
+
+  it("resolves albums, gates related chats on cache hits, and ranks download events by video identity", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      // Use a single transaction so these events cannot change other statistics tests.
+      const db = client as unknown as Pool
+      await client.query(`INSERT INTO video_details (pk_id, platform, platform_video_id, telegram_bot_id, telegram_files)
+        VALUES (100, 'tiktok', 'same-post', 123, '[{"position":0,"media_type":"video","file_id":"video-file","file_unique_id":"unique-video"},{"position":1,"media_type":"photo","file_id":"photo-file","file_unique_id":"unique-photo"}]')`)
+      await client.query(`INSERT INTO videos (pk_id, user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit) VALUES
+        (100, 1, 100, 10, 'https://example.test/alias-a', 'video', 'chat', true),
+        (101, 2, 100, 20, 'https://example.test/alias-b', 'video', 'chat', false),
+        (102, 2, 100, 30, 'https://example.test/alias-c', 'video', 'chat', true),
+        (103, -10, 100, NULL, 'https://example.test/alias-d', 'video', 'chat', true),
+        (104, 1, NULL, 40, 'https://example.test/alias-a', 'video', 'chat', true),
+        (105, 1, NULL, 50, 'https://example.test/legacy', 'video', 'chat', false),
+        (106, 2, NULL, 60, 'https://example.test/legacy', 'video', 'chat', false),
+        (107, 2, NULL, 70, 'https://example.test/legacy', 'images', 'chat', false)`)
+      expect(
+        (await getStoredMedia("100", db))?.telegram_files?.map(
+          (file) => file.media_type
+        )
+      ).toEqual(["video", "photo"])
+      expect(await getStoredMedia("999999", db)).toBeNull()
+      expect(await getDownloadersRaw("100", 1, db)).toEqual({
+        page: 1,
+        hasMore: false,
+        items: [
+          { userId: "2", downloads: "2", lastDownloadedAt: 30 },
+          { userId: "-10", downloads: "1", lastDownloadedAt: null },
+        ],
+      })
+      expect((await getDownloadersRaw("101", 1, db)).items).toEqual([])
+      expect((await getDownloadersRaw("104", 1, db)).items).toEqual([])
+      expect((await getDownloadersRaw("100", 2, db)).items).toEqual([])
+      const ranked = await getPopularVideosRaw(1, db)
+      expect(ranked.items[0]).toMatchObject({
+        downloadId: "100",
+        downloads: "4",
+        uniqueChats: "3",
+      })
+      expect(ranked.items[1]).toMatchObject({
+        sharedLink: "https://example.test/legacy",
+        downloads: "2",
+        uniqueChats: "2",
+      })
+      expect((await getPopularVideosRaw(2, db)).items).toEqual([])
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
   })
 
   it("streams escaped CSV in newest-first order with protected headers", async () => {
