@@ -7,6 +7,7 @@ import {
   telegramUserFromClaims,
 } from "@/lib/auth/telegram"
 import { MemoryStore } from "@/lib/auth/memory"
+import { telegramLoginFailureDetails } from "@/lib/auth/diagnostics"
 import {
   createUserSession,
   deleteUserSession,
@@ -23,15 +24,20 @@ const jwk = {
 const issuer = "https://oauth.telegram.org"
 const encode = (value: unknown) =>
   Buffer.from(JSON.stringify(value)).toString("base64url")
-const signedToken = (claims: Record<string, unknown>) => {
-  const payload = `${encode({ alg: "RS256", kid: "test-key" })}.${encode(claims)}`
+const signedToken = (claims: Record<string, unknown>, alg = "RS256") => {
+  const payload = `${encode({ alg, kid: "test-key" })}.${encode(claims)}`
   return `${payload}.${sign("RSA-SHA256", Buffer.from(payload), keys.privateKey).toString("base64url")}`
 }
 afterEach(() => {
   vi.unstubAllEnvs()
   vi.unstubAllGlobals()
 })
-async function flow(change: Record<string, unknown> = {}, forged = false) {
+async function flow(
+  change: Record<string, unknown> = {},
+  forged = false,
+  responseChange: Record<string, unknown> = {},
+  alg = "RS256"
+) {
   vi.stubEnv("TELEGRAM_OAUTH_CLIENT_ID", "123456")
   vi.stubEnv("TELEGRAM_OAUTH_CLIENT_SECRET", "test-oauth-secret")
   vi.stubEnv("APP_ORIGIN", "https://stats.example")
@@ -63,23 +69,27 @@ async function flow(change: Record<string, unknown> = {}, forged = false) {
           access_token: "unused",
           token_type: "Bearer",
           id_token: token,
+          ...responseChange,
         })
       throw new Error("Unexpected outgoing URL")
     })
   )
   const result = await beginTelegramLogin()
   const epoch = Math.floor(Date.now() / 1000)
-  token = signedToken({
-    iss: issuer,
-    aud: "123456",
-    sub: "not-the-bot-user-id",
-    id: 987654321,
-    name: "Test user",
-    nonce: result.transaction.nonce,
-    iat: epoch,
-    exp: epoch + 3600,
-    ...change,
-  })
+  token = signedToken(
+    {
+      iss: issuer,
+      aud: "123456",
+      sub: "not-the-bot-user-id",
+      id: 987654321,
+      name: "Test user",
+      nonce: result.transaction.nonce,
+      iat: epoch,
+      exp: epoch + 3600,
+      ...change,
+    },
+    alg
+  )
   if (forged)
     token =
       token.slice(0, token.lastIndexOf(".") + 1) +
@@ -90,6 +100,34 @@ async function flow(change: Record<string, unknown> = {}, forged = false) {
   return { ...result, callback, calls }
 }
 describe("official Telegram OIDC", () => {
+  it.each([
+    { claims: { nonce: undefined }, reason: "missing_nonce", claim: "nonce" },
+    { claims: { nonce: "wrong" }, reason: "unexpected_nonce", claim: "nonce" },
+    { claims: { aud: 123456 }, reason: "invalid_aud_type", claim: "aud" },
+    {
+      alg: "ES256",
+      reason: "unexpected_signing_algorithm",
+      algorithm: "ES256",
+    },
+    { response: { access_token: undefined }, reason: "invalid_access_token" },
+    { forged: true, reason: "signature_verification_failed" },
+  ])("identifies real OIDC failures: $reason", async (test) => {
+    const { callback, transaction } = await flow(
+      test.claims,
+      test.forged,
+      test.response,
+      test.alg
+    )
+    const error = await finishTelegramLogin(callback, transaction).catch(
+      (error: unknown) => error
+    )
+    expect(error).toBeInstanceOf(Error)
+    expect(telegramLoginFailureDetails(error)).toMatchObject({
+      reason: test.reason,
+      claim: test.claim ?? "unknown",
+      algorithm: test.algorithm ?? "unknown",
+    })
+  })
   it("uses PKCE, nonce, minimal scopes, Basic client auth, and verified profile ID", async () => {
     const { url, transaction, callback, calls } = await flow()
     expect(url.origin).toBe(issuer)

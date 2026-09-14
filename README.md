@@ -280,8 +280,13 @@ user ID. Tokens and client secrets are never returned to the browser.
 
 If Telegram approves a login but the site reports that it could not be verified,
 check the application log for `[telegram-login] callback failed`. It records only
-allowlisted error codes and claim names, never tokens, credentials, or profile
-values. `invalid_client` indicates rejected OAuth client credentials;
+allowlisted error codes, failure reasons, claim names, and algorithm names, never
+tokens, credentials, or profile values. Nested library errors are inspected to
+distinguish failures sharing `OAUTH_INVALID_RESPONSE`. For example,
+`missing_nonce` means the ID token omitted the requested nonce,
+`unexpected_signing_algorithm` includes the returned `algorithm`, and
+`invalid_access_token` means the token response omitted a non-empty access token.
+`invalid_client` indicates rejected OAuth client credentials;
 `invalid_grant` indicates a rejected code, redirect URI, or PKCE verifier. A JWT
 validation error includes the failing claim name when available. Keep RS256
 selected in BotFather and verify that the server clock is correct. After changing

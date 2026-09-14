@@ -78,6 +78,8 @@ describe("OAuth callback and logout", () => {
         code: "OAUTH_RESPONSE_BODY_ERROR",
         providerError: "invalid_client",
         claim: "unknown",
+        reason: "unknown",
+        algorithm: "unknown",
       }
     )
     expect(JSON.stringify(log.mock.calls)).not.toContain("sentinel")
@@ -92,6 +94,8 @@ describe("OAuth callback and logout", () => {
       code: "OAUTH_JWT_CLAIM_COMPARISON_FAILED",
       providerError: "unknown",
       claim: "nonce",
+      reason: "unknown",
+      algorithm: "unknown",
     })
     for (const error of [
       undefined,
@@ -106,8 +110,27 @@ describe("OAuth callback and logout", () => {
         code: "unknown",
         providerError: "unknown",
         claim: "unknown",
+        reason: "unknown",
+        algorithm: "unknown",
       })
     }
+  })
+  it("bounds cyclic causes and redacts nested messages and header values", () => {
+    const error = new Error("sentinel-top-level")
+    const cause = {
+      message: 'unexpected JWT "alg" header parameter: sentinel-secret',
+      header: { alg: "sentinel-secret" },
+      claim: "sentinel-secret",
+      cause: error,
+    }
+    error.cause = cause
+    expect(telegramLoginFailureDetails(error)).toEqual({
+      code: "unknown",
+      providerError: "unknown",
+      claim: "unknown",
+      reason: "unknown",
+      algorithm: "unknown",
+    })
   })
   it("consumes login transactions once and replaces the previous session", async () => {
     const previous = createUserSession({
