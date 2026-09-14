@@ -278,6 +278,15 @@ and signature-verified ID tokens. Only `openid profile` is requested. The
 verified Telegram `id` claim selects bot records; the OIDC `sub` is not a bot
 user ID. Tokens and client secrets are never returned to the browser.
 
+If Telegram approves a login but the site reports that it could not be verified,
+check the application log for `[telegram-login] callback failed`. It records only
+allowlisted error codes and claim names, never tokens, credentials, or profile
+values. `invalid_client` indicates rejected OAuth client credentials;
+`invalid_grant` indicates a rejected code, redirect URI, or PKCE verifier. A JWT
+validation error includes the failing claim name when available. Keep RS256
+selected in BotFather and verify that the server clock is correct. After changing
+configuration or restarting, start a new login instead of reusing a callback URL.
+
 Telegram sessions last seven days in RAM and use opaque HttpOnly cookies.
 Logout revokes the current session. Login transactions expire after ten minutes.
 A restart ends all Telegram sessions and clears rate limits. Run one app process

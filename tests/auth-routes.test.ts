@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import type { APIContext, AstroCookies } from "astro"
 import { GET as callback } from "@/src/pages/api/auth/telegram/callback"
 import { GET as getSession, DELETE as logout } from "@/src/pages/api/session"
+import { telegramLoginFailureDetails } from "@/lib/auth/diagnostics"
 import {
   createUserSession,
   getUserSession,
@@ -44,6 +45,70 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 describe("OAuth callback and logout", () => {
+  it("logs only safe diagnostics when Telegram rejects the token exchange", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {})
+    loginTransactions.set(
+      "failed-exchange",
+      {
+        state: "state",
+        nonce: "nonce",
+        verifier: "verifier",
+        redirectUri: "https://example.test/api/auth/telegram/callback",
+      },
+      600_000
+    )
+    finish.mockRejectedValue(
+      Object.assign(new Error("sentinel-client-secret"), {
+        code: "OAUTH_RESPONSE_BODY_ERROR",
+        error: "invalid_client",
+        error_description: "sentinel-access-token",
+        cause: { id_token: "sentinel-id-token" },
+      })
+    )
+    const ctx = context(
+      "https://example.test/api/auth/telegram/callback?state=state&code=code",
+      { [LOGIN_COOKIE]: "failed-exchange" }
+    )
+    const response = await callback(ctx)
+    expect(response.headers.get("location")).toBe("/dashboard/me?login=failed")
+    expect(ctx.cookies.get(USER_COOKIE)).toBeUndefined()
+    expect(log).toHaveBeenCalledExactlyOnceWith(
+      "[telegram-login] callback failed",
+      {
+        code: "OAUTH_RESPONSE_BODY_ERROR",
+        providerError: "invalid_client",
+        claim: "unknown",
+      }
+    )
+    expect(JSON.stringify(log.mock.calls)).not.toContain("sentinel")
+  })
+  it("retains failing claim names without exposing claim values or arbitrary errors", () => {
+    expect(
+      telegramLoginFailureDetails({
+        code: "OAUTH_JWT_CLAIM_COMPARISON_FAILED",
+        cause: { claim: "nonce", claims: { nonce: "sentinel-nonce" } },
+      })
+    ).toEqual({
+      code: "OAUTH_JWT_CLAIM_COMPARISON_FAILED",
+      providerError: "unknown",
+      claim: "nonce",
+    })
+    for (const error of [
+      undefined,
+      "sentinel-error",
+      {
+        code: "sentinel-code",
+        error: "sentinel-error",
+        cause: { claim: "sentinel-claim" },
+      },
+    ]) {
+      expect(telegramLoginFailureDetails(error)).toEqual({
+        code: "unknown",
+        providerError: "unknown",
+        claim: "unknown",
+      })
+    }
+  })
   it("consumes login transactions once and replaces the previous session", async () => {
     const previous = createUserSession({
       id: "1",

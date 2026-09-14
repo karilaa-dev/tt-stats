@@ -105,12 +105,19 @@ export async function finishTelegramLogin(
 ) {
   const callback = new URL(transaction.redirectUri)
   callback.search = url.search
-  const tokens = await oidc.authorizationCodeGrant(await config(), callback, {
-    pkceCodeVerifier: transaction.verifier,
-    expectedState: transaction.state,
-    expectedNonce: transaction.nonce,
-    idTokenExpected: true,
-  })
+  const configuration = await config()
+  const tokens = await oidc.authorizationCodeGrant(
+    configuration,
+    callback,
+    {
+      pkceCodeVerifier: transaction.verifier,
+      expectedState: transaction.state,
+      expectedNonce: transaction.nonce,
+      idTokenExpected: true,
+    },
+    // Telegram's token endpoint expects this in addition to Basic client auth.
+    { client_id: configuration.clientMetadata().client_id }
+  )
   const claims = tokens.claims()
   if (!claims) throw new Error("Missing Telegram identity")
   return telegramUserFromClaims(claims)

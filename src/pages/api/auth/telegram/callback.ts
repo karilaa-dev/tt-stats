@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro"
 import { finishTelegramLogin } from "@/lib/auth/telegram"
+import { telegramLoginFailureDetails } from "@/lib/auth/diagnostics"
 import {
   LOGIN_COOKIE,
   USER_COOKIE,
@@ -31,7 +32,11 @@ export const GET: APIRoute = async ({ cookies, url, redirect }) => {
       sessionCookieOptions(url.protocol === "https:", USER_SESSION_SECONDS)
     )
     return redirect("/dashboard/me", 303)
-  } catch {
+  } catch (error) {
+    console.error(
+      "[telegram-login] callback failed",
+      telegramLoginFailureDetails(error)
+    )
     return redirect("/dashboard/me?login=failed", 303)
   }
 }

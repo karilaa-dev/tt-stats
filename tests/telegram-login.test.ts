@@ -103,6 +103,7 @@ describe("official Telegram OIDC", () => {
       username: null,
     })
     const exchange = calls.find((call) => call.url.endsWith("/token"))!
+    expect(new URLSearchParams(exchange.body).get("client_id")).toBe("123456")
     expect(
       decodeURIComponent(
         Buffer.from(exchange.authorization!.slice(6), "base64").toString()
