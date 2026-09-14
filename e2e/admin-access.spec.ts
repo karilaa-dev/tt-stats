@@ -11,6 +11,14 @@ test("login is visible and admin menus are hidden until visiting /admin", async 
   await expect(page.locator(".telegram-login")).toHaveText(
     "Log in with Telegram"
   )
+  const profileTab = page
+    .getByRole("navigation", {
+      name: isMobile ? "Quick navigation" : "Main navigation",
+      exact: true,
+    })
+    .getByRole("link", { name: "My Profile", exact: true })
+  await expect(profileTab).toBeInViewport()
+  await expect(profileTab).toHaveAttribute("href", "/dashboard/me")
   await expect(
     page.getByRole("link", { name: "Operations", exact: true })
   ).toHaveCount(0)
@@ -20,7 +28,7 @@ test("login is visible and admin menus are hidden until visiting /admin", async 
   if (isMobile) {
     const dock = page.getByRole("navigation", { name: "Quick navigation" })
     await expect(
-      dock.getByRole("link", { name: "Log in with Telegram", exact: true })
+      dock.getByRole("link", { name: "My Profile", exact: true })
     ).toBeInViewport()
     await expect(
       dock.getByRole("link", { name: "Videos", exact: true })
@@ -92,6 +100,8 @@ test("server denies private actions and exports without the correct session", as
     "sendVideoNotificationTest",
     "getMyStats",
     "getMyDownloads",
+    "getMyActivity",
+    "getUserActivity",
   ]) {
     const response = await request.post(`/_actions/${action}`, {
       data: {},

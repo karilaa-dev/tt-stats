@@ -40,6 +40,13 @@ test("personal statistics, filters, mobile access, and logout", async ({
     })
     await route.fulfill({ response })
   })
+  await page.route("**/_actions/getMyActivity/**", async (route) => {
+    const response = await backend.post("/_actions/getUserActivity", {
+      data: { ...route.request().postDataJSON(), userId: "123456789" },
+      headers: { origin: baseURL! },
+    })
+    await route.fulfill({ response })
+  })
   try {
     await page.goto("/dashboard/me")
     await expect(page.getByText("Alex Example", { exact: true })).toBeVisible()
@@ -73,10 +80,69 @@ test("personal statistics, filters, mobile access, and logout", async ({
         () => document.documentElement.scrollWidth <= innerWidth
       )
     ).toBe(true)
-    await page.screenshot({
-      path: testInfo.outputPath("my-videos.png"),
-      fullPage: true,
+    await expect(page.getByText("English", { exact: true })).toBeVisible()
+    const summary = await page.locator(".profile-summary").boundingBox()
+    const chart = await page.locator(".profile-activity-card").boundingBox()
+    if (isMobile) {
+      expect(chart!.y).toBeGreaterThanOrEqual(summary!.y + summary!.height)
+    } else {
+      expect(chart!.x).toBeGreaterThan(summary!.x + summary!.width)
+      expect(Math.abs(chart!.y - summary!.y)).toBeLessThan(2)
+    }
+    await expect(
+      page.getByText("No other people have downloaded this yet")
+    ).toHaveCount(0)
+    const activityPeriod = page.getByRole("group", {
+      name: "Activity period",
+      exact: true,
     })
+    await activityPeriod
+      .getByRole("button", { name: "All time", exact: true })
+      .click()
+    await expect(page.getByText(/Downloads per month/)).toBeVisible()
+    await expect(
+      page
+        .getByRole("group", { name: "Activity period", exact: true })
+        .getByRole("button", { name: "All time", exact: true })
+    ).toHaveAttribute("aria-pressed", "true")
+    await page
+      .getByRole("group", { name: "Activity period", exact: true })
+      .getByRole("button", { name: "90 days", exact: true })
+      .click()
+    await expect(page.getByText(/Downloads per week/)).toBeVisible()
+    await page
+      .getByRole("group", { name: "Activity period", exact: true })
+      .getByRole("button", { name: "31 days", exact: true })
+      .click()
+    await page
+      .getByRole("button", { name: "View media", exact: true })
+      .first()
+      .click()
+    await expect(
+      page.getByRole("dialog", { name: "Saved media" })
+    ).toContainText("Saved media is unavailable in demo mode.")
+    await page.keyboard.press("Escape")
+    await expect(page.getByRole("dialog", { name: "Saved media" })).toBeHidden()
+    await page.evaluate(() => {
+      if (document.activeElement instanceof HTMLElement)
+        document.activeElement.blur()
+      window.scrollTo(0, 0)
+    })
+    await page.screenshot({
+      path: testInfo.outputPath("my-profile-light.png"),
+    })
+    await page.evaluate(() => document.documentElement.classList.add("dark"))
+    if (isMobile) await page.setViewportSize({ width: 320, height: 720 })
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true)
+    await page.screenshot({ path: testInfo.outputPath("my-profile-dark.png") })
+    await history.scrollIntoViewIfNeeded()
+    await page.screenshot({ path: testInfo.outputPath("my-history-dark.png") })
+    if (isMobile) await page.setViewportSize({ width: 393, height: 851 })
+    await page.evaluate(() => document.documentElement.classList.remove("dark"))
     await page
       .getByRole("group", { name: "Media type", exact: true })
       .getByRole("button", { name: "Albums", exact: true })
@@ -106,7 +172,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
       await expect(
         page
           .getByRole("navigation", { name: "Quick navigation" })
-          .getByRole("link", { name: "Log in with Telegram" })
+          .getByRole("link", { name: "My Profile", exact: true })
       ).toBeInViewport()
       await page.setViewportSize({ width: 320, height: 720 })
       await expect(page.locator(".telegram-login-compact")).toBeInViewport()

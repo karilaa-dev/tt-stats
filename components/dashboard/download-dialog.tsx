@@ -105,7 +105,13 @@ function MediaPreview({ id }: { id: string }) {
   const query = useQuery(mediaQueryOptions(id))
   const [index, setIndex] = useState(0)
   if (query.isPending) return <Spinner aria-label="Loading saved media" />
-  if (query.isError) return <LoadError retry={() => void query.refetch()} />
+  if (query.isError)
+    return (
+      <LoadError
+        message={query.error.message}
+        retry={() => void query.refetch()}
+      />
+    )
   if (query.data.unavailableReason)
     return (
       <Alert>
@@ -311,11 +317,17 @@ function DownloadersList({ id }: { id: string }) {
   )
 }
 
-function LoadError({ retry }: { retry: () => void }) {
+function LoadError({
+  retry,
+  message = "Could not load this download.",
+}: {
+  retry: () => void
+  message?: string
+}) {
   return (
     <Alert variant="destructive">
       <AlertDescription className="flex flex-col items-start gap-2">
-        Could not load this download.
+        {message}
         <Button variant="outline" onClick={retry}>
           Try again
         </Button>

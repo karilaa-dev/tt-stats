@@ -16,6 +16,8 @@ import type {
   TimeSeriesPoint,
   UserDownload,
   UserStats,
+  UserActivity,
+  UserActivityRange,
 } from "@/lib/stats/types"
 
 const FAKE_NOW_EPOCH = 1_786_338_000
@@ -246,6 +248,33 @@ export function getFakeUserStats(userId: string): UserStats | null {
         })),
       }
     : null
+}
+
+export function getFakeUserActivity(
+  userId: string,
+  range: UserActivityRange
+): UserActivity {
+  const interval = range === "31d" ? "day" : range === "90d" ? "week" : "month"
+  if (!fakeUsers[userId]) return { interval, points: [] }
+  if (range === "31d")
+    return { interval, points: getFakeUserStats(userId)!.activity! }
+  const length = range === "90d" ? 13 : range === "1y" ? 12 : 24
+  const current = new Date(FAKE_NOW_EPOCH * 1000)
+  return {
+    interval,
+    points: Array.from({ length }, (_, index) => ({
+      bucketEpoch:
+        interval === "month"
+          ? Date.UTC(
+              current.getUTCFullYear(),
+              current.getUTCMonth() - length + 1 + index,
+              1
+            ) / 1000
+          : Math.floor(FAKE_NOW_EPOCH / 86400) * 86400 -
+            (length - index - 1) * 7 * 86400,
+      count: 20 + ((index * 29) % 127),
+    })),
+  }
 }
 
 export function getFakeUserDownloads(

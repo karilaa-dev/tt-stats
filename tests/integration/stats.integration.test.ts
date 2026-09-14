@@ -1,4 +1,5 @@
 import { canReadMedia } from "@/lib/media/access"
+import { getUserActivityRaw } from "@/lib/stats/user-activity"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { readFile } from "node:fs/promises"
 import { Pool } from "pg"
@@ -140,6 +141,81 @@ integration("PostgreSQL statistics queries", () => {
     const allChats = await getStatsBreakdownRaw("all", "24h", pool)
     expect(allChats.chats).toBe("3")
     expect(allChats.downloads.cacheHits).toBe("1")
+  })
+
+  it("allows owners to preview their media independently of ranking schema availability", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query(
+        "ALTER TABLE tt_stats_cache.popular_videos_metadata RENAME COLUMN ranking_version TO unavailable_version"
+      )
+      const db = client as unknown as Pool
+      const id = (
+        await client.query(
+          "SELECT min(pk_id)::text AS id FROM videos WHERE user_id = 1"
+        )
+      ).rows[0].id
+      expect(
+        await canReadMedia(
+          { admin: false, user: { id: "1", name: "Owner", username: null } },
+          id,
+          db
+        )
+      ).toBe(true)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("groups personal activity in UTC, bounds detail, and isolates accounts", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query(`INSERT INTO users(user_id) VALUES (777), (778)`)
+      await client.query(`INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit)
+        SELECT 777, floor(extract(epoch FROM now()))::bigint - n * 86400,
+          'https://example.test/activity/' || n, 'video', 'chat', false FROM generate_series(0, 800) n`)
+      await client.query(`INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit) VALUES
+        (777, 0, 'https://example.test/invalid', 'video', 'chat', false),
+        (777, 9999999999, 'https://example.test/future', 'video', 'chat', false),
+        (778, extract(epoch FROM now())::bigint - 10, 'https://example.test/other', 'video', 'chat', false)`)
+      await client.query("SET LOCAL TIME ZONE 'Pacific/Auckland'")
+      const db = client as unknown as Pool
+      const total = await getUserActivityRaw("777", "all", db)
+      expect(total.interval).toBe("month")
+      expect(total.points.length).toBeLessThanOrEqual(28)
+      expect(total.points.reduce((sum, p) => sum + p.count, 0)).toBe(801)
+      expect(
+        total.points.every(
+          (p) => new Date(p.bucketEpoch * 1000).getUTCDate() === 1
+        )
+      ).toBe(true)
+      expect((await getUserActivityRaw("777", "31d", db)).points).toHaveLength(
+        31
+      )
+      expect(
+        (await getUserActivityRaw("777", "90d", db)).points.length
+      ).toBeLessThanOrEqual(14)
+      expect((await getUserActivityRaw("777", "1y", db)).points).toHaveLength(
+        12
+      )
+      expect(
+        (await getUserActivityRaw("778", "all", db)).points.reduce(
+          (s, p) => s + p.count,
+          0
+        )
+      ).toBe(1)
+      expect(
+        (await getUserActivityRaw("779", "all", db)).points.every(
+          (p) => p.count === 0
+        )
+      ).toBe(true)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
   })
 
   it("identifies an outdated snapshot column and repairs it without changing tt-bot tables", async () => {

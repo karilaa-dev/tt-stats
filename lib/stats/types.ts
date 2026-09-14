@@ -5,6 +5,12 @@ export const STATS_DATASETS = ["rolling_24h", "daily"] as const
 
 export type ChatScope = (typeof CHAT_SCOPES)[number]
 export type StatsRange = (typeof STATS_RANGES)[number]
+export const USER_ACTIVITY_RANGES = ["31d", "90d", "1y", "all"] as const
+export type UserActivityRange = (typeof USER_ACTIVITY_RANGES)[number]
+export interface UserActivity {
+  points: TimeSeriesPoint[]
+  interval: "day" | "week" | "month"
+}
 export type SeriesMetric = (typeof SERIES_METRICS)[number]
 export type StatsDataset = (typeof STATS_DATASETS)[number]
 export type StatsJobStatus = "queued" | "running" | "succeeded" | "failed"

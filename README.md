@@ -310,8 +310,18 @@ There are no session or rate-limit database tables and no Redis requirement.
 
 Users can read only their own account's records. Group records belong to the
 group ID and cannot be attributed to individual members from this schema.
+Navigation always links to **My Profile**; signed-out visitors see the Telegram
+login button on that page. Download history defaults to all time, with compact
+rows on desktop and stacked details on mobile. Preferences show language names.
+Personal activity offers 31 days (daily), 90 days (weekly), one year (monthly),
+and all time (monthly). PostgreSQL filters by account using the existing history
+index before aggregating. Longer periods load on demand and stay fresh in the
+browser cache for five minutes; the initial daily chart reuses the profile data.
 Public media is limited to representative download IDs in the published Top
-videos snapshots. Private media requires ownership or admin access. All files
+videos snapshots. Private media requires ownership or admin access; an owner's
+preview does not depend on the rankings schema being installed or current.
+Metadata failures log a sanitized database error category under
+`[media] metadata unavailable`. All files
 continue through the server proxy; the Telegram Bot API 20 MB limit remains.
 
 Set `ADMIN_TOKEN` to a random value of at least 32 characters. Admin login is

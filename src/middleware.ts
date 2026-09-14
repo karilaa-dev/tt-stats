@@ -19,7 +19,7 @@ const publicActions = new Set([
   "getTelegramMau",
   "getDownloadMedia",
 ])
-const userActions = new Set(["getMyStats", "getMyDownloads"])
+const userActions = new Set(["getMyStats", "getMyDownloads", "getMyActivity"])
 const adminPages = new Set(["/dashboard/users", "/dashboard/jobs"])
 
 export const onRequest = defineMiddleware(async (context, next) => {

@@ -4,6 +4,7 @@ import { canReadMedia } from "@/lib/media/access"
 import { getStoredMedia } from "@/lib/media/queries"
 import { describeMedia } from "@/lib/media/telegram"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
+import { getSafeDatabaseError } from "@/lib/db/errors"
 export const GET: APIRoute = async ({ params, cookies }) => {
   const id = params.downloadId ?? ""
   const headers = { "Cache-Control": "private, no-store" }
@@ -27,7 +28,10 @@ export const GET: APIRoute = async ({ params, cookies }) => {
         : describeMedia(id, await getStoredMedia(id)),
       { headers }
     )
-  } catch {
+  } catch (error) {
+    console.error("[media] metadata unavailable", {
+      kind: getSafeDatabaseError(error).kind,
+    })
     return Response.json(
       { message: "Saved media is temporarily unavailable." },
       { status: 503, headers }

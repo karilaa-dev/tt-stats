@@ -15,6 +15,8 @@ export interface TimeSeriesPlotProps {
   view: "line" | "bars"
   time: BrowserTimeSettings
   reducedMotion: boolean
+  height?: number
+  calendarUnit?: "day" | "week" | "month"
 }
 
 export default memo(function TimeSeriesPlot({
@@ -25,13 +27,15 @@ export default memo(function TimeSeriesPlot({
   view,
   time,
   reducedMotion,
+  height = 300,
+  calendarUnit,
 }: TimeSeriesPlotProps) {
   // Reuse formatters across every point and axis tick in this reporting period.
   const { labelFormatter, tickFormatter } = useMemo(() => {
     const options: Intl.DateTimeFormatOptions = {
-      timeZone: time.timeZone,
+      timeZone: calendarUnit ? "UTC" : time.timeZone,
       month: "short",
-      day: "2-digit",
+      ...(calendarUnit === "month" ? {} : { day: "2-digit" as const }),
       ...(range === "all" ? { year: "numeric" as const } : {}),
       ...(range === "24h" || range === "7d"
         ? { hour: "2-digit" as const, minute: "2-digit" as const }
@@ -44,7 +48,7 @@ export default memo(function TimeSeriesPlot({
       }),
       tickFormatter: new Intl.DateTimeFormat(time.locale, options),
     }
-  }, [range, time.locale, time.timeZone])
+  }, [range, time.locale, time.timeZone, calendarUnit])
   const data = useMemo(
     () =>
       points.map((point) => ({
@@ -129,7 +133,10 @@ export default memo(function TimeSeriesPlot({
         sticky: true,
         placement: ["top", "right", "left", "bottom"],
         items: [
-          { field: "label", label: "Local interval" },
+          {
+            field: "label",
+            label: calendarUnit ? "Period (UTC)" : "Local interval",
+          },
           {
             channel: "y",
             label: title,
@@ -139,13 +146,13 @@ export default memo(function TimeSeriesPlot({
       },
       svgAnimation: !reducedMotion && data.length <= 240,
     })
-  }, [color, data, reducedMotion, tickFormatter, title, view])
+  }, [color, data, reducedMotion, tickFormatter, title, view, calendarUnit])
 
   return (
     <Chart
       definition={definition}
-      height={300}
-      ariaLabel={`${title}, ${time.timeZone} time series`}
+      height={height}
+      ariaLabel={`${title}, ${calendarUnit ? "UTC" : time.timeZone} time series`}
       ariaDescription="Use the pointer or arrow keys to inspect intervals. Click or press Enter to pin a value."
     />
   )

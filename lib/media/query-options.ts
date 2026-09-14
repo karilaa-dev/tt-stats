@@ -19,7 +19,13 @@ export const mediaQueryOptions = (downloadId: string) =>
             Number(response.headers.get("Retry-After")) || 60
           )
         if (!response.ok)
-          throw new Error("Saved media is temporarily unavailable.")
+          throw new Error(
+            response.status === 404
+              ? "This saved download is unavailable for your account."
+              : response.status === 401
+                ? "Your session has expired. Log in again to view saved media."
+                : "Saved media is temporarily unavailable. Please try again."
+          )
         return (await response.json()) as DownloadMedia
       }),
     retry: false,

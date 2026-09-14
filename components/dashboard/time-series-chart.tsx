@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from "react"
 import {
   BarChart3Icon,
@@ -41,6 +42,9 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   range,
   color = "var(--chart-1)",
   intervalDescription,
+  controls,
+  compact = false,
+  calendarUnit,
 }: {
   title: string
   description: string
@@ -48,6 +52,9 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   range: StatsRange
   color?: string
   intervalDescription?: string
+  controls?: ReactNode
+  compact?: boolean
+  calendarUnit?: "day" | "week" | "month"
 }) {
   const [view, setView] = useState<"line" | "bars">("line")
   const time = useBrowserTime()
@@ -111,7 +118,7 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   }, [points.length])
 
   return (
-    <Card>
+    <Card className={compact ? "profile-activity-card" : undefined}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>
@@ -140,13 +147,18 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        {controls}
         <div className="grid grid-cols-3 gap-2" aria-label={`${title} summary`}>
           <ChartSummary label="Total" value={summary.total} />
           <ChartSummary label="Average" value={summary.average} />
           <ChartSummary label="Peak" value={summary.peak?.count ?? 0} />
         </div>
         {points.length ? (
-          <div ref={plotRef} className="h-[300px] min-w-0">
+          <div
+            ref={plotRef}
+            className="min-w-0"
+            style={{ height: compact ? 200 : 300 }}
+          >
             <Suspense fallback={<ChartPlaceholder title={title} />}>
               {visible ? (
                 <TimeSeriesPlot
@@ -157,6 +169,8 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
                   view={view}
                   time={time}
                   reducedMotion={reducedMotion}
+                  height={compact ? 200 : 300}
+                  calendarUnit={calendarUnit}
                 />
               ) : (
                 <ChartPlaceholder title={title} />

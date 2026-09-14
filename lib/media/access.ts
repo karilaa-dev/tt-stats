@@ -25,12 +25,19 @@ export async function canReadMedia(
     )
   }
   try {
-    const result = await (pool ?? getPool()).query<{ allowed: boolean }>(
-      `SELECT EXISTS (SELECT 1 FROM public.videos WHERE pk_id = $1::bigint AND user_id = $2::bigint)
-       OR EXISTS (SELECT 1 FROM tt_stats_cache.popular_videos ranking
+    const database = pool ?? getPool()
+    if (principal.user) {
+      const owned = await database.query<{ allowed: boolean }>(
+        `SELECT EXISTS (SELECT 1 FROM public.videos WHERE pk_id = $1::bigint AND user_id = $2::bigint) AS allowed`,
+        [downloadId, principal.user.id]
+      )
+      if (owned.rows[0]?.allowed === true) return true
+    }
+    const result = await database.query<{ allowed: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM tt_stats_cache.popular_videos ranking
          JOIN tt_stats_cache.popular_videos_metadata metadata USING (range)
          WHERE ranking.download_id = $1::bigint AND metadata.ranking_version = 2) AS allowed`,
-      [downloadId, principal.user?.id ?? null]
+      [downloadId]
     )
     return result.rows[0]?.allowed === true
   } catch (error) {

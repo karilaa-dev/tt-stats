@@ -47,7 +47,7 @@ export function UserDownloadsTable({
   const time = useBrowserTime()
   const first = data?.items.length ? (data.page - 1) * data.pageSize + 1 : 0
   return (
-    <Card aria-busy={loading || refreshing}>
+    <Card className="profile-history-card" aria-busy={loading || refreshing}>
       <CardHeader>
         <CardTitle>Download history</CardTitle>
         <CardDescription>
@@ -59,7 +59,7 @@ export function UserDownloadsTable({
         {loading ? (
           <div className="flex flex-col gap-3" aria-label="Loading downloads">
             {Array.from({ length: 5 }, (_, i) => (
-              <Skeleton key={i} className="h-24 w-full" />
+              <Skeleton key={i} className="h-16 w-full" />
             ))}
           </div>
         ) : data?.items.length ? (
@@ -110,23 +110,27 @@ export function UserDownloadsTable({
                     ) : (
                       <p>{label}</p>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      {download.downloadedAt === null
-                        ? "Unknown time"
-                        : formatTimestamp(download.downloadedAt, time)}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {others === null
-                        ? "Downloader count unavailable"
-                        : others === 0n
-                          ? "No other people have downloaded this yet"
-                          : `${others.toLocaleString("en-US")} other ${others === 1n ? "person" : "people"} downloaded this`}
-                      {download.isFirstDownloader === null ? (
-                        <span className="block text-xs">
-                          First downloader unknown
+                    <div className="download-context">
+                      <time
+                        className="text-xs text-muted-foreground"
+                        dateTime={
+                          download.downloadedAt == null
+                            ? undefined
+                            : new Date(
+                                download.downloadedAt * 1000
+                              ).toISOString()
+                        }
+                      >
+                        {download.downloadedAt === null
+                          ? "Unknown time"
+                          : formatTimestamp(download.downloadedAt, time)}
+                      </time>
+                      {others !== null && others > 0n ? (
+                        <span className="download-popularity">
+                          {`${others.toLocaleString("en-US")} other ${others === 1n ? "person" : "people"} downloaded this`}
                         </span>
                       ) : null}
-                    </p>
+                    </div>
                   </div>
                   {onView ? (
                     <div className="download-actions">

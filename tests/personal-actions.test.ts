@@ -4,7 +4,14 @@ import {
   deleteUserSession,
   USER_COOKIE,
 } from "@/lib/auth/session"
-const queries = vi.hoisted(() => ({ stats: vi.fn(), downloads: vi.fn() }))
+const queries = vi.hoisted(() => ({
+  stats: vi.fn(),
+  downloads: vi.fn(),
+  activity: vi.fn(),
+}))
+vi.mock("@/lib/stats/user-activity", () => ({
+  getUserActivityRaw: queries.activity,
+}))
 vi.mock("astro:actions", () => ({
   defineAction: (definition: unknown) => definition,
   ActionError: class extends Error {
@@ -24,7 +31,12 @@ vi.mock("@/lib/dev/fake-data", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   isFakeDataEnabled: () => false,
 }))
-import { getMyStats, getMyDownloads } from "@/src/actions/stats"
+import {
+  getMyStats,
+  getMyDownloads,
+  getMyActivity,
+  getUserActivity,
+} from "@/src/actions/stats"
 // defineAction is kept as its definition to exercise the real handlers and input schemas.
 const stats = getMyStats as unknown as {
   handler: (input: unknown, context: unknown) => Promise<unknown>
@@ -33,6 +45,8 @@ const downloads = getMyDownloads as unknown as {
   handler: (input: unknown, context: unknown) => Promise<unknown>
   input: { safeParse: (value: unknown) => { success: boolean } }
 }
+const activity = getMyActivity as unknown as typeof downloads
+const arbitraryActivity = getUserActivity as unknown as typeof downloads
 afterEach(() => {
   vi.clearAllMocks()
 })
@@ -51,8 +65,17 @@ describe("personal action authorization", () => {
     }
     queries.stats.mockResolvedValue({ userId: "123" })
     queries.downloads.mockResolvedValue({ items: [] })
+    queries.activity.mockResolvedValue({ interval: "month", points: [] })
     await stats.handler({ userId: "999" }, context)
     expect(queries.stats).toHaveBeenCalledWith("123")
+    expect(
+      activity.input.safeParse({ range: "all", userId: "999" }).success
+    ).toBe(false)
+    await activity.handler({ range: "all" }, context)
+    expect(queries.activity).toHaveBeenCalledWith("123", "all")
+    await expect(
+      arbitraryActivity.handler({ range: "all", userId: "999" }, context)
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
     const input = { page: 1, pageSize: 20, range: "all", mediaKind: "all" }
     expect(downloads.input.safeParse({ ...input, userId: "999" }).success).toBe(
       false
@@ -76,5 +99,9 @@ describe("personal action authorization", () => {
       downloads.handler({ page: 1, pageSize: 20 }, context)
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
     expect(queries.downloads).not.toHaveBeenCalled()
+    await expect(
+      activity.handler({ range: "all" }, context)
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
+    expect(queries.activity).not.toHaveBeenCalled()
   })
 })

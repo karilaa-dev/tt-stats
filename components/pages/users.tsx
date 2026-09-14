@@ -43,7 +43,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Badge } from "@/components/ui/badge"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
-import type { HistoryFilters, UserStats } from "@/lib/stats/types"
+import { getLanguagePresentation } from "@/lib/language"
+import type {
+  HistoryFilters,
+  UserStats,
+  UserActivityRange,
+  TimeSeriesPoint,
+} from "@/lib/stats/types"
 
 export function UsersPage({ own = false }: { own?: boolean }) {
   const session = useSession()
@@ -188,7 +194,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   const user = userQuery.data
   return (
     <section
-      className="flex min-w-0 flex-col gap-6"
+      className="profile-workspace"
       aria-label={own ? "Your statistics" : "Chat results"}
     >
       <DownloadDialog
@@ -199,141 +205,148 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
         <TelegramChatCard chatId={userId} />
       ) : (
         <div className="personal-profile">
-          <div>
-            <h2 className="font-heading text-xl font-semibold">
-              {session.user?.name}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {session.user?.username
-                ? `@${session.user.username}`
-                : "Your Telegram account"}
-            </p>
+          <div className="profile-identity">
+            <span className="profile-avatar" aria-hidden="true">
+              <UserRoundIcon />
+            </span>
+            <div>
+              <h2 className="font-heading text-xl font-semibold">
+                {session.user?.name}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {session.user?.username
+                  ? `@${session.user.username}`
+                  : "Your Telegram account"}
+              </p>
+            </div>
           </div>
           <Button variant="ghost" onClick={() => void session.logout()}>
             Log out
           </Button>
         </div>
       )}
-      {userQuery.isPending ? (
-        <Skeleton
-          className="h-32 w-full"
-          aria-label="Loading user statistics"
-        />
-      ) : userQuery.isError ? (
-        <QueryError
-          title="Statistics unavailable"
-          error={userQuery.error}
-          retry={() => void userQuery.refetch()}
-        />
-      ) : user ? (
-        <UserSummary user={user} />
-      ) : (
-        <Alert>
-          <AlertTitle>
-            {own ? "Your first download starts here" : "User not found"}
-          </AlertTitle>
-          <AlertDescription>
-            {own
-              ? "Download a video using the bot, then refresh this page. Group downloads are recorded separately."
-              : "There are no saved bot records for this ID."}
-          </AlertDescription>
-        </Alert>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-3">
-          <ToggleGroup
-            aria-label="History period"
-            value={[filters.range]}
-            onValueChange={(value) => {
-              if (value[0])
-                changeFilters({ range: value[0] as HistoryFilters["range"] })
-            }}
-            variant="outline"
-            size="sm"
-          >
-            {[
-              ["24h", "24 hours"],
-              ["7d", "7 days"],
-              ["31d", "31 days"],
-              ["all", "All time"],
-            ].map(([value, label]) => (
-              <ToggleGroupItem key={value} value={value}>
-                {label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <ToggleGroup
-            aria-label="Media type"
-            value={[mediaKind]}
-            onValueChange={(value) => {
-              if (value[0])
-                changeFilters({
-                  mediaKind: value[0] as HistoryFilters["mediaKind"],
-                })
-            }}
-            variant="outline"
-            size="sm"
-          >
-            {[
-              ["all", "All media"],
-              ["video", "Videos"],
-              ["images", "Albums"],
-            ].map(([value, label]) => (
-              <ToggleGroupItem key={value} value={value}>
-                {label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-        </div>
+      <div className="profile-overview">
+        {userQuery.isPending ? (
+          <Skeleton
+            className="h-32 w-full"
+            aria-label="Loading user statistics"
+          />
+        ) : userQuery.isError ? (
+          <QueryError
+            title="Statistics unavailable"
+            error={userQuery.error}
+            retry={() => void userQuery.refetch()}
+          />
+        ) : user ? (
+          <UserSummary user={user} />
+        ) : (
+          <Alert>
+            <AlertTitle>
+              {own ? "Your first download starts here" : "User not found"}
+            </AlertTitle>
+            <AlertDescription>
+              {own
+                ? "Download a video using the bot, then refresh this page. Group downloads are recorded separately."
+                : "There are no saved bot records for this ID."}
+            </AlertDescription>
+          </Alert>
+        )}
         {user ? (
-          <a
-            className={buttonVariants({ variant: "outline" })}
-            href={
-              own
-                ? "/api/me/history.csv"
-                : `/api/users/${encodeURIComponent(userId)}/history.csv`
-            }
-          >
-            <DownloadIcon data-icon="inline-start" />
-            Export full history
-          </a>
+          <UserActivityChart
+            own={own}
+            userId={userId}
+            initial={user.activity ?? []}
+          />
         ) : null}
       </div>
-      {history.isError ? (
-        <QueryError
-          title="Download history unavailable"
-          error={history.error}
-          retry={() => void history.refetch()}
-        />
-      ) : (
-        <UserDownloadsTable
-          own={own}
-          admin={session.admin}
-          data={history.data}
-          loading={history.isPending}
-          refreshing={history.isFetching && !history.isPending}
-          onView={setSelection}
-          onPageChange={(nextPage) => {
-            setSelection(null)
-            void navigate({
-              search: {
-                ...(!own ? { id: userId } : {}),
-                ...filters,
-                page: nextPage,
-              },
-            })
-          }}
-        />
-      )}
-      {user?.activity ? (
-        <TimeSeriesChart
-          title="Download activity"
-          description="Daily downloads over the last 31 days, including today. Days are grouped in UTC."
-          points={user.activity}
-          range="31d"
-          intervalDescription="Daily intervals, including today"
-        />
-      ) : null}
+      <section className="profile-history" aria-label="Your download history">
+        <div className="history-toolbar">
+          <div className="flex flex-wrap gap-3">
+            <ToggleGroup
+              aria-label="History period"
+              value={[filters.range]}
+              onValueChange={(value) => {
+                if (value[0])
+                  changeFilters({ range: value[0] as HistoryFilters["range"] })
+              }}
+              variant="outline"
+              size="sm"
+            >
+              {[
+                ["24h", "24 hours"],
+                ["7d", "7 days"],
+                ["31d", "31 days"],
+                ["all", "All time"],
+              ].map(([value, label]) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+            <ToggleGroup
+              aria-label="Media type"
+              value={[mediaKind]}
+              onValueChange={(value) => {
+                if (value[0])
+                  changeFilters({
+                    mediaKind: value[0] as HistoryFilters["mediaKind"],
+                  })
+              }}
+              variant="outline"
+              size="sm"
+            >
+              {[
+                ["all", "All media"],
+                ["video", "Videos"],
+                ["images", "Albums"],
+              ].map(([value, label]) => (
+                <ToggleGroupItem key={value} value={value}>
+                  {label}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          </div>
+          {user ? (
+            <a
+              className={buttonVariants({ variant: "outline" })}
+              href={
+                own
+                  ? "/api/me/history.csv"
+                  : `/api/users/${encodeURIComponent(userId)}/history.csv`
+              }
+            >
+              <DownloadIcon data-icon="inline-start" />
+              Export full history
+            </a>
+          ) : null}
+        </div>
+        {history.isError ? (
+          <QueryError
+            title="Download history unavailable"
+            error={history.error}
+            retry={() => void history.refetch()}
+          />
+        ) : (
+          <UserDownloadsTable
+            own={own}
+            admin={session.admin}
+            data={history.data}
+            loading={history.isPending}
+            refreshing={history.isFetching && !history.isPending}
+            onView={setSelection}
+            onPageChange={(nextPage) => {
+              setSelection(null)
+              void navigate({
+                search: {
+                  ...(!own ? { id: userId } : {}),
+                  ...filters,
+                  page: nextPage,
+                },
+              })
+            }}
+          />
+        )}
+      </section>
     </section>
   )
 }
@@ -342,12 +355,10 @@ function UserSummary({ user }: { user: UserStats }) {
   const timestamp = (value: number | null | undefined) =>
     value == null ? "Not recorded" : formatTimestamp(value, time)
   return (
-    <Card>
+    <Card className="profile-summary">
       <CardHeader>
         <CardTitle>Download statistics</CardTitle>
-        <CardDescription>
-          All recorded activity for this account.
-        </CardDescription>
+        <CardDescription>All your recorded downloads.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <dl className="personal-metrics">
@@ -366,7 +377,7 @@ function UserSummary({ user }: { user: UserStats }) {
             </div>
           ))}
         </dl>
-        <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="profile-details">
           {[
             ["First download", timestamp(user.firstDownloadAt)],
             ["Latest download", timestamp(user.latestDownloadAt)],
@@ -380,7 +391,9 @@ function UserSummary({ user }: { user: UserStats }) {
           <div>
             <dt className="text-muted-foreground">Preferences</dt>
             <dd className="mt-1 flex flex-wrap gap-2">
-              <Badge variant="secondary">{user.language.toUpperCase()}</Badge>
+              <Badge variant="secondary">
+                {getLanguagePresentation(user.language).name}
+              </Badge>
               <Badge variant="outline">
                 {user.fileMode ? "Send as file" : "Send as media"}
               </Badge>
@@ -389,6 +402,94 @@ function UserSummary({ user }: { user: UserStats }) {
         </dl>
       </CardContent>
     </Card>
+  )
+}
+
+function UserActivityChart({
+  own,
+  userId,
+  initial,
+}: {
+  own: boolean
+  userId: string
+  initial: TimeSeriesPoint[]
+}) {
+  const [range, setRange] = useState<UserActivityRange>("31d")
+  const query = useQuery({
+    queryKey: ["stats", own ? "me" : "user", userId, "activity", range],
+    queryFn: () =>
+      requestWithCooldown("read", () =>
+        own
+          ? actions.getMyActivity.orThrow({ range })
+          : actions.getUserActivity.orThrow({ userId, range })
+      ),
+    enabled: range !== "31d",
+    staleTime: 300_000,
+    retry: false,
+  })
+  const controls = (
+    <ToggleGroup
+      aria-label="Activity period"
+      value={[range]}
+      onValueChange={(values) =>
+        values[0] && setRange(values[0] as UserActivityRange)
+      }
+      variant="outline"
+      size="sm"
+    >
+      {[
+        ["31d", "31 days"],
+        ["90d", "90 days"],
+        ["1y", "1 year"],
+        ["all", "All time"],
+      ].map(([value, label]) => (
+        <ToggleGroupItem key={value} value={value}>
+          {label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  )
+  if (range !== "31d" && (query.isPending || query.isError))
+    return (
+      <Card className="profile-activity-card">
+        <CardHeader>
+          <CardTitle>Download activity</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {controls}
+          {query.isError ? (
+            <QueryError
+              title="Activity unavailable"
+              error={query.error}
+              retry={() => void query.refetch()}
+            />
+          ) : (
+            <Skeleton
+              className="h-64 w-full"
+              aria-label="Loading download activity"
+            />
+          )}
+        </CardContent>
+      </Card>
+    )
+  const interval = range === "31d" ? "day" : (query.data?.interval ?? "month")
+  return (
+    <TimeSeriesChart
+      title="Download activity"
+      description={
+        interval === "month"
+          ? "Downloads per month"
+          : interval === "week"
+            ? "Downloads per week"
+            : "Downloads per day"
+      }
+      intervalDescription="UTC, including the current period"
+      points={range === "31d" ? initial : (query.data?.points ?? [])}
+      range={interval === "month" ? "all" : "31d"}
+      calendarUnit={interval}
+      compact
+      controls={controls}
+    />
   )
 }
 function QueryError({

@@ -502,6 +502,61 @@ a:focus-visible {
 }
 
 /* Personal history keeps the post and its download context together. */
+.profile-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  min-width: 0;
+}
+.profile-overview {
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1.4fr);
+  gap: 1.25rem;
+  align-items: stretch;
+}
+.profile-overview > * {
+  min-width: 0;
+}
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 1rem;
+  color: var(--primary);
+  background: var(--secondary);
+}
+.profile-avatar svg {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+.profile-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 1rem;
+  font-size: 0.75rem;
+}
+.profile-history {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.85rem;
+}
+.history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.profile-activity-card [data-slot="card-description"] {
+  font-size: 0.75rem;
+}
 .personal-profile {
   display: flex;
   align-items: center;
@@ -510,7 +565,7 @@ a:focus-visible {
 }
 .personal-metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
 .personal-metrics > div {
@@ -518,6 +573,9 @@ a:focus-visible {
   border-right: 1px solid var(--border);
 }
 .personal-metrics > div:last-child {
+  border: 0;
+}
+.personal-metrics > div:nth-child(2) {
   border: 0;
 }
 .personal-metrics dt {
@@ -537,10 +595,10 @@ a:focus-visible {
 }
 .download-entry {
   display: grid;
-  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 1rem;
-  padding: 1.2rem 0;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0;
   border-bottom: 1px solid var(--border);
 }
 .download-entry:first-child {
@@ -556,8 +614,8 @@ a:focus-visible {
   background: var(--muted);
   color: var(--muted-foreground);
   border-radius: 0.75rem;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 2rem;
+  height: 2rem;
 }
 .download-kind svg {
   width: 1.1rem;
@@ -568,12 +626,26 @@ a:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0.4rem 0;
+  padding: 0.15rem 0;
   color: var(--primary);
   font-weight: 550;
 }
 .download-link:hover {
   text-decoration: underline;
+}
+.download-description {
+  min-width: 0;
+  font-size: 0.8rem;
+}
+.download-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.8rem;
+}
+.download-context time,
+.download-popularity {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
 }
 .download-actions {
   display: flex;
@@ -606,6 +678,23 @@ a:focus-visible {
   pointer-events: none;
 }
 @media (max-width: 767px) {
+  .profile-overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+  .profile-workspace {
+    gap: 1rem;
+  }
+  .personal-profile {
+    gap: 0.65rem;
+  }
+  .profile-identity h2 {
+    font-size: 1.05rem;
+  }
+  .profile-details {
+    font-size: 0.72rem;
+    gap: 0.75rem;
+  }
   .workspace-topbar {
     gap: 0.5rem;
     padding: 0.7rem 0.75rem;
@@ -641,15 +730,19 @@ a:focus-visible {
     border: 0;
   }
   .download-entry {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
   }
   .download-kind {
     display: none;
   }
   .download-actions {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+  }
+  .download-actions button {
+    font-size: 0.7rem;
+    padding-inline: 0.5rem;
+    min-height: 2rem;
   }
   .media-stage video,
   .media-stage img {

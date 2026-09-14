@@ -1,4 +1,3 @@
-import { useSession } from "./session-access"
 import {
   ActivityIcon,
   ArrowUpRightIcon,
@@ -92,7 +91,6 @@ const navigation = [
 ]
 
 export function DesktopNavigation() {
-  const { user } = useSession()
   const { authenticated } = useAdminAccess()
   const visibleNavigation = navigation.filter(
     (item) =>
@@ -106,15 +104,11 @@ export function DesktopNavigation() {
       {visibleNavigation.map(({ href, label, icon: Icon }) => (
         <a
           key={href}
-          href={
-            href === "/dashboard/me" && !user
-              ? "/api/auth/telegram/start"
-              : href
-          }
+          href={href}
           aria-current={current === href ? "page" : undefined}
         >
           <Icon aria-hidden="true" />
-          {href === "/dashboard/me" && !user ? "Log in with Telegram" : label}
+          {label}
         </a>
       ))}
     </nav>
@@ -131,7 +125,6 @@ export function AppSidebar() {
   const { pathname, fakeMode } = useDashboardContext()
   const { isMobile, openMobile, setOpenMobile } = useSidebar()
   const current = pathname.replace(/\/$/, "")
-  const { user } = useSession()
   const quickLinks = [
     navigation.find((item) => item.href === "/dashboard")!,
     navigation.find((item) => item.href === "/dashboard/videos")!,
@@ -143,19 +136,11 @@ export function AppSidebar() {
         {quickLinks.map(({ href, short, icon: Icon }) => (
           <a
             key={href}
-            href={
-              href === "/dashboard/me" && !user
-                ? "/api/auth/telegram/start"
-                : href
-            }
+            href={href}
             aria-current={current === href ? "page" : undefined}
           >
             <Icon aria-hidden="true" />
-            <span>
-              {href === "/dashboard/me" && !user
-                ? "Log in with Telegram"
-                : short}
-            </span>
+            <span>{short}</span>
           </a>
         ))}
         <Button
@@ -185,26 +170,14 @@ export function AppSidebar() {
                 ({ href, label, description, icon: Icon }) => (
                   <a
                     key={href}
-                    href={
-                      href === "/dashboard/me" && !user
-                        ? "/api/auth/telegram/start"
-                        : href
-                    }
+                    href={href}
                     aria-current={current === href ? "page" : undefined}
-                    aria-label={
-                      href === "/dashboard/me" && !user
-                        ? "Log in with Telegram"
-                        : label
-                    }
+                    aria-label={label}
                     onClick={() => setOpenMobile(false)}
                   >
                     <Icon aria-hidden="true" />
                     <span>
-                      <strong>
-                        {href === "/dashboard/me" && !user
-                          ? "Log in with Telegram"
-                          : label}
-                      </strong>
+                      <strong>{label}</strong>
                       <small>{description}</small>
                     </span>
                     <ArrowUpRightIcon aria-hidden="true" />

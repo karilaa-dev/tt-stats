@@ -1,4 +1,5 @@
 import { getPrincipal } from "@/lib/auth/session"
+import { getUserActivityRaw } from "@/lib/stats/user-activity"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { defineAction, ActionError } from "astro:actions"
 import { getSafeDatabaseError } from "@/lib/db/errors"
@@ -14,6 +15,7 @@ import {
   getFakeTimeSeries,
   getFakeUserDownloads,
   getFakeUserStats,
+  getFakeUserActivity,
   isFakeDataEnabled,
 } from "@/lib/dev/fake-data"
 import {
@@ -43,6 +45,7 @@ import {
   SERIES_METRICS,
   STATS_DATASETS,
   STATS_RANGES,
+  USER_ACTIVITY_RANGES,
 } from "@/lib/stats/types"
 
 const statsRange = z.enum(STATS_RANGES)
@@ -169,6 +172,39 @@ const historyFilters = {
   range: statsRange.default("all"),
   mediaKind: z.enum(["all", "video", "images"]).default("all"),
 }
+export const getMyActivity = defineAction({
+  input: z.object({ range: z.enum(USER_ACTIVITY_RANGES) }).strict(),
+  handler: async ({ range }, context) => {
+    const user = getPrincipal(context.cookies).user
+    if (!user)
+      throw new ActionError({
+        code: "UNAUTHORIZED",
+        message: "Log in with Telegram to continue.",
+      })
+    return safeHandler(() =>
+      isFakeDataEnabled()
+        ? getFakeUserActivity(user.id, range)
+        : getUserActivityRaw(user.id, range)
+    )(undefined)
+  },
+})
+export const getUserActivity = defineAction({
+  input: z
+    .object({ userId: telegramId, range: z.enum(USER_ACTIVITY_RANGES) })
+    .strict(),
+  handler: async ({ userId, range }, context) => {
+    if (!getPrincipal(context.cookies).admin)
+      throw new ActionError({
+        code: "UNAUTHORIZED",
+        message: "Admin access required.",
+      })
+    return safeHandler(() =>
+      isFakeDataEnabled()
+        ? getFakeUserActivity(userId, range)
+        : getUserActivityRaw(userId, range)
+    )(undefined)
+  },
+})
 export const getMyStats = defineAction({
   handler: async (_input, context) => {
     const user = getPrincipal(context.cookies).user

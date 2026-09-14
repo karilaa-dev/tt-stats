@@ -57,8 +57,8 @@ describe("user downloads table", () => {
     const rows = screen.getAllByRole("listitem")
     expect(within(rows[0]!).getByText("You were first")).toBeTruthy()
     expect(
-      within(rows[0]!).getByText("No other people have downloaded this yet")
-    ).toBeTruthy()
+      within(rows[0]!).queryByText("No other people have downloaded this yet")
+    ).toBeNull()
     expect(
       within(rows[1]!).getByText("5 other people downloaded this")
     ).toBeTruthy()
