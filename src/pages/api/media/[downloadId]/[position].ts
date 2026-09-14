@@ -14,6 +14,14 @@ import {
 } from "@/lib/media/telegram"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 
+// Astro otherwise invokes GET for HEAD and discards its streaming body without
+// cancellation, leaving the upstream request and concurrency slot open.
+export const HEAD: APIRoute = () =>
+  new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "no-store" },
+  })
+
 export const GET: APIRoute = async ({
   params,
   request,

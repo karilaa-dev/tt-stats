@@ -2,7 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
-  useRef,
+  useState,
   type ReactNode,
 } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
@@ -37,22 +37,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   })
   const data = session.isError ? undefined : session.data
   const identity = `${data?.user?.id ?? ""}:${data?.admin ?? false}`
-  const previous = useRef<string | undefined>(undefined)
+  const [cacheIdentity, setCacheIdentity] = useState<string | null>(null)
   useEffect(() => {
-    if (previous.current === undefined) {
-      if (!session.isPending) previous.current = identity
+    // The first session check establishes ownership of the initial cache.
+    // Requests already sent with this browser's cookies need no restart.
+    if (cacheIdentity === null) {
+      if (!session.isPending) setCacheIdentity(identity)
       return
     }
-    if (previous.current !== identity) {
-      previous.current = identity
+    if (cacheIdentity !== identity) {
       clearCooldowns()
-      const predicate = (query: { queryKey: readonly unknown[] }) =>
-        query.queryKey[0] !== "session"
-      void client
-        .cancelQueries({ predicate })
-        .then(() => client.removeQueries({ predicate }))
+      // Removal cancels in-flight queries too. Keep the workspace unmounted
+      // until the old cache is gone so new requests cannot be removed with it.
+      client.removeQueries({
+        predicate: (query) => query.queryKey[0] !== "session",
+      })
+      setCacheIdentity(identity)
     }
-  }, [identity, client, session.isPending])
+  }, [identity, cacheIdentity, client, session.isPending])
   useEffect(() => {
     const refresh = () => {
       void client.invalidateQueries({ queryKey: ["session"] })
@@ -99,7 +101,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         logout,
       }}
     >
-      {children}
+      {cacheIdentity === null || cacheIdentity === identity ? (
+        children
+      ) : (
+        <p role="status">Updating your session…</p>
+      )}
     </SessionContext.Provider>
   )
 }
