@@ -38,6 +38,51 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
+  it("compares legacy history promptly without optional TT Stats indexes", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query("INSERT INTO users(user_id) VALUES (998003), (998004)")
+      await client.query(`INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        SELECT CASE WHEN n <= 2271 THEN 998003 ELSE 998004 END, 1700000000 + n,
+          'https://example.test/legacy-performance/' || ((n - 1) % 5000), 'video', 'chat'
+        FROM generate_series(1, 102271) n`)
+      await client.query("ANALYZE videos")
+      await client.query("SET LOCAL statement_timeout = '1500ms'")
+      const task = new DatabaseTask()
+      const reports = vi.spyOn(task, "report")
+      const adapter = {
+        query: (text: string, values: unknown[]) => client.query(text, values),
+      } as unknown as Pool
+      const result = await withDatabaseTask(task, () =>
+        getUserDownloadsRaw("998003", 1, 20, adapter, {
+          mediaKind: "all",
+          discovery: "others",
+          sort: "popular",
+        })
+      )
+      expect(result.total).toBe("2271")
+      expect(result.items).toHaveLength(20)
+      expect(result.items[0]?.otherUniqueChats).toBe("1")
+      const progress = reports.mock.calls.filter(
+        ([, completed]) => completed != null && completed > 0
+      )
+      expect(progress[0]?.slice(0, 3)).toEqual([
+        "Comparing downloads",
+        64,
+        2271,
+      ])
+      expect(progress.at(-1)?.slice(0, 3)).toEqual([
+        "Comparing downloads",
+        2271,
+        2271,
+      ])
+      expect(progress[0]?.[3]).toBeGreaterThan(0)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
   it("reuses comparisons when a date filter selects a later repeat of the same post", async () => {
     const client = await pool.connect()
     try {

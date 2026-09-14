@@ -30,23 +30,35 @@ export class DatabaseTask {
   private phase = "Querying database"
   private completed: number | null = null
   private total: number | null = null
+  private estimate: { remainingMs: number; at: number } | null = null
   finished = false
 
   report(
     phase: string,
     completed: number | null = null,
-    total: number | null = null
+    total: number | null = null,
+    remainingMs?: number
   ) {
     this.controller.signal.throwIfAborted()
     if (phase !== this.phase) this.phaseStarted = Date.now()
     this.phase = phase
     this.completed = completed
     this.total = total
+    this.estimate =
+      remainingMs === undefined ? null : { remainingMs, at: Date.now() }
   }
   status(): TaskProgress {
     const elapsed = Date.now() - this.phaseStarted
-    const remaining =
-      this.completed && this.total && elapsed >= 250
+    const batchRemaining = this.estimate
+      ? this.estimate.remainingMs - (Date.now() - this.estimate.at)
+      : null
+    const remaining = this.estimate
+      ? batchRemaining! > 0
+        ? batchRemaining
+        : this.completed === this.total
+          ? 0
+          : null
+      : this.completed && this.total && elapsed >= 250
         ? (elapsed / this.completed) * (this.total - this.completed)
         : null
     return {
@@ -71,8 +83,9 @@ export const withDatabaseTask = <T>(task: DatabaseTask, operation: () => T) =>
 export const reportDatabaseProgress = (
   phase: string,
   completed?: number,
-  total?: number
-) => scope.getStore()?.report(phase, completed, total)
+  total?: number,
+  remainingMs?: number
+) => scope.getStore()?.report(phase, completed, total, remainingMs)
 
 export class TaskRegistry {
   private entries = new Map<

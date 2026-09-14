@@ -100,22 +100,28 @@ export async function getHistoryComparisons(
     else missing.push(row)
   }
   reportDatabaseProgress("Comparing downloads", 0, missing.length)
-  for (let offset = 0; offset < missing.length; offset += 1024) {
-    const batch = missing.slice(offset, offset + 1024)
+  let comparedBatches = 0
+  let comparisonTime = 0
+  for (let offset = 0; offset < missing.length;) {
+    // Establish visible progress quickly, then amortize full-table scan costs
+    // over larger batches when optional identity indexes are absent.
+    const batch = missing.slice(offset, offset + (offset === 0 ? 64 : 1024))
+    const started = performance.now()
+    // Keep these joins set-based. A forced per-identity LATERAL scan is
+    // quadratic for legacy links on the standard bot schema without our indexes.
     const result = await pool.query<Comparison & { content_id: string }>(
       `WITH identities AS (
         SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint, shared_link text, media_kind text)
       ), matched AS MATERIALIZED (
         SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
-        CROSS JOIN LATERAL (
-          SELECT user_id, downloaded_at, pk_id FROM public.videos
-          WHERE i.video_details_id IS NOT NULL AND video_details_id = i.video_details_id AND user_id <> 0
-          UNION ALL
-          SELECT user_id, downloaded_at, pk_id FROM public.videos
-          WHERE i.video_details_id IS NULL AND video_details_id IS NULL AND user_id <> 0
-            AND md5(shared_link) = md5(i.shared_link) AND shared_link = i.shared_link AND media_kind = i.media_kind
-          OFFSET 0
-        ) v
+        JOIN public.videos v ON i.video_details_id IS NOT NULL
+          AND v.video_details_id = i.video_details_id AND v.user_id <> 0
+        UNION ALL
+        SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
+        JOIN public.videos v ON i.video_details_id IS NULL
+          AND v.video_details_id IS NULL AND v.user_id <> 0
+          AND md5(v.shared_link) = md5(i.shared_link)
+          AND v.shared_link = i.shared_link AND v.media_kind = i.media_kind
       ), compared AS (
         SELECT content_id, count(DISTINCT user_id) FILTER (WHERE user_id <> $2::bigint) AS other_chats,
           bool_or(downloaded_at IS NULL OR downloaded_at < 946684800
@@ -139,10 +145,15 @@ export async function getHistoryComparisons(
       })
       results.push(comparison)
     }
+    offset += batch.length
+    comparisonTime += performance.now() - started
+    comparedBatches++
     reportDatabaseProgress(
       "Comparing downloads",
-      Math.min(offset + batch.length, missing.length),
-      missing.length
+      offset,
+      missing.length,
+      (Math.ceil((missing.length - offset) / 1024) * comparisonTime) /
+        comparedBatches
     )
   }
   reportDatabaseProgress("Preparing your results")

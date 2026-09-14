@@ -492,8 +492,10 @@ time is estimated from completed work. Other queries use the previous request's
 duration when available, with an approximate percentage. A first request with no
 measurable progress stays indeterminate rather than inventing a percentage.
 
-History comparisons run in batches of 1,024 distinct posts using the identity
-indexes in `002_stats_snapshot_indexes.sql`. Completed comparisons are reused
+History comparisons start with 64 distinct posts to show progress promptly,
+then use batches of up to 1,024. Joins compare each batch together and also work
+without the optional identity indexes in `002_stats_snapshot_indexes.sql`.
+Those indexes still improve performance on large databases. Completed comparisons are reused
 across pages, dates, media filters, and sorting for two minutes. The cache is
 account-scoped, limited to 50,000 comparisons and approximately 16 MB per process.
 Counts and first-downloader badges in these filtered views can therefore lag by

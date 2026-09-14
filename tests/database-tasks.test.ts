@@ -9,6 +9,19 @@ import { ComparisonCache } from "@/lib/stats/history-comparisons"
 
 afterEach(() => vi.useRealTimers())
 describe("database task control", () => {
+  it("uses batch timing for ETA when the first batch is smaller", () => {
+    vi.useFakeTimers()
+    const task = new DatabaseTask()
+    task.report("Comparing downloads", 64, 2271, 3000)
+    expect(task.status().remainingMs).toBe(3000)
+    vi.advanceTimersByTime(1000)
+    expect(task.status().remainingMs).toBe(2000)
+    // An overdue estimate returns to unknown instead of claiming completion.
+    vi.advanceTimersByTime(2001)
+    expect(task.status().remainingMs).toBeNull()
+    task.report("Preparing your results")
+    expect(task.status().remainingMs).toBeNull()
+  })
   it("isolates status and cancellation by owner and consumes an early cancel", () => {
     const registry = new TaskRegistry()
     const task = registry.start("one", "owner")!
