@@ -1,21 +1,16 @@
 import "@/lib/server-only"
 import type { Pool } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
+import { withDatabaseStage } from "@/lib/db/diagnostics"
 import { getHistoryComparisons } from "./history-comparisons"
 import type { HistoryFilters, PaginatedUserDownloads } from "./types"
 
-// Match stable identities first, with exact-link matching for legacy records.
+// Only stable video identities can establish other downloaders or who was first.
 // Comparisons deliberately include events outside the selected history dates.
 function matches(source: string) {
   return `SELECT user_id, downloaded_at, pk_id FROM public.videos
     WHERE ${source}.video_details_id IS NOT NULL
-      AND video_details_id = ${source}.video_details_id AND user_id <> 0
-    UNION ALL
-    SELECT user_id, downloaded_at, pk_id FROM public.videos
-    WHERE ${source}.video_details_id IS NULL AND video_details_id IS NULL
-      AND md5(shared_link) = md5(${source}.shared_link)
-      AND shared_link = ${source}.shared_link AND media_kind = ${source}.media_kind
-      AND user_id <> 0`
+      AND video_details_id = ${source}.video_details_id AND user_id <> 0`
 }
 
 function comparisons(source: string) {
@@ -74,23 +69,27 @@ export async function getUserDownloadsRaw(
   try {
     if (filters.discovery === "all" && filters.sort === "newest") {
       // Ordinary browsing compares only the requested page.
-      const count = await pool.query<{ count: string }>(
-        `SELECT count(*)::text AS count FROM public.videos WHERE ${predicate}`,
-        values
+      const count = await withDatabaseStage("history.count", () =>
+        pool.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM public.videos WHERE ${predicate}`,
+          values
+        )
       )
       total = count.rows[0]?.count ?? "0"
       page = Math.min(
         requestedPage,
         Math.max(1, Math.ceil(Number(total) / pageSize))
       )
-      const result = await pool.query<HistoryRow>(
-        `WITH page AS (
+      const result = await withDatabaseStage("history.page", () =>
+        pool.query<HistoryRow>(
+          `WITH page AS (
           SELECT * FROM public.videos WHERE ${predicate}
           ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC LIMIT $5 OFFSET $6
         ) SELECT ${fields}, comparison.other_chats::text, comparison.uncertain,
           first_download.user_id::text AS first_user
         FROM page ${comparisons("page")} ORDER BY ${newest}`,
-        [...values, pageSize, (page - 1) * pageSize]
+          [...values, pageSize, (page - 1) * pageSize]
+        )
       )
       rows = result.rows
     } else {
@@ -119,12 +118,6 @@ export async function getUserDownloadsRaw(
           SELECT identities.content_id, v.user_id, v.downloaded_at, v.pk_id
           FROM identities JOIN public.videos v ON identities.video_details_id IS NOT NULL
             AND v.video_details_id = identities.video_details_id AND v.user_id <> 0
-          UNION ALL
-          SELECT identities.content_id, v.user_id, v.downloaded_at, v.pk_id
-          FROM identities JOIN public.videos v ON identities.video_details_id IS NULL
-            AND v.video_details_id IS NULL AND v.user_id <> 0
-            AND md5(v.shared_link) = md5(identities.shared_link)
-            AND v.shared_link = identities.shared_link AND v.media_kind = identities.media_kind
         ), compared AS (
           SELECT content_id,
             count(DISTINCT user_id) FILTER (WHERE user_id <> $1::bigint) AS other_chats,
@@ -135,20 +128,19 @@ export async function getUserDownloadsRaw(
           SELECT DISTINCT ON (content_id) content_id, user_id AS first_user FROM matched
           ORDER BY content_id, downloaded_at ASC NULLS LAST, pk_id ASC
         )`
-      const result = await pool.query<HistoryRow>(
-        `WITH candidates AS MATERIALIZED (
-          SELECT *, CASE WHEN video_details_id IS NOT NULL THEN 'id:' || video_details_id::text
-            ELSE 'link:' || media_kind || ':' || shared_link END AS identity
+      const result = await withDatabaseStage("history.rank", () =>
+        pool.query<HistoryRow>(
+          `WITH candidates AS MATERIALIZED (
+          SELECT *
           FROM public.videos WHERE ${predicate}
         ), identities AS (
-          SELECT min(pk_id) AS content_id, identity, video_details_id,
-            CASE WHEN video_details_id IS NULL THEN shared_link END AS shared_link,
-            CASE WHEN video_details_id IS NULL THEN media_kind END AS media_kind
-          FROM candidates GROUP BY 2, 3, 4, 5
+          SELECT min(pk_id) AS content_id, video_details_id
+          FROM candidates WHERE video_details_id IS NOT NULL GROUP BY 2
         ), ${comparisonCtes}, annotated AS MATERIALIZED (
-          SELECT candidates.*, compared.other_chats, compared.uncertain, first_downloads.first_user
-          FROM candidates JOIN identities USING (identity)
-          JOIN compared USING (content_id) JOIN first_downloads USING (content_id)
+          SELECT candidates.*, coalesce(compared.other_chats, 0) AS other_chats,
+            coalesce(compared.uncertain, true) AS uncertain, first_downloads.first_user
+          FROM candidates LEFT JOIN identities USING (video_details_id)
+          LEFT JOIN compared USING (content_id) LEFT JOIN first_downloads USING (content_id)
         ), qualified AS MATERIALIZED (
           SELECT * FROM annotated WHERE ${discovery}
         ), totals AS (SELECT count(*) AS total FROM qualified)
@@ -160,12 +152,13 @@ export async function getUserDownloadsRaw(
         ) selected ON true
         ORDER BY ${filters.sort === "popular" ? "selected.other_chats::bigint DESC," : ""}
           selected.downloaded_at DESC NULLS LAST, selected.id::bigint DESC`,
-        [
-          ...values,
-          pageSize,
-          requestedPage,
-          ...(cached ? [JSON.stringify(cached)] : []),
-        ]
+          [
+            ...values,
+            pageSize,
+            requestedPage,
+            ...(cached ? [JSON.stringify(cached)] : []),
+          ]
+        )
       )
       total = result.rows[0]?.total ?? "0"
       page = Math.min(

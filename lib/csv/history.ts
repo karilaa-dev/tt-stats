@@ -85,7 +85,7 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
     client = undefined
     let cancellation: Promise<unknown> | undefined
     const abort = () => {
-      cancellation = cancelClient(getPool(), checkedOutClient)
+      cancellation = cancelClient(getPool(), checkedOutClient, task?.id)
       rows.destroy(new Error("Export cancelled"))
     }
     task?.controller.signal.addEventListener("abort", abort, { once: true })

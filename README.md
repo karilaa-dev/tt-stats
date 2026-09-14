@@ -323,6 +323,10 @@ least one other distinct chat. The latter requires a known first-downloader
 status for the account. These views default to **Most downloaded by others**;
 **Newest first** remains available. Comparisons use all recorded history,
 including events outside the selected dates, and happen before pagination.
+Only records with a stable `video_details_id` participate in these comparisons.
+Legacy downloads remain in history, but do not receive other-downloader or
+first-downloader badges and do not match either discovery filter. Saved URLs are
+not used to infer that two legacy downloads refer to the same video.
 Repeated downloads remain separate history events. Popularity comparisons run
 once per distinct candidate post and use the indexes in
 `database/002_stats_snapshot_indexes.sql`; ordinary history only compares posts
@@ -388,9 +392,9 @@ Rebuild rolling and daily snapshots so all four ranking periods have
 that refresh is pending. Install and refresh before switching production traffic
 to the new build.
 
-The source bot tables are not rewritten. Added source indexes support identity,
-legacy-link, and first-download comparisons. Legacy links retain an exact text
-comparison alongside their hash index. Timestamp gaps produce an unknown first
+The source bot tables are not rewritten. Added source indexes support identity
+and first-download comparisons. Personal history comparisons require a stable
+video ID and skip legacy links. Timestamp gaps produce an unknown first
 downloader rather than treating a cache miss as proof of being first.
 
 Validation includes `bun run lint`, `bun run typecheck`, `bun run test`,
@@ -492,14 +496,14 @@ time is estimated from completed work. Other queries use the previous request's
 duration when available, with an approximate percentage. A first request with no
 measurable progress stays indeterminate rather than inventing a percentage.
 
-History comparisons start with 64 distinct posts to show progress promptly,
-then use batches of up to 1,024. Joins compare each batch together and also work
-without the optional identity indexes in `002_stats_snapshot_indexes.sql`.
+History comparisons start with 64 distinct stable video IDs to show progress
+promptly, then use batches of up to 1,024. Legacy links never trigger comparison
+queries. Joins compare each batch together using the bot's video identity index.
 Those indexes still improve performance on large databases. Completed comparisons are reused
 across pages, dates, media filters, and sorting for two minutes. The cache is
 account-scoped, limited to 50,000 comparisons and approximately 16 MB per process.
 Counts and first-downloader badges in these filtered views can therefore lag by
-up to two minutes. Histories above 20,000 distinct posts use the database-only
+up to two minutes. Histories above 20,000 distinct stable video IDs use the database-only
 ranking path to bound application memory. No new database objects are required.
 
 Progress and cancellation use `/api/tasks`, bound to the verified browser session
@@ -519,6 +523,40 @@ See [PostgreSQL's cancellation permissions](https://www.postgresql.org/docs/17/f
 
 All task state and cached comparisons live in RAM and disappear on restart.
 Keep one application process, as with login sessions and usage limits.
+
+### Troubleshooting history requests
+
+Server logs under `[database]` report failed queries, queries taking at least one
+second, and a heartbeat every five seconds while a query is pending. The logs
+include the request ID, query ID, stage, elapsed time, connection wait time, pool
+usage, comparison batch size and progress, and a sanitized PostgreSQL error code.
+`waiting_for_connection` means SQL has not started; `executing` means PostgreSQL
+has received the query and may be executing or waiting for a database lock.
+Cancellation failures are logged too. SQL, query parameters, download links,
+account IDs, credentials, and raw exception messages are excluded.
+
+Temporarily set `DB_QUERY_DEBUG=true` and restart to also log every query start,
+successful completion, and comparison-cache hit count. Reproduce the request and
+collect the lines with the same `requestId`, then disable verbose logging.
+
+The build includes a read-only diagnostic command. Run it on the application's
+network with its existing `DB_URL` environment variable:
+
+```sh
+bun dist/diagnose-history.mjs <user-id>
+# Inspect the first comparison's plan without executing that comparison:
+bun dist/diagnose-history.mjs <user-id> --explain
+```
+
+The command runs the same popularity-history code used by the website. It reports
+database settings, table-size estimates, index structure, query timings, and
+result counts. Plan output omits conditions and literals. It uses one read-only
+connection, a 30-second statement timeout, a two-minute overall deadline, and
+supports Ctrl+C cancellation. It does not create indexes or change database data.
+Connection errors and query failures exit nonzero. `--explain` still reads the
+account's candidate identities but does not run the comparison or fetch history.
+Never use the integration tests or `check-database-progress.mjs` against the real
+database; those checks modify their isolated test database.
 
 ### Access controls
 

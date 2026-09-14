@@ -4,6 +4,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg"
 
 import { getDbEnv } from "@/lib/env"
 import { trackPool } from "@/lib/db/cancellation"
+import { safeDatabaseError } from "@/lib/db/diagnostics"
 import { DATABASE_ERROR_COPY, type DatabaseErrorKind } from "@/lib/db/errors"
 
 export class DataAccessError extends Error {
@@ -76,8 +77,7 @@ export function getPool(): Pool {
   })
 
   pool.on("error", (error) => {
-    const code = (error as NodeJS.ErrnoException).code ?? "unknown"
-    console.error("[database] idle client error", { code })
+    console.error("[database] idle client error", safeDatabaseError(error))
   })
 
   globalForDatabase.ttStatsPool = trackPool(pool)
@@ -92,8 +92,6 @@ export async function query<Row extends QueryResultRow>(
     const result = await getPool().query<Row>(text, [...values])
     return result.rows
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? "unknown"
-    console.error("[database] query failed", { code })
     throw new DataAccessError(error)
   }
 }
@@ -102,8 +100,7 @@ export async function connect(): Promise<PoolClient> {
   try {
     return await getPool().connect()
   } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code ?? "unknown"
-    console.error("[database] connection failed", { code })
+    console.error("[database] connection failed", safeDatabaseError(error))
     throw new DataAccessError(error)
   }
 }

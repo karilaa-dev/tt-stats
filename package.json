@@ -9,7 +9,7 @@
   "packageManager": "bun@1.4.2",
   "scripts": {
     "dev": "ASTRO_DEV_BACKGROUND=1 bun --bun astro dev",
-    "build": "bun --bun astro build && bun scripts/build-monitor.mjs",
+    "build": "bun --bun astro build && bun scripts/build-monitor.mjs && bun build scripts/diagnose-history.ts --target=bun --packages=external --outfile=dist/diagnose-history.mjs",
     "start": "bun scripts/start.mjs",
     "lint": "bun --bun eslint .",
     "format": "bun --bun prettier --write \"**/*.{ts,tsx,astro,mjs,css}\"",

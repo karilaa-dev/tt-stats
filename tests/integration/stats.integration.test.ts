@@ -38,7 +38,93 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
-  it("compares legacy history promptly without optional TT Stats indexes", async () => {
+  it("keeps legacy entries in the large-account fallback while filtering only stable IDs", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query("INSERT INTO users(user_id) VALUES (998031), (998032)")
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id)
+        SELECT n, 'tiktok', 'large-history-' || n FROM generate_series(550000, 570000) n`)
+      await client.query(`INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        SELECT 998031, n, 1700000000, 'https://example.test/large-history/' || n, 'video', 'chat'
+        FROM generate_series(550000, 570000) n`)
+      await client.query(`INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface) VALUES
+        (998032, 550000, 1700000001, 'https://example.test/stable-alias', 'video', 'chat'),
+        (998031, NULL, 1700000002, 'https://example.test/shared-legacy', 'video', 'chat'),
+        (998032, NULL, 1700000003, 'https://example.test/shared-legacy', 'video', 'chat')`)
+      const adapter = client as unknown as Pool
+      const result = await getUserDownloadsRaw("998031", 1, 20, adapter, {
+        mediaKind: "all",
+        discovery: "all",
+        sort: "popular",
+      })
+      expect(result.total).toBe("20002")
+      expect(result.items[0]).toMatchObject({
+        videoDetailsId: "550000",
+        otherUniqueChats: "1",
+        isFirstDownloader: true,
+      })
+      expect(result.items[1]).toMatchObject({
+        videoDetailsId: null,
+        otherUniqueChats: "0",
+        isFirstDownloader: null,
+      })
+      const others = await getUserDownloadsRaw("998031", 1, 20, adapter, {
+        mediaKind: "all",
+        discovery: "others",
+        sort: "popular",
+      })
+      expect(others.total).toBe("1")
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("runs the read-only diagnostic command and redacts query plans and records", async () => {
+    // This suite requires an isolated test database. Separate CLI connections
+    // need committed fixtures, removed in finally before subsequent tests.
+    await pool.query("INSERT INTO users(user_id) VALUES (998041)")
+    await pool.query(
+      "INSERT INTO video_details(pk_id, platform, platform_video_id) VALUES (998041, 'tiktok', 'diagnostic-sentinel')"
+    )
+    try {
+      await pool.query(`INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        VALUES (998041, 998041, 1700000000, 'https://example.test/private-diagnostic-sentinel', 'video', 'chat')`)
+      for (const flags of [[], ["--explain"]]) {
+        const process = Bun.spawn(
+          ["bun", "scripts/diagnose-history.ts", "998041", ...flags],
+          {
+            env: {
+              ...globalThis.process.env,
+              DB_URL: globalThis.process.env.TEST_DB_URL,
+            },
+            stdout: "pipe",
+            stderr: "pipe",
+          }
+        )
+        const [stdout, stderr, exit] = await Promise.all([
+          new Response(process.stdout).text(),
+          new Response(process.stderr).text(),
+          process.exited,
+        ])
+        expect(exit, stderr).toBe(0)
+        expect(stdout).toContain('"read_only":true')
+        expect(stdout).toContain(
+          flags.length ? '"event":"plan"' : '"event":"history.completed"'
+        )
+        expect(stdout + stderr).not.toMatch(
+          /998041|diagnostic-sentinel|postgresql:\/\/|SELECT|Index Cond|Filter/
+        )
+      }
+    } finally {
+      await pool.query("DELETE FROM videos WHERE user_id = 998041")
+      await pool.query("DELETE FROM video_details WHERE pk_id = 998041")
+      await pool.query("DELETE FROM users WHERE user_id = 998041")
+    }
+  })
+
+  it("keeps legacy history but never compares its links or assigns downloader badges", async () => {
     const client = await pool.connect()
     try {
       await client.query("BEGIN")
@@ -49,35 +135,43 @@ integration("PostgreSQL statistics queries", () => {
         FROM generate_series(1, 102271) n`)
       await client.query("ANALYZE videos")
       await client.query("SET LOCAL statement_timeout = '1500ms'")
-      const task = new DatabaseTask()
-      const reports = vi.spyOn(task, "report")
-      const adapter = {
-        query: (text: string, values: unknown[]) => client.query(text, values),
-      } as unknown as Pool
-      const result = await withDatabaseTask(task, () =>
-        getUserDownloadsRaw("998003", 1, 20, adapter, {
+      const execute = vi.fn((text: string, values: unknown[]) =>
+        client.query(text, values)
+      )
+      const adapter = { query: execute } as unknown as Pool
+      for (const sort of ["popular", "newest"] as const) {
+        const result = await getUserDownloadsRaw("998003", 1, 20, adapter, {
           mediaKind: "all",
-          discovery: "others",
+          discovery: "all",
+          sort,
+        })
+        expect(result.total).toBe("2271")
+        expect(result.items).toHaveLength(20)
+        expect(
+          result.items.every(
+            (item) =>
+              item.otherUniqueChats === "0" && item.isFirstDownloader === null
+          )
+        ).toBe(true)
+      }
+      for (const discovery of ["others", "first"] as const) {
+        const result = await getUserDownloadsRaw("998003", 1, 20, adapter, {
+          mediaKind: "all",
+          discovery,
           sort: "popular",
         })
-      )
-      expect(result.total).toBe("2271")
-      expect(result.items).toHaveLength(20)
-      expect(result.items[0]?.otherUniqueChats).toBe("1")
-      const progress = reports.mock.calls.filter(
-        ([, completed]) => completed != null && completed > 0
-      )
-      expect(progress[0]?.slice(0, 3)).toEqual([
-        "Comparing downloads",
-        64,
-        2271,
-      ])
-      expect(progress.at(-1)?.slice(0, 3)).toEqual([
-        "Comparing downloads",
-        2271,
-        2271,
-      ])
-      expect(progress[0]?.[3]).toBeGreaterThan(0)
+        expect(result.total).toBe("0")
+        expect(result.items).toEqual([])
+      }
+      // The old path scanned the entire table four times for 2,271 legacy links.
+      expect(
+        execute.mock.calls.filter(([sql]) => sql.includes("WITH identities AS"))
+      ).toHaveLength(0)
+      expect(
+        execute.mock.calls.every(
+          ([sql]) => !sql.includes("md5(") && !sql.includes("shared_link =")
+        )
+      ).toBe(true)
     } finally {
       await client.query("ROLLBACK")
       client.release()
@@ -88,10 +182,13 @@ integration("PostgreSQL statistics queries", () => {
     try {
       await client.query("BEGIN")
       await client.query("INSERT INTO users(user_id) VALUES (998001), (998002)")
-      await client.query(`INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface)
-        VALUES (998001, 1700000000, 'https://example.test/repeated-cache', 'video', 'chat'),
-          (998001, 1700000100, 'https://example.test/repeated-cache', 'video', 'chat'),
-          (998002, 1700000200, 'https://example.test/repeated-cache', 'video', 'chat')`)
+      await client.query(
+        "INSERT INTO video_details(pk_id, platform, platform_video_id) VALUES (998010, 'tiktok', 'cached-stable-post')"
+      )
+      await client.query(`INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        VALUES (998001, 998010, 1700000000, 'https://example.test/repeated-cache', 'video', 'chat'),
+          (998001, 998010, 1700000100, 'https://example.test/repeated-cache', 'video', 'chat'),
+          (998002, 998010, 1700000200, 'https://example.test/repeated-cache', 'video', 'chat')`)
       const execute = vi.fn((text: string, values: unknown[]) =>
         client.query(text, values)
       )
@@ -136,31 +233,44 @@ integration("PostgreSQL statistics queries", () => {
     )
   })
   it("reuses completed popularity comparisons across pages and discovery filters", async () => {
-    const execute = vi.fn((text: string, values: unknown[]) =>
-      pool.query(text, values)
-    )
-    const adapter = { query: execute } as unknown as Pool
-    await getUserDownloadsRaw("1", 1, 1, adapter, {
-      mediaKind: "all",
-      discovery: "all",
-      sort: "popular",
-    })
-    const comparisons = () =>
-      execute.mock.calls.filter(([sql]) => sql.includes("WITH identities AS"))
-        .length
-    expect(comparisons()).toBe(1)
-    await getUserDownloadsRaw("1", 2, 1, adapter, {
-      mediaKind: "all",
-      discovery: "others",
-      sort: "popular",
-    })
-    expect(comparisons()).toBe(1)
-    await getUserDownloadsRaw("2", 1, 1, adapter, {
-      mediaKind: "all",
-      discovery: "others",
-      sort: "popular",
-    })
-    expect(comparisons()).toBe(2)
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query(
+        "INSERT INTO video_details(pk_id, platform, platform_video_id) VALUES (998020, 'tiktok', 'cached-across-pages')"
+      )
+      await client.query(
+        "UPDATE videos SET video_details_id = 998020 WHERE user_id IN (1, 2)"
+      )
+      const execute = vi.fn((text: string, values: unknown[]) =>
+        client.query(text, values)
+      )
+      const adapter = { query: execute } as unknown as Pool
+      await getUserDownloadsRaw("1", 1, 1, adapter, {
+        mediaKind: "all",
+        discovery: "all",
+        sort: "popular",
+      })
+      const comparisons = () =>
+        execute.mock.calls.filter(([sql]) => sql.includes("WITH identities AS"))
+          .length
+      expect(comparisons()).toBe(1)
+      await getUserDownloadsRaw("1", 2, 1, adapter, {
+        mediaKind: "all",
+        discovery: "others",
+        sort: "popular",
+      })
+      expect(comparisons()).toBe(1)
+      await getUserDownloadsRaw("2", 1, 1, adapter, {
+        mediaKind: "all",
+        discovery: "others",
+        sort: "popular",
+      })
+      expect(comparisons()).toBe(2)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
   })
 
   it("cancels the actual PostgreSQL query even when the read pool is full", async () => {
@@ -874,7 +984,7 @@ integration("PostgreSQL statistics queries", () => {
         sort: "popular" as const,
       }
       const firstPage = await getUserDownloadsRaw("4001", 1, 2, db, filters)
-      expect(firstPage).toMatchObject({ total: "5", totalPages: 3, page: 1 })
+      expect(firstPage).toMatchObject({ total: "4", totalPages: 2, page: 1 })
       expect(
         firstPage.items.map((item) => [item.id, item.otherUniqueChats])
       ).toEqual([
@@ -886,20 +996,16 @@ integration("PostgreSQL statistics queries", () => {
         (await getUserDownloadsRaw("4001", 2, 2, db, filters)).items.map(
           (item) => item.id
         )
-      ).toEqual(["91015", "91013"])
+      ).toEqual(["91013", "91011"])
       expect(
         await getUserDownloadsRaw("4001", 99, 2, db, filters)
-      ).toMatchObject({ page: 3, items: [{ id: "91011" }] })
+      ).toMatchObject({ page: 2, items: [{ id: "91013" }, { id: "91011" }] })
       const pioneers = await getUserDownloadsRaw("4001", 1, 20, db, {
         ...filters,
         discovery: "first",
       })
-      expect(pioneers.total).toBe("3")
-      expect(pioneers.items.map((item) => item.id)).toEqual([
-        "91002",
-        "91015",
-        "91011",
-      ])
+      expect(pioneers.total).toBe("2")
+      expect(pioneers.items.map((item) => item.id)).toEqual(["91002", "91011"])
       expect(
         pioneers.items.every(
           (item) =>

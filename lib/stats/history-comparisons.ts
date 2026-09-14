@@ -1,12 +1,11 @@
 import "@/lib/server-only"
 import type { Pool } from "pg"
-import { reportDatabaseProgress } from "@/lib/tasks/server"
+import { currentDatabaseTask, reportDatabaseProgress } from "@/lib/tasks/server"
+import { logHistoryCache, withDatabaseStage } from "@/lib/db/diagnostics"
 
 interface Identity {
   content_id: string
-  video_details_id: string | null
-  shared_link: string | null
-  media_kind: string | null
+  video_details_id: string
 }
 interface Comparison {
   other_chats: string
@@ -67,13 +66,13 @@ export async function getHistoryComparisons(
   values: unknown[]
 ) {
   reportDatabaseProgress("Finding videos in your history")
-  const identities = await pool.query<Identity>(
-    `SELECT min(pk_id)::text AS content_id, video_details_id::text,
-      CASE WHEN video_details_id IS NULL THEN shared_link END AS shared_link,
-      CASE WHEN video_details_id IS NULL THEN media_kind END AS media_kind
-    FROM public.videos WHERE ${predicate}
-    GROUP BY 2, 3, 4 LIMIT 20001`,
-    values
+  const identities = await withDatabaseStage("history.identities", () =>
+    pool.query<Identity>(
+      `SELECT min(pk_id)::text AS content_id, video_details_id::text
+    FROM public.videos WHERE (${predicate}) AND video_details_id IS NOT NULL
+    GROUP BY 2 LIMIT 20001`,
+      values
+    )
   )
   // Large accounts retain the bounded, database-only ranking path rather than
   // retaining arbitrarily large identity lists in the application.
@@ -86,12 +85,7 @@ export async function getHistoryComparisons(
     cache = new ComparisonCache()
     caches.set(pool, cache)
   }
-  const key = (row: Identity) =>
-    `${userId}:${
-      row.video_details_id !== null
-        ? `id:${row.video_details_id}`
-        : `link:${row.media_kind}:${row.shared_link}`
-    }`
+  const key = (row: Identity) => `${userId}:id:${row.video_details_id}`
   const results: (Comparison & { content_id: string })[] = []
   const missing: Identity[] = []
   for (const row of identities.rows) {
@@ -99,29 +93,27 @@ export async function getHistoryComparisons(
     if (cached) results.push({ ...cached, content_id: row.content_id })
     else missing.push(row)
   }
+  logHistoryCache(
+    identities.rows.length,
+    results.length,
+    currentDatabaseTask()?.id
+  )
   reportDatabaseProgress("Comparing downloads", 0, missing.length)
   let comparedBatches = 0
   let comparisonTime = 0
   for (let offset = 0; offset < missing.length;) {
-    // Establish visible progress quickly, then amortize full-table scan costs
-    // over larger batches when optional identity indexes are absent.
     const batch = missing.slice(offset, offset + (offset === 0 ? 64 : 1024))
     const started = performance.now()
-    // Keep these joins set-based. A forced per-identity LATERAL scan is
-    // quadratic for legacy links on the standard bot schema without our indexes.
-    const result = await pool.query<Comparison & { content_id: string }>(
-      `WITH identities AS (
-        SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint, shared_link text, media_kind text)
+    const result = await withDatabaseStage(
+      "history.compare",
+      () =>
+        pool.query<Comparison & { content_id: string }>(
+          `WITH identities AS (
+        SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint)
       ), matched AS MATERIALIZED (
         SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
         JOIN public.videos v ON i.video_details_id IS NOT NULL
           AND v.video_details_id = i.video_details_id AND v.user_id <> 0
-        UNION ALL
-        SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
-        JOIN public.videos v ON i.video_details_id IS NULL
-          AND v.video_details_id IS NULL AND v.user_id <> 0
-          AND md5(v.shared_link) = md5(i.shared_link)
-          AND v.shared_link = i.shared_link AND v.media_kind = i.media_kind
       ), compared AS (
         SELECT content_id, count(DISTINCT user_id) FILTER (WHERE user_id <> $2::bigint) AS other_chats,
           bool_or(downloaded_at IS NULL OR downloaded_at < 946684800
@@ -133,7 +125,14 @@ export async function getHistoryComparisons(
       ) SELECT i.content_id::text, coalesce(compared.other_chats, 0)::text AS other_chats,
         coalesce(compared.uncertain, true) AS uncertain, first_downloads.first_user::text
       FROM identities i LEFT JOIN compared USING(content_id) LEFT JOIN first_downloads USING(content_id)`,
-      [JSON.stringify(batch), userId]
+          [JSON.stringify(batch), userId]
+        ),
+      {
+        batch: comparedBatches + 1,
+        batchSize: batch.length,
+        completed: offset,
+        total: missing.length,
+      }
     )
     const byId = new Map(result.rows.map((row) => [row.content_id, row]))
     for (const row of batch) {

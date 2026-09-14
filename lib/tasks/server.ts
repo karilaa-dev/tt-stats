@@ -1,6 +1,6 @@
 import "@/lib/server-only"
 import { AsyncLocalStorage } from "node:async_hooks"
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import type { AstroCookies } from "astro"
 import { ADMIN_COOKIE } from "@/lib/admin/session"
 import { USER_COOKIE } from "@/lib/auth/session"
@@ -24,6 +24,10 @@ export function taskOwner(
 }
 
 export class DatabaseTask {
+  readonly id: string
+  constructor(id?: string) {
+    this.id = id && validTaskId(id) ? id : randomUUID()
+  }
   readonly controller = new AbortController()
   readonly started = Date.now()
   private phaseStarted = this.started
@@ -118,7 +122,7 @@ export class TaskRegistry {
       ).length >= 8
     )
       return null
-    const task = new DatabaseTask()
+    const task = new DatabaseTask(id)
     this.entries.set(id, { owner, task, expires: this.now() + 120_000 })
     return task
   }
