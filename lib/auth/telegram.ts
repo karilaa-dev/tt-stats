@@ -3,6 +3,60 @@ import * as oidc from "openid-client"
 import type { TelegramUser } from "./types"
 import { randomToken, type LoginTransaction } from "./session"
 
+const telegramFetch: oidc.CustomFetch = async (url, options) => {
+  // The library's Uint8Array body type is broader than the DOM fetch typings.
+  const response = await fetch(url, options as RequestInit)
+  if (
+    url !== "https://oauth.telegram.org/token" ||
+    options.method !== "POST" ||
+    response.status !== 200 ||
+    response.headers.has("www-authenticate") ||
+    response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !==
+      "application/json"
+  )
+    return response
+
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => null)
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body) ||
+    "error" in body ||
+    !("id_token" in body) ||
+    typeof body.id_token !== "string" ||
+    !body.id_token ||
+    ("access_token" in body &&
+      body.access_token !== null &&
+      body.access_token !== undefined &&
+      body.access_token !== "")
+  )
+    return response
+
+  // Telegram may return only an ID token. openid-client requires access-token
+  // fields even though this application never uses or exposes an access token.
+  // Supply a non-credential placeholder solely for its response parser. The
+  // original ID token still passes all claim and signature checks below.
+  const normalized = {
+    ...body,
+    access_token: "unused-telegram-login-access-token",
+  }
+  if (
+    !("token_type" in normalized) ||
+    normalized.token_type == null ||
+    normalized.token_type === ""
+  ) {
+    Object.assign(normalized, { token_type: "Bearer" })
+  }
+  const headers = new Headers(response.headers)
+  headers.delete("content-length")
+  headers.delete("content-encoding")
+  headers.set("cache-control", "no-store")
+  return Response.json(normalized, { headers })
+}
+
 export function getOAuthEnv(source = process.env) {
   const id = source.TELEGRAM_OAUTH_CLIENT_ID?.trim()
   const secret = source.TELEGRAM_OAUTH_CLIENT_SECRET?.trim()
@@ -49,6 +103,7 @@ async function config() {
       oidc.ClientSecretBasic(env.secret),
       {
         timeout: 10,
+        [oidc.customFetch]: telegramFetch,
         execute: [oidc.enableNonRepudiationChecks],
       }
     )

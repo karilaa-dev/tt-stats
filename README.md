@@ -278,6 +278,13 @@ and signature-verified ID tokens. Only `openid profile` is requested. The
 verified Telegram `id` claim selects bot records; the OIDC `sub` is not a bot
 user ID. Tokens and client secrets are never returned to the browser.
 
+Some Telegram token responses contain an ID token without a usable access token.
+For successful ID-token-only responses, a Telegram-specific adapter supplies the
+unused access-token fields required by `openid-client`'s response parser. This
+placeholder is never used as a credential or returned by the login API. The
+original ID token still undergoes signature, issuer, audience, expiry, and nonce
+validation; HTTP errors and malformed credentials remain rejected.
+
 If Telegram approves a login but the site reports that it could not be verified,
 check the application log for `[telegram-login] callback failed`. It records only
 allowlisted error codes, failure reasons, claim names, and algorithm names, never
@@ -285,7 +292,7 @@ tokens, credentials, or profile values. Nested library errors are inspected to
 distinguish failures sharing `OAUTH_INVALID_RESPONSE`. For example,
 `missing_nonce` means the ID token omitted the requested nonce,
 `unexpected_signing_algorithm` includes the returned `algorithm`, and
-`invalid_access_token` means the token response omitted a non-empty access token.
+`invalid_access_token` indicates an unsupported access-token response format.
 `invalid_client` indicates rejected OAuth client credentials;
 `invalid_grant` indicates a rejected code, redirect URI, or PKCE verifier. A JWT
 validation error includes the failing claim name when available. Keep RS256

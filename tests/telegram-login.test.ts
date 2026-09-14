@@ -36,7 +36,8 @@ async function flow(
   change: Record<string, unknown> = {},
   forged = false,
   responseChange: Record<string, unknown> = {},
-  alg = "RS256"
+  alg = "RS256",
+  responseStatus = 200
 ) {
   vi.stubEnv("TELEGRAM_OAUTH_CLIENT_ID", "123456")
   vi.stubEnv("TELEGRAM_OAUTH_CLIENT_SECRET", "test-oauth-secret")
@@ -65,12 +66,15 @@ async function flow(
         })
       if (url.endsWith("/keys")) return Response.json({ keys: [jwk] })
       if (url.endsWith("/token"))
-        return Response.json({
-          access_token: "unused",
-          token_type: "Bearer",
-          id_token: token,
-          ...responseChange,
-        })
+        return Response.json(
+          {
+            access_token: "unused",
+            token_type: "Bearer",
+            id_token: token,
+            ...responseChange,
+          },
+          { status: responseStatus }
+        )
       throw new Error("Unexpected outgoing URL")
     })
   )
@@ -109,7 +113,7 @@ describe("official Telegram OIDC", () => {
       reason: "unexpected_signing_algorithm",
       algorithm: "ES256",
     },
-    { response: { access_token: undefined }, reason: "invalid_access_token" },
+    { response: { access_token: 123 }, reason: "invalid_access_token" },
     { forged: true, reason: "signature_verification_failed" },
   ])("identifies real OIDC failures: $reason", async (test) => {
     const { callback, transaction } = await flow(
@@ -127,6 +131,50 @@ describe("official Telegram OIDC", () => {
       claim: test.claim ?? "unknown",
       algorithm: test.algorithm ?? "unknown",
     })
+  })
+  it.each([
+    { access_token: undefined, token_type: undefined },
+    { access_token: null, token_type: null },
+    { access_token: "", token_type: "" },
+    { access_token: "", token_type: "Bearer" },
+  ])("accepts a verified ID-token-only response: %j", async (response) => {
+    const { callback, transaction } = await flow({}, false, response)
+    expect(await finishTelegramLogin(callback, transaction)).toEqual({
+      id: "987654321",
+      name: "Test user",
+      username: null,
+    })
+  })
+  it.each([
+    { claims: { iss: "https://attacker.example" } },
+    { claims: { aud: "other-client" } },
+    { claims: { exp: 1 } },
+    { claims: { nonce: undefined } },
+    { claims: { nonce: "wrong-nonce" } },
+    { claims: { id: undefined } },
+    { forged: true },
+    { alg: "ES256" },
+    { response: { id_token: undefined } },
+    { response: { id_token: "" } },
+    { response: { id_token: "invalid.jwt.token" } },
+    { response: { error: "invalid_grant" } },
+    { response: { token_type: "invalid" } },
+    { response: { token_type: 123 } },
+    { status: 400 },
+    { status: 401 },
+  ])("still rejects invalid ID-token-only responses: %j", async (test) => {
+    const { callback, transaction } = await flow(
+      test.claims,
+      test.forged,
+      {
+        access_token: "",
+        token_type: undefined,
+        ...test.response,
+      },
+      test.alg,
+      test.status
+    )
+    await expect(finishTelegramLogin(callback, transaction)).rejects.toThrow()
   })
   it("uses PKCE, nonce, minimal scopes, Basic client auth, and verified profile ID", async () => {
     const { url, transaction, callback, calls } = await flow()
