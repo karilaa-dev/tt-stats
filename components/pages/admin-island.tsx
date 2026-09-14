@@ -4,6 +4,7 @@ import {
   type DashboardShellProps,
 } from "@/components/dashboard/dashboard-shell"
 import { useSession } from "@/components/dashboard/session-access"
+import { useHydrated } from "@/lib/dashboard-context"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,6 +32,7 @@ export default function AdminIsland(
 }
 function AdminLogin() {
   const { admin } = useSession()
+  const hydrated = useHydrated()
   const [token, setToken] = useState("")
   const [error, setError] = useState("")
   const [pending, setPending] = useState(false)
@@ -60,9 +62,10 @@ function AdminLogin() {
           </div>
         ) : (
           <form
+            aria-busy={!hydrated || pending}
             onSubmit={async (event) => {
               event.preventDefault()
-              if (pending || Date.now() < retryAt) return
+              if (!hydrated || pending || Date.now() < retryAt) return
               setPending(true)
               setError("")
               try {
@@ -108,13 +111,13 @@ function AdminLogin() {
                   maxLength={4096}
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  disabled={pending}
+                  disabled={!hydrated || pending}
                   required
                   aria-invalid={Boolean(error)}
                 />
                 {error ? <FieldError role="alert">{error}</FieldError> : null}
               </Field>
-              <Button type="submit" disabled={pending || !token}>
+              <Button type="submit" disabled={!hydrated || pending || !token}>
                 {pending ? <Spinner /> : null}Unlock admin access
               </Button>
             </FieldGroup>

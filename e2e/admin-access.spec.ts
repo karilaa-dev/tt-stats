@@ -1,6 +1,44 @@
 import { expect, test } from "@playwright/test"
 const token = "test-admin-secret-with-at-least-32-characters"
 
+test("admin login waits for hydration before accepting a token", async ({
+  page,
+}) => {
+  let releaseHydration!: () => void
+  const hydrationGate = new Promise<void>((resolve) => {
+    releaseHydration = resolve
+  })
+  let requestedModule!: () => void
+  const moduleRequested = new Promise<void>((resolve) => {
+    requestedModule = resolve
+  })
+  await page.route("**/components/pages/admin-island.tsx*", async (route) => {
+    requestedModule()
+    await hydrationGate
+    await route.continue()
+  })
+  try {
+    await page.goto("/admin", { waitUntil: "domcontentloaded" })
+    await moduleRequested
+    const input = page.getByLabel("Admin token", { exact: true })
+    await expect(input).toBeVisible()
+    await expect(input).toBeDisabled()
+    await expect(
+      page.getByRole("button", { name: "Unlock admin access", exact: true })
+    ).toBeDisabled()
+    releaseHydration()
+    await expect(input).toBeEnabled()
+    await input.fill("wrong-token")
+    await page
+      .getByRole("button", { name: "Unlock admin access", exact: true })
+      .click()
+    await expect(page.getByRole("alert")).toContainText("Incorrect admin token")
+  } finally {
+    releaseHydration()
+    await page.unrouteAll({ behavior: "wait" })
+  }
+})
+
 test("login is visible and admin menus are hidden until visiting /admin", async ({
   page,
   isMobile,
