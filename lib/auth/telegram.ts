@@ -81,7 +81,15 @@ async function config() {
         client_secret: env.secret,
         id_token_signed_response_alg: "RS256",
       },
-      oidc.ClientSecretBasic(env.secret),
+      (_server, client, _body, headers) => {
+        // Telegram documents base64(client_id:client_secret), without OAuth
+        // form-encoding first. ClientSecretBasic encodes even '_' as '%5F',
+        // changing the secret Telegram receives after decoding the header.
+        headers.set(
+          "authorization",
+          `Basic ${Buffer.from(`${client.client_id}:${env.secret}`, "utf8").toString("base64")}`
+        )
+      },
       {
         timeout: 10,
         [oidc.customFetch]: telegramFetch,

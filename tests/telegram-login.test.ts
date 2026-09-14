@@ -37,10 +37,11 @@ async function flow(
   forged = false,
   responseChange: Record<string, unknown> = {},
   alg = "RS256",
-  responseStatus = 200
+  responseStatus = 200,
+  clientSecret = "test-oauth-secret"
 ) {
   vi.stubEnv("TELEGRAM_OAUTH_CLIENT_ID", "123456")
-  vi.stubEnv("TELEGRAM_OAUTH_CLIENT_SECRET", "test-oauth-secret")
+  vi.stubEnv("TELEGRAM_OAUTH_CLIENT_SECRET", clientSecret)
   vi.stubEnv("APP_ORIGIN", "https://stats.example")
   let token = ""
   const calls: { url: string; body: string; authorization: string | null }[] =
@@ -65,7 +66,13 @@ async function flow(
           id_token_signing_alg_values_supported: ["RS256"],
         })
       if (url.endsWith("/keys")) return Response.json({ keys: [jwk] })
-      if (url.endsWith("/token"))
+      if (url.endsWith("/token")) {
+        // Telegram documents raw base64(client_id:client_secret), without
+        // form-encoding the credentials before constructing Basic auth.
+        const expectedAuth = `Basic ${Buffer.from(`123456:${clientSecret}`).toString("base64")}`
+        if (new Headers(init?.headers).get("authorization") !== expectedAuth) {
+          return Response.json({ error: "invalid_client" })
+        }
         return Response.json(
           {
             access_token: "unused",
@@ -75,6 +82,7 @@ async function flow(
           },
           { status: responseStatus }
         )
+      }
       throw new Error("Unexpected outgoing URL")
     })
   )
@@ -104,6 +112,29 @@ async function flow(
   return { ...result, callback, calls }
 }
 describe("official Telegram OIDC", () => {
+  it.each(["secret_with_underscores", "test+oauth/secret=with:%characters"])(
+    "sends client secret %s exactly as Telegram documents",
+    async (clientSecret) => {
+      const { callback, transaction, calls } = await flow(
+        {},
+        false,
+        {},
+        "RS256",
+        200,
+        clientSecret
+      )
+      expect(await finishTelegramLogin(callback, transaction)).toMatchObject({
+        id: "987654321",
+      })
+      const exchange = calls.find((call) => call.url.endsWith("/token"))!
+      expect(
+        Buffer.from(exchange.authorization!.slice(6), "base64").toString()
+      ).toBe(`123456:${clientSecret}`)
+      expect(new URLSearchParams(exchange.body).has("client_secret")).toBe(
+        false
+      )
+    }
+  )
   it.each([
     { providerError: "invalid_client", withTokens: false },
     { providerError: "invalid_grant", withTokens: false },
@@ -210,9 +241,7 @@ describe("official Telegram OIDC", () => {
     const exchange = calls.find((call) => call.url.endsWith("/token"))!
     expect(new URLSearchParams(exchange.body).get("client_id")).toBe("123456")
     expect(
-      decodeURIComponent(
-        Buffer.from(exchange.authorization!.slice(6), "base64").toString()
-      )
+      Buffer.from(exchange.authorization!.slice(6), "base64").toString()
     ).toBe("123456:test-oauth-secret")
     expect(new URLSearchParams(exchange.body).get("code_verifier")).toBe(
       transaction.verifier

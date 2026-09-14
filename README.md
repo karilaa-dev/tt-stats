@@ -278,6 +278,11 @@ and signature-verified ID tokens. Only `openid profile` is requested. The
 verified Telegram `id` claim selects bot records; the OIDC `sub` is not a bot
 user ID. Tokens and client secrets are never returned to the browser.
 
+Client authentication follows Telegram's documented
+`Authorization: Basic base64(client_id:client_secret)` format. Credentials are
+not form-encoded before Base64 encoding; encoding an underscore as `%5F`, for
+example, changes the secret Telegram receives and results in `invalid_client`.
+
 Telegram can return an OAuth error with HTTP 200. A Telegram-specific adapter
 marks these error responses as HTTP 400 internally so `openid-client` reports
 the actual provider error instead of a misleading missing-access-token error.
