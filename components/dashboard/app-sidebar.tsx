@@ -1,3 +1,4 @@
+import { useSession } from "./session-access"
 import {
   ActivityIcon,
   ArrowUpRightIcon,
@@ -9,6 +10,7 @@ import {
   MoreHorizontalIcon,
   SearchIcon,
   Share2Icon,
+  UserRoundIcon,
   VideoIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -24,6 +26,13 @@ import { useDashboardContext } from "@/lib/dashboard-context"
 import { useAdminAccess } from "./admin-access"
 
 const navigation = [
+  {
+    href: "/dashboard/me",
+    label: "My profile",
+    short: "My profile",
+    icon: UserRoundIcon,
+    description: "Your downloads and statistics",
+  },
   {
     href: "/dashboard",
     label: "Overview",
@@ -83,20 +92,20 @@ const navigation = [
 ]
 
 export function DesktopNavigation() {
-  const { requireAdmin } = useAdminAccess()
+  const { authenticated } = useAdminAccess()
+  const visibleNavigation = navigation.filter(
+    (item) =>
+      authenticated ||
+      !["/dashboard/users", "/dashboard/jobs"].includes(item.href)
+  )
   const { pathname } = useDashboardContext()
   const current = pathname.replace(/\/$/, "")
   return (
     <nav aria-label="Main navigation" className="desktop-navigation">
-      {navigation.map(({ href, label, icon: Icon }) => (
+      {visibleNavigation.map(({ href, label, icon: Icon }) => (
         <a
           key={href}
           href={href}
-          onClick={async (event) => {
-            if (href !== "/dashboard/jobs") return
-            event.preventDefault()
-            if (await requireAdmin()) window.location.assign(href)
-          }}
           aria-current={current === href ? "page" : undefined}
         >
           <Icon aria-hidden="true" />
@@ -108,22 +117,32 @@ export function DesktopNavigation() {
 }
 
 export function AppSidebar() {
-  const { requireAdmin } = useAdminAccess()
+  const { authenticated } = useAdminAccess()
+  const visibleNavigation = navigation.filter(
+    (item) =>
+      authenticated ||
+      !["/dashboard/users", "/dashboard/jobs"].includes(item.href)
+  )
   const { pathname, fakeMode } = useDashboardContext()
   const { isMobile, openMobile, setOpenMobile } = useSidebar()
   const current = pathname.replace(/\/$/, "")
-  const quickLinks = navigation.filter((item) =>
-    ["/dashboard", "/dashboard/analytics", "/dashboard/users"].includes(
-      item.href
-    )
-  )
+  const { user } = useSession()
+  const quickLinks = [
+    navigation.find((item) => item.href === "/dashboard")!,
+    navigation.find((item) => item.href === "/dashboard/videos")!,
+    navigation.find((item) => item.href === "/dashboard/me")!,
+  ]
   return (
     <>
       <nav aria-label="Quick navigation" className="mobile-dock">
         {quickLinks.map(({ href, short, icon: Icon }) => (
           <a
             key={href}
-            href={href}
+            href={
+              href === "/dashboard/me" && !user
+                ? "/api/auth/telegram/start"
+                : href
+            }
             aria-current={current === href ? "page" : undefined}
           >
             <Icon aria-hidden="true" />
@@ -153,27 +172,24 @@ export function AppSidebar() {
               </SheetDescription>
             </SheetHeader>
             <nav aria-label="Main navigation" className="sheet-navigation">
-              {navigation.map(({ href, label, description, icon: Icon }) => (
-                <a
-                  key={href}
-                  href={href}
-                  aria-current={current === href ? "page" : undefined}
-                  aria-label={label}
-                  onClick={async (event) => {
-                    setOpenMobile(false)
-                    if (href !== "/dashboard/jobs") return
-                    event.preventDefault()
-                    if (await requireAdmin()) window.location.assign(href)
-                  }}
-                >
-                  <Icon aria-hidden="true" />
-                  <span>
-                    <strong>{label}</strong>
-                    <small>{description}</small>
-                  </span>
-                  <ArrowUpRightIcon aria-hidden="true" />
-                </a>
-              ))}
+              {visibleNavigation.map(
+                ({ href, label, description, icon: Icon }) => (
+                  <a
+                    key={href}
+                    href={href}
+                    aria-current={current === href ? "page" : undefined}
+                    aria-label={label}
+                    onClick={() => setOpenMobile(false)}
+                  >
+                    <Icon aria-hidden="true" />
+                    <span>
+                      <strong>{label}</strong>
+                      <small>{description}</small>
+                    </span>
+                    <ArrowUpRightIcon aria-hidden="true" />
+                  </a>
+                )
+              )}
             </nav>
             <div className="sheet-workspace">
               <ActivityIcon aria-hidden="true" />

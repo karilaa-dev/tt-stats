@@ -34,9 +34,10 @@ describe("statistics validation", () => {
   })
 
   it("preserves signed and very large Telegram IDs as strings", () => {
-    expect(parseTelegramId("-1009223372036854775807")).toBe(
-      "-1009223372036854775807"
-    )
+    expect(parseTelegramId("-1009223372036854775807")).toBeNull()
+    expect(parseTelegramId("-9223372036854775808")).toBe("-9223372036854775808")
+    expect(parseTelegramId("0")).toBeNull()
+    expect(parseTelegramId("000123")).toBe("123")
     expect(parseTelegramId("9223372036854775807")).toBe("9223372036854775807")
     expect(parseTelegramId("12.5")).toBeNull()
     expect(parseTelegramId(" 12")).toBeNull()

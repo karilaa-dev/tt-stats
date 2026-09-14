@@ -30,10 +30,12 @@ export function parseSeriesMetric(value: unknown): SeriesMetric {
 }
 
 export function parseTelegramId(value: unknown): string | null {
-  if (typeof value !== "string" || !/^-?\d+$/u.test(value)) return null
+  if (typeof value !== "string" || !/^-?\d{1,19}$/u.test(value)) return null
   try {
-    BigInt(value)
-    return value
+    const id = BigInt(value)
+    if (id === 0n || id < -9223372036854775808n || id > 9223372036854775807n)
+      return null
+    return id.toString()
   } catch {
     return null
   }

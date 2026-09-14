@@ -1,400 +1,418 @@
+import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { actions } from "astro:actions"
+import { DownloadIcon, UserRoundIcon } from "lucide-react"
 import {
+  useDashboardContext,
   useDashboardSearch,
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
+import { requestWithCooldown } from "@/lib/http-client"
+import {
+  useSession,
+  TelegramLoginButton,
+} from "@/components/dashboard/session-access"
+import { useAdminAccess } from "@/components/dashboard/admin-access"
 import {
   DownloadDialog,
   type SelectedDownload,
 } from "@/components/dashboard/download-dialog"
-import { useEffect, useRef, useState } from "react"
-import { useAdminAccess } from "@/components/dashboard/admin-access"
-import { useQuery } from "@tanstack/react-query"
-import type { LucideIcon } from "lucide-react"
-import {
-  CalendarClockIcon,
-  DownloadIcon,
-  FileArchiveIcon,
-  ImagesIcon,
-  HistoryIcon,
-  LanguagesIcon,
-  LinkIcon,
-  UserIcon,
-  UserRoundSearchIcon,
-  UsersIcon,
-} from "lucide-react"
-
-import { LanguageValue } from "@/components/dashboard/language-value"
-import { PageHeading } from "@/components/dashboard/page-heading"
 import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
 import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { TimeSeriesChart } from "@/components/dashboard/time-series-chart"
+import { PageHeading } from "@/components/dashboard/page-heading"
 import {
   Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
+  CardDescription,
+  CardContent,
 } from "@/components/ui/card"
 import {
   Empty,
-  EmptyDescription,
   EmptyHeader,
-  EmptyMedia,
   EmptyTitle,
+  EmptyDescription,
+  EmptyMedia,
 } from "@/components/ui/empty"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Separator } from "@/components/ui/separator"
-import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
-import {
-  userDownloadsQueryOptions,
-  userStatsQueryOptions,
-} from "@/lib/stats/query-options"
-import type { UserStats } from "@/lib/stats/types"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Badge } from "@/components/ui/badge"
 import { parseTelegramId } from "@/lib/stats/validation"
+import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
+import type { HistoryFilters, UserStats } from "@/lib/stats/types"
 
-const DOWNLOADS_PAGE_SIZE = 8
-
-export function UsersPage() {
-  const [selection, setSelection] = useState<SelectedDownload | null>(null)
-  const { authenticated, ready, requireAdmin } = useAdminAccess()
-  const prompted = useRef(false)
-  const { id, page } = useDashboardSearch()
-  const navigate = useDashboardNavigate()
-  const requested = id.trim()
-  const userId = requested ? parseTelegramId(requested) : null
-  useEffect(() => {
-    if (userId && ready && !authenticated && !prompted.current) {
-      prompted.current = true
-      void requireAdmin()
+export function UsersPage({ own = false }: { own?: boolean }) {
+  const session = useSession()
+  const { authenticated } = useAdminAccess()
+  const { id } = useDashboardSearch()
+  const { search } = useDashboardContext()
+  const requested = own ? (session.user?.id ?? "") : id.trim()
+  const userId = parseTelegramId(requested)
+  if (own && !session.user) {
+    const login = new URLSearchParams(search).get("login")
+    const messages: Record<string, string> = {
+      cancelled:
+        "Login was cancelled. You can try again whenever you're ready.",
+      expired: "That login link expired. Start a new login below.",
+      failed: "Telegram login could not be verified. Please try again.",
+      unavailable:
+        "Telegram login is temporarily unavailable. Please try again later.",
     }
-  }, [userId, ready, authenticated, requireAdmin])
-  const userQuery = useQuery({
-    ...userStatsQueryOptions(userId ?? "0"),
-    enabled: authenticated && Boolean(userId),
-  })
-  const downloadsQuery = useQuery({
-    ...userDownloadsQueryOptions(userId ?? "0", page, DOWNLOADS_PAGE_SIZE),
-    enabled: authenticated && Boolean(userId),
-    placeholderData: (previousData, previousQuery) =>
-      previousQuery?.queryKey[2] === userId ? previousData : undefined,
-  })
-
+    return (
+      <>
+        <PageHeading
+          title="My videos"
+          description="Your downloads, all in one place."
+        />
+        <Card className="mx-auto w-full max-w-xl">
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <UserRoundIcon />
+              </EmptyMedia>
+              <EmptyTitle>See your download history</EmptyTitle>
+              <EmptyDescription>
+                Log in with Telegram to see your videos, activity, and the posts
+                you downloaded first. Your history is private.
+              </EmptyDescription>
+            </EmptyHeader>
+            {login && messages[login] ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                {messages[login]}
+              </p>
+            ) : null}
+            <TelegramLoginButton />
+          </Empty>
+        </Card>
+      </>
+    )
+  }
+  if (!own && !authenticated) return <p>Admin access required.</p>
   return (
     <>
-      <DownloadDialog
-        selection={selection}
-        onClose={() => setSelection(null)}
-      />
       <PageHeading
-        title="User lookup"
-        description="A closer look at the people and groups using your bot."
+        title={own ? "My videos" : "User lookup"}
+        description={
+          own
+            ? "Revisit your downloads and see what caught on."
+            : "Download history and statistics for a user or group."
+        }
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[19rem_minmax(0,1fr)] xl:gap-8">
-        <aside
-          className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-44"
-          aria-label="Lookup controls"
-        >
-          <UserLookupForm
-            initialId={requested}
-            searching={Boolean(userId) && userQuery.isFetching}
+      <div
+        className={
+          own
+            ? "flex flex-col gap-6"
+            : "grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]"
+        }
+      >
+        {!own ? (
+          <aside aria-label="Lookup controls">
+            <UserLookupForm initialId={requested} searching={false} />
+          </aside>
+        ) : null}
+        {userId ? (
+          <UserWorkspace
+            key={`${own}:${userId}:${session.admin}`}
+            userId={userId}
+            own={own}
           />
-          <div className="hidden flex-col gap-3 px-2 lg:flex">
-            <p className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-              About chat IDs
-            </p>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Use the numeric ID from your bot's records. Usernames, phone
-              numbers, and invite links can't be searched here.
-            </p>
-            <Separator />
-            <div className="flex items-start gap-3">
-              <UserIcon
-                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  Private users
-                </span>
-                <br />A positive number
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <UsersIcon
-                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                aria-hidden="true"
-              />
-              <p className="text-sm text-muted-foreground">
-                <span className="font-medium text-foreground">Groups</span>
-                <br />A number starting with a minus sign
-              </p>
-            </div>
-          </div>
-        </aside>
-        <section
-          className="flex min-w-0 flex-col gap-6"
-          aria-label="Chat results"
-          aria-busy={Boolean(userId) && userQuery.isPending}
-        >
-          {authenticated && userId ? (
-            <TelegramChatCard chatId={userId} />
-          ) : null}
-          {!requested ? (
-            <Card>
-              <Empty className="px-5 py-6 lg:min-h-80 lg:py-12">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <UserRoundSearchIcon />
-                  </EmptyMedia>
-                  <EmptyTitle>Enter an ID to begin</EmptyTitle>
-                  <EmptyDescription>
-                    Find a chat to see their profile and what they've
-                    downloaded.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-              <CardFooter className="hidden justify-center gap-6 lg:flex">
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <HistoryIcon className="size-4" aria-hidden="true" />
-                  Download history
-                </p>
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <DownloadIcon className="size-4" aria-hidden="true" />
-                  CSV export
-                </p>
-              </CardFooter>
-            </Card>
-          ) : !userId ? (
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>Invalid Telegram ID</EmptyTitle>
-                <EmptyDescription>
-                  Use a signed integer without spaces or decimals.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : !authenticated ? (
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>Admin access required</EmptyTitle>
-                <EmptyDescription>
-                  Enter the admin token to view this chat and its download
-                  history.
-                </EmptyDescription>
-              </EmptyHeader>
-              <Button disabled={!ready} onClick={() => void requireAdmin()}>
-                Enter admin token
-              </Button>
-            </Empty>
-          ) : userQuery.isPending ? (
-            <UserResultLoading />
-          ) : userQuery.isError ? (
-            <Alert variant="destructive">
-              <UserRoundSearchIcon />
-              <AlertTitle>Lookup failed</AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-3">
-                <p>
-                  The database could not complete this lookup. Try again in a
-                  moment.
-                </p>
-                <Button
-                  variant="outline"
-                  disabled={userQuery.isFetching}
-                  onClick={() => void userQuery.refetch()}
-                >
-                  {userQuery.isFetching ? "Retrying…" : "Retry lookup"}
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : !userQuery.data ? (
-            <Empty className="border">
-              <EmptyHeader>
-                <EmptyTitle>No saved chat records</EmptyTitle>
-                <EmptyDescription>
-                  No user or group is saved with ID {userId}. Check the ID and
-                  include the minus sign for a group.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <div className="flex flex-col gap-6">
-              <UserResult user={userQuery.data} />
-              {downloadsQuery.isError ? (
-                <Alert variant="destructive">
-                  <FileArchiveIcon />
-                  <AlertTitle>Download history unavailable</AlertTitle>
-                  <AlertDescription className="flex flex-col items-start gap-3">
-                    <p>
-                      The user was found, but their recent downloads could not
-                      be loaded.
-                    </p>
-                    <Button
-                      variant="outline"
-                      disabled={downloadsQuery.isFetching}
-                      onClick={() => void downloadsQuery.refetch()}
-                    >
-                      {downloadsQuery.isFetching
-                        ? "Retrying…"
-                        : "Retry history"}
-                    </Button>
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <UserDownloadsTable
-                  onView={setSelection}
-                  data={downloadsQuery.data}
-                  loading={downloadsQuery.isPending}
-                  refreshing={
-                    downloadsQuery.isFetching && !downloadsQuery.isPending
-                  }
-                  onPageChange={(nextPage) =>
-                    navigate({
-                      search: (previous) => ({ ...previous, page: nextPage }),
-                    })
-                  }
-                />
-              )}
-            </div>
-          )}
-        </section>
+        ) : (
+          <Empty className="border">
+            <EmptyHeader>
+              <EmptyTitle>
+                {requested ? "Invalid Telegram ID" : "Enter an ID to begin"}
+              </EmptyTitle>
+              <EmptyDescription>
+                Search for a user or group by their numeric Telegram ID.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        )}
       </div>
     </>
   )
 }
-
-function UserResult({ user }: { user: UserStats }) {
-  const group = user.userId.startsWith("-")
+function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
+  const session = useSession()
+  const { page, historyRange, mediaKind } = useDashboardSearch()
+  const navigate = useDashboardNavigate()
+  const [selection, setSelection] = useState<SelectedDownload | null>(null)
+  const filters: HistoryFilters = { range: historyRange, mediaKind }
+  const userQuery = useQuery({
+    queryKey: ["stats", own ? "me" : "user", userId],
+    queryFn: () =>
+      requestWithCooldown("read", () =>
+        own
+          ? actions.getMyStats.orThrow()
+          : actions.getUserStats.orThrow({ userId })
+      ),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: false,
+  })
+  const history = useQuery({
+    queryKey: [
+      "stats",
+      own ? "me" : "user",
+      userId,
+      "downloads",
+      page,
+      filters,
+    ],
+    queryFn: () =>
+      requestWithCooldown("read", () =>
+        own
+          ? actions.getMyDownloads.orThrow({ page, pageSize: 20, ...filters })
+          : actions.getUserDownloads.orThrow({
+              userId,
+              page,
+              pageSize: 20,
+              ...filters,
+            })
+      ),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    retry: false,
+    placeholderData: (previous) => previous,
+  })
+  const changeFilters = (next: Partial<HistoryFilters>) => {
+    setSelection(null)
+    void navigate({
+      search: { ...(!own ? { id: userId } : {}), ...filters, ...next, page: 1 },
+    })
+  }
+  const user = userQuery.data
+  return (
+    <section
+      className="flex min-w-0 flex-col gap-6"
+      aria-label={own ? "Your statistics" : "Chat results"}
+    >
+      <DownloadDialog
+        selection={selection}
+        onClose={() => setSelection(null)}
+      />
+      {!own ? (
+        <TelegramChatCard chatId={userId} />
+      ) : (
+        <div className="personal-profile">
+          <div>
+            <h2 className="font-heading text-xl font-semibold">
+              {session.user?.name}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {session.user?.username
+                ? `@${session.user.username}`
+                : "Your Telegram account"}
+            </p>
+          </div>
+          <Button variant="ghost" onClick={() => void session.logout()}>
+            Log out
+          </Button>
+        </div>
+      )}
+      {userQuery.isPending ? (
+        <Skeleton
+          className="h-32 w-full"
+          aria-label="Loading user statistics"
+        />
+      ) : userQuery.isError ? (
+        <QueryError
+          title="Statistics unavailable"
+          error={userQuery.error}
+          retry={() => void userQuery.refetch()}
+        />
+      ) : user ? (
+        <UserSummary user={user} />
+      ) : (
+        <Alert>
+          <AlertTitle>
+            {own ? "Your first download starts here" : "User not found"}
+          </AlertTitle>
+          <AlertDescription>
+            {own
+              ? "Download a video using the bot, then refresh this page. Group downloads are recorded separately."
+              : "There are no saved bot records for this ID."}
+          </AlertDescription>
+        </Alert>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-3">
+          <ToggleGroup
+            aria-label="History period"
+            value={[filters.range]}
+            onValueChange={(value) => {
+              if (value[0])
+                changeFilters({ range: value[0] as HistoryFilters["range"] })
+            }}
+            variant="outline"
+            size="sm"
+          >
+            {[
+              ["24h", "24 hours"],
+              ["7d", "7 days"],
+              ["31d", "31 days"],
+              ["all", "All time"],
+            ].map(([value, label]) => (
+              <ToggleGroupItem key={value} value={value}>
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          <ToggleGroup
+            aria-label="Media type"
+            value={[mediaKind]}
+            onValueChange={(value) => {
+              if (value[0])
+                changeFilters({
+                  mediaKind: value[0] as HistoryFilters["mediaKind"],
+                })
+            }}
+            variant="outline"
+            size="sm"
+          >
+            {[
+              ["all", "All media"],
+              ["video", "Videos"],
+              ["images", "Albums"],
+            ].map(([value, label]) => (
+              <ToggleGroupItem key={value} value={value}>
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </div>
+        {user ? (
+          <a
+            className={buttonVariants({ variant: "outline" })}
+            href={
+              own
+                ? "/api/me/history.csv"
+                : `/api/users/${encodeURIComponent(userId)}/history.csv`
+            }
+          >
+            <DownloadIcon data-icon="inline-start" />
+            Export full history
+          </a>
+        ) : null}
+      </div>
+      {history.isError ? (
+        <QueryError
+          title="Download history unavailable"
+          error={history.error}
+          retry={() => void history.refetch()}
+        />
+      ) : (
+        <UserDownloadsTable
+          own={own}
+          admin={session.admin}
+          data={history.data}
+          loading={history.isPending}
+          refreshing={history.isFetching && !history.isPending}
+          onView={setSelection}
+          onPageChange={(nextPage) => {
+            setSelection(null)
+            void navigate({
+              search: {
+                ...(!own ? { id: userId } : {}),
+                ...filters,
+                page: nextPage,
+              },
+            })
+          }}
+        />
+      )}
+      {user?.activity ? (
+        <TimeSeriesChart
+          title="Download activity"
+          description="Daily downloads over the last 31 days, including today. Days are grouped in UTC."
+          points={user.activity}
+          range="31d"
+          intervalDescription="Daily intervals, including today"
+        />
+      ) : null}
+    </section>
+  )
+}
+function UserSummary({ user }: { user: UserStats }) {
   const time = useBrowserTime()
+  const timestamp = (value: number | null | undefined) =>
+    value == null ? "Not recorded" : formatTimestamp(value, time)
   return (
     <Card>
-      <CardHeader className="gap-y-2">
-        <CardTitle>
-          <span className="flex items-center gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              {group ? (
-                <UsersIcon className="size-5" aria-hidden="true" />
-              ) : (
-                <UserIcon className="size-5" aria-hidden="true" />
-              )}
-            </span>
-            <span className="flex min-w-0 flex-col gap-1">
-              <span>{group ? "Group" : "Private user"}</span>
-              <span className="font-mono text-sm font-normal break-all text-muted-foreground">
-                {user.userId}
-              </span>
-            </span>
-          </span>
-        </CardTitle>
-        <CardDescription>Saved bot records</CardDescription>
-        <CardAction>
-          <Badge variant="secondary">Chat activity</Badge>
-        </CardAction>
+      <CardHeader>
+        <CardTitle>Download statistics</CardTitle>
+        <CardDescription>
+          All recorded activity for this account.
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <dl className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-muted/60 p-4">
-            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
-              <DownloadIcon className="size-4" aria-hidden="true" />
-              Downloads
-            </dt>
-            <dd className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">
-              {BigInt(user.downloads).toLocaleString("en-US")}
-            </dd>
-          </div>
-          <div className="rounded-2xl bg-muted/60 p-4">
-            <dt className="flex items-center gap-2 text-sm text-muted-foreground">
-              <ImagesIcon className="size-4" aria-hidden="true" />
-              Image albums
-            </dt>
-            <dd className="mt-2 font-heading text-3xl font-semibold tracking-tight tabular-nums">
-              {BigInt(user.images).toLocaleString("en-US")}
-            </dd>
-          </div>
+        <dl className="personal-metrics">
+          {[
+            ["Downloads", user.downloads],
+            [
+              "Videos",
+              (BigInt(user.downloads) - BigInt(user.images)).toString(),
+            ],
+            ["Image albums", user.images],
+            ["Unique videos", user.uniqueVideos ?? "0"],
+          ].map(([label, count]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{BigInt(count).toLocaleString("en-US")}</dd>
+            </div>
+          ))}
         </dl>
-        <Separator />
-        <dl className="grid grid-cols-2 gap-5 xl:grid-cols-4">
-          <Detail
-            icon={CalendarClockIcon}
-            label="Registered"
-            value={
-              user.registeredAt === null
-                ? "Unknown"
-                : formatTimestamp(user.registeredAt, time)
-            }
-          />
-          <Detail
-            icon={LanguagesIcon}
-            label="Language"
-            value={<LanguageValue value={user.language} />}
-          />
-          <Detail
-            icon={LinkIcon}
-            label="Referral"
-            value={user.referral ?? "None"}
-          />
-          <Detail
-            icon={FileArchiveIcon}
-            label="File mode"
-            value={
-              <Badge variant={user.fileMode ? "default" : "secondary"}>
-                {user.fileMode ? "Enabled" : "Disabled"}
+        <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["First download", timestamp(user.firstDownloadAt)],
+            ["Latest download", timestamp(user.latestDownloadAt)],
+            ["Joined", timestamp(user.registeredAt)],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="mt-1 font-medium">{value}</dd>
+            </div>
+          ))}
+          <div>
+            <dt className="text-muted-foreground">Preferences</dt>
+            <dd className="mt-1 flex flex-wrap gap-2">
+              <Badge variant="secondary">{user.language.toUpperCase()}</Badge>
+              <Badge variant="outline">
+                {user.fileMode ? "Send as file" : "Send as media"}
               </Badge>
-            }
-          />
+            </dd>
+          </div>
         </dl>
       </CardContent>
-      <CardFooter className="justify-between gap-3">
-        <p className="hidden text-xs text-muted-foreground sm:block">
-          Export this chat's full download history.
-        </p>
-        <a
-          href={`/api/users/${encodeURIComponent(user.userId)}/history.csv`}
-          className={buttonVariants({ variant: "outline", size: "lg" })}
-        >
-          <DownloadIcon data-icon="inline-start" /> Download CSV history
-        </a>
-      </CardFooter>
     </Card>
   )
 }
-
-function Detail({
-  icon: Icon,
-  label,
-  value,
+function QueryError({
+  title,
+  error,
+  retry,
 }: {
-  icon: LucideIcon
-  label: string
-  value: React.ReactNode
+  title: string
+  error: Error
+  retry: () => void
 }) {
   return (
-    <div>
-      <dt className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-        <Icon className="size-3.5" aria-hidden="true" />
-        {label}
-      </dt>
-      <dd className="mt-1.5 text-sm font-medium break-words">{value}</dd>
-    </div>
-  )
-}
-
-function UserResultLoading() {
-  return (
-    <Card aria-label="Loading user">
-      <CardHeader>
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-4 w-28" />
-      </CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} className="h-16 w-full" />
-        ))}
-      </CardContent>
-    </Card>
+    <Alert variant="destructive">
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>
+        <p>
+          {"code" in error && error.code === "TOO_MANY_REQUESTS"
+            ? error.message
+            : "Please try again in a moment."}
+        </p>
+        <Button variant="outline" onClick={retry}>
+          Try again
+        </Button>
+      </AlertDescription>
+    </Alert>
   )
 }

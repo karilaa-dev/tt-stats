@@ -1,26 +1,34 @@
 import { expect, test } from "@playwright/test"
-
 const token = "test-admin-secret-with-at-least-32-characters"
 
-test("public stats and MAU load, Operations prompts before navigation", async ({
+test("login is visible and admin menus are hidden until visiting /admin", async ({
   page,
   isMobile,
 }) => {
   await page.goto("/dashboard")
+  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  await expect(page.locator(".telegram-login")).toBeInViewport()
+  await expect(page.locator(".telegram-login")).toHaveText("My profile")
   await expect(
-    page.getByText("Registered chats", { exact: true }).first()
-  ).toBeVisible()
-  await expect(page.getByText("Telegram MAU", { exact: false })).toBeVisible()
-  await expect(page.getByText("28,430", { exact: true })).toBeVisible()
-  if (isMobile)
-    await page.getByRole("button", { name: "Open all sections" }).click()
-  await page
-    .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("link", { name: "Operations", exact: true })
-    .click()
-  const dialog = page.getByRole("dialog", { name: "Admin access", exact: true })
-  await expect(dialog).toBeVisible()
-  await expect(page).not.toHaveURL(/\/jobs/)
+    page.getByRole("link", { name: "Operations", exact: true })
+  ).toHaveCount(0)
+  await expect(
+    page.getByRole("link", { name: "User lookup", exact: true })
+  ).toHaveCount(0)
+  if (isMobile) {
+    const dock = page.getByRole("navigation", { name: "Quick navigation" })
+    await expect(
+      dock.getByRole("link", { name: "My profile", exact: true })
+    ).toBeInViewport()
+    await expect(
+      dock.getByRole("link", { name: "Videos", exact: true })
+    ).toBeInViewport()
+    await dock.getByRole("button", { name: "Open all sections" }).click()
+    await expect(
+      page.getByRole("link", { name: "Operations", exact: true })
+    ).toHaveCount(0)
+  }
+  await page.goto("/admin")
   await page.getByLabel("Admin token", { exact: true }).fill("wrong-token")
   await page
     .getByRole("button", { name: "Unlock admin access", exact: true })
@@ -37,60 +45,30 @@ test("public stats and MAU load, Operations prompts before navigation", async ({
   await page
     .getByRole("button", { name: "Lock admin access", exact: true })
     .click()
-  await expect(
-    page.getByText("Controls disabled in fake-data mode")
-  ).toBeHidden()
+  await expect(page).toHaveURL(/\/admin/)
+  await expect(page.getByLabel("Admin token", { exact: true })).toBeVisible()
 })
 
-test("search asks for a token without querying user data beforehand", async ({
+test("private page deep links redirect to /admin before querying private data", async ({
   page,
 }) => {
   const privateRequests: string[] = []
   page.on("request", (request) => {
     if (
-      /\/_actions\/(getUser(Stats|Downloads)|getTelegramChat)/u.test(
-        request.url()
-      )
+      /\/_actions\/(getUser|getStatsJobs|getTelegramChat)/u.test(request.url())
     )
       privateRequests.push(request.url())
   })
-  await page.goto("/dashboard/users")
-  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
-  await page
-    .getByRole("textbox", { name: "Telegram user or group ID" })
-    .fill("123456789")
-  await page.getByRole("button", { name: "Search", exact: true }).click()
-  await expect(
-    page.getByRole("dialog", { name: "Admin access", exact: true })
-  ).toBeVisible()
-  expect(privateRequests).toEqual([])
-  await page.getByRole("button", { name: "Cancel", exact: true }).click()
-  await expect(page.getByText("Saved bot records")).toBeHidden()
-  await page.getByRole("button", { name: "Search", exact: true }).click()
-  await page.getByLabel("Admin token", { exact: true }).fill(token)
-  await page
-    .getByRole("button", { name: "Unlock admin access", exact: true })
-    .click()
-  await expect(page.getByText("Saved bot records")).toBeVisible()
-  expect(privateRequests.length).toBeGreaterThan(0)
-  await page.reload()
-  await expect(page.getByText("Saved bot records")).toBeVisible()
-})
-
-test("deep links prompt and hide private content", async ({ page }) => {
-  for (const route of ["jobs", "users?id=123456789"]) {
-    await page.goto(`/dashboard/${route}`)
-    await expect(
-      page.getByRole("dialog", { name: "Admin access", exact: true })
-    ).toBeVisible()
-    await expect(page.getByText("Saved bot records")).toBeHidden()
-    await expect(
-      page.getByText("Controls disabled in fake-data mode")
-    ).toBeHidden()
+  for (const path of ["/dashboard/users?id=123456789", "/dashboard/jobs"]) {
+    await page.goto(path)
+    await expect(page).toHaveURL(/\/admin$/)
+    await expect(page.getByLabel("Admin token", { exact: true })).toBeVisible()
+    await expect(page.getByText("Download statistics")).toHaveCount(0)
   }
+  expect(privateRequests).toEqual([])
 })
 
-test("server denies every private action and CSV without a session", async ({
+test("server denies private actions and exports without the correct session", async ({
   request,
   baseURL,
 }) => {
@@ -98,7 +76,6 @@ test("server denies every private action and CSV without a session", async ({
     "getTelegramChat",
     "getUserStats",
     "getUserDownloads",
-    "getDownloadMedia",
     "getDownloaders",
     "getStatsJobs",
     "getDatabaseSetupStatus",
@@ -111,6 +88,8 @@ test("server denies every private action and CSV without a session", async ({
     "getManualRefreshRequest",
     "getVideoNotificationStatus",
     "sendVideoNotificationTest",
+    "getMyStats",
+    "getMyDownloads",
   ]) {
     const response = await request.post(`/_actions/${action}`, {
       data: {},
@@ -118,22 +97,25 @@ test("server denies every private action and CSV without a session", async ({
     })
     expect(response.status(), action).toBe(401)
   }
-  expect((await request.get("/api/users/123456789/history.csv")).status()).toBe(
-    401
-  )
-  expect(
-    (
-      await request.post("/_actions/getOverview", {
-        headers: { origin: baseURL! },
-      })
-    ).status()
-  ).toBe(200)
-  expect((await request.get("/api/media/100/0")).status()).toBe(401)
-  const wrong = await request.post("/api/admin-session", {
-    data: { token: "wrong" },
+  for (const route of [
+    "/api/users/123456789/history.csv",
+    "/api/me/history.csv",
+  ])
+    expect((await request.get(route)).status()).toBe(401)
+  const popular = await request.post("/_actions/getDownloadMedia", {
+    data: { downloadId: "10000" },
     headers: { origin: baseURL! },
   })
-  expect(wrong.status()).toBe(401)
+  expect(popular.status()).toBe(200)
+  const privateMedia = await request.post("/_actions/getDownloadMedia", {
+    data: { downloadId: "1" },
+    headers: { origin: baseURL! },
+  })
+  expect(privateMedia.status()).toBe(404)
+  const publicAudience = await request.post("/_actions/getOtherStats", {
+    headers: { origin: baseURL! },
+  })
+  expect(await publicAudience.text()).not.toContain("9007199254740993")
   const login = await request.post("/api/admin-session", {
     data: { token },
     headers: { origin: baseURL! },
@@ -145,18 +127,8 @@ test("server denies every private action and CSV without a session", async ({
   expect((await request.get("/api/users/123456789/history.csv")).status()).toBe(
     200
   )
-  const write = await request.post("/_actions/requestStatsJobRun", {
-    data: { dataset: "rolling_24h" },
-    headers: { origin: baseURL! },
-  })
-  expect(await write.text()).toContain("disabled while fake data is active")
-  expect(
-    (
-      await request.post("/_actions/startBotstat", {
-        headers: { origin: baseURL! },
-      })
-    ).status()
-  ).toBe(404)
+  // Admin access does not invent a Telegram identity.
+  expect((await request.get("/api/me/history.csv")).status()).toBe(401)
   expect(
     (
       await request.delete("/api/admin-session", {
@@ -168,4 +140,24 @@ test("server denies every private action and CSV without a session", async ({
   expect((await request.get("/api/users/123456789/history.csv")).status()).toBe(
     401
   )
+})
+
+test("personal page explains login and cancelled or expired attempts", async ({
+  page,
+}) => {
+  for (const [status, message] of [
+    ["cancelled", "Login was cancelled"],
+    ["expired", "That login link expired"],
+    ["unavailable", "Telegram login is temporarily unavailable"],
+  ]) {
+    await page.goto(`/dashboard/me?login=${status}`)
+    await expect(
+      page.getByRole("heading", { name: "My videos", exact: true })
+    ).toBeVisible()
+    await expect(page.getByRole("status")).toContainText(message)
+    await expect(page.locator(".telegram-login").first()).toBeInViewport()
+    await expect(
+      page.getByRole("link", { name: "Operations", exact: true })
+    ).toHaveCount(0)
+  }
 })

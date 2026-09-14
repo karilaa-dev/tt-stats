@@ -5,9 +5,9 @@ An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/t
 The normal statistics read path is read-only. Guided setup can use the same
 non-superuser `DB_URL` for the fixed TT Stats schema and schedules after an
 explicit confirmation. Narrow `SECURITY DEFINER` functions let authenticated
-operators manage only the two fixed TT Stats `pg_cron` jobs. Aggregate statistics
-are public. A shared admin token protects Operations, individual user lookups,
-download history, and CSV exports.
+operators manage only the two fixed TT Stats `pg_cron` jobs. Aggregate statistics and ranked-video previews are public. Telegram OAuth gives
+users access to their own statistics, history, media, and CSV exports. A shared
+admin token at `/admin` protects Operations and lookup of other accounts.
 
 ## Stack
 
@@ -95,7 +95,7 @@ is never sent to the browser.
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
 tables every minute or every 15 minutes, depending on the dataset, while keeping
-the previous result visible. Admin-only user lookup, paginated history, and CSV
+the previous result visible. Personal and admin user lookup, paginated history, and CSV
 export remain live operations.
 
 The rolling charts use 48 completed 30-minute buckets. All-time snapshots keep
@@ -210,6 +210,12 @@ bun run dev
 
 Open <http://localhost:3000>. To run the interface without PostgreSQL in development, set `TT_STATS_FAKE_DATA=true`; example lookup IDs are `123456789`, `-1009876543210`, and `9007199254740993`.
 
+`bun run dev` stays in the foreground and prints startup and request logs,
+including in agent terminals. The script sets `ASTRO_DEV_BACKGROUND=1` to prevent
+Astro 7 from spawning another background process. Host and port flags still work:
+`bun run dev --host 0.0.0.0 --port 3001`. Use the URL printed at startup; Astro
+selects another port if the requested one is occupied. Stop the server with Ctrl+C.
+
 All scripts explicitly use Bun as their runtime. Astro retains its Vite pipeline and `@astrojs/node` adapter, whose standalone output runs on Bun. The notification monitor uses `Bun.build`. PostgreSQL pooling, LISTEN/NOTIFY, and cursor-based CSV streaming retain `pg` and `pg-query-stream`.
 
 The test suite runs Vitest on Bun to preserve per-file jsdom environments, hoisted mocks, and asynchronous fake timers. Use `bun run test`, which invokes the configured suite, rather than Bun's separate `bun test` runner.
@@ -240,8 +246,10 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard` — private-user and group overview
 - `/dashboard/analytics` — registration, video, and music time series
 - `/dashboard/detailed` — linkable scope and range filters
-- `/dashboard/users` — responsive user/group lookup, paginated recent downloads, and streaming CSV history
-- `/dashboard/videos` — public most-downloaded videos by period, with download counts and unique chats
+- `/dashboard/me` — Telegram login, personal statistics, filtered history, and CSV export
+- `/admin` — the only admin login screen
+- `/dashboard/users` — admin-only user/group lookup, filtered history, and CSV export
+- `/dashboard/videos` — public most-downloaded videos by period, ranked by unique chats with public media previews
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, and top downloaders
 - `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
@@ -249,11 +257,100 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 
 The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"unavailable"}` with HTTP 503.
 
-## Admin access
+## Login and access
 
-Set `ADMIN_TOKEN` to a random secret of at least 32 characters, for example with `openssl rand -hex 32`. Visitors can view aggregate statistics without signing in. Opening Operations or submitting a user search prompts for the token. Successful entry creates an eight-hour signed, HttpOnly, SameSite=Strict cookie, marked Secure on HTTPS. The token is never stored in browser storage or URLs. Use **Lock admin access** to end the browser session; changing `ADMIN_TOKEN` invalidates all sessions.
+Configure `TELEGRAM_OAUTH_CLIENT_ID` and `TELEGRAM_OAUTH_CLIENT_SECRET` from
+**Login Widget** in your bot's @BotFather settings. Use Telegram's default RS256
+signing algorithm. Register the website origin and the exact callback URL:
 
-Server middleware protects all actions except the explicit public statistics allowlist, and protects `/api/users/*` exports. A missing or short token leaves admin access locked while public statistics remain available. Keep origin checking enabled and forward the original host/protocol through the reverse proxy. Remove any blanket proxy login requirement if statistics should be publicly viewable.
+```text
+https://tt-stats.karilaa.dev/api/auth/telegram/callback
+```
+
+`APP_ORIGIN` defaults to `https://tt-stats.karilaa.dev`. Set it consistently when
+building and running a deployment on another domain. Local OAuth development
+may use an explicitly registered localhost HTTP callback; production requires
+HTTPS. The build needs no OAuth secret. Missing configuration leaves public
+statistics usable and shows a login-unavailable message.
+
+The server uses authorization code flow, PKCE S256, single-use state and nonce,
+and signature-verified ID tokens. Only `openid profile` is requested. The
+verified Telegram `id` claim selects bot records; the OIDC `sub` is not a bot
+user ID. Tokens and client secrets are never returned to the browser.
+
+Telegram sessions last seven days in RAM and use opaque HttpOnly cookies.
+Logout revokes the current session. Login transactions expire after ten minutes.
+A restart ends all Telegram sessions and clears rate limits. Run one app process
+and one replica; these stores are intentionally not shared across instances.
+There are no session or rate-limit database tables and no Redis requirement.
+
+Users can read only their own account's records. Group records belong to the
+group ID and cannot be attributed to individual members from this schema.
+Public media is limited to representative download IDs in the published Top
+videos snapshots. Private media requires ownership or admin access. All files
+continue through the server proxy; the Telegram Bot API 20 MB limit remains.
+
+Set `ADMIN_TOKEN` to a random value of at least 32 characters. Admin login is
+available only at `/admin`; protected page links redirect there. The existing
+eight-hour signed admin session is separate from Telegram login. An admin token
+does not create a Telegram identity. Admin-only menus, downloader identities,
+and operational diagnostics are hidden from other visitors.
+
+## Rate limits and production security
+
+Rate limits apply to verified Telegram account IDs across all their sessions.
+Anonymous traffic and login attempts use the trusted client IP. Verified admins
+are exempt from usage limits. A login attempt without admin authentication is
+still limited. Static assets and the detail-free health endpoint are excluded.
+
+| Class | Replenishment | Burst |
+| --- | --- | --- |
+| Dynamic pages and data | 120/minute | 60 |
+| Media metadata | 60/minute | 20 |
+| Media streams and ranges | 240/minute | 60 |
+| CSV exports | 5/10 minutes | 2 |
+| Login attempts | 10/10 minutes | 5 |
+
+Use the `RATE_LIMIT_<CLASS>_COUNT` and `RATE_LIMIT_<CLASS>_BURST` overrides in
+`.env.example`. Four media streams may be active per non-admin identity.
+Completion, disconnect, cancellation, and stream failure release their slots.
+HTTP 429 includes `Retry-After`; browser data requests respect the cooldown.
+Bounded stores reject excess entries instead of evicting blocked identities.
+
+The trusted proxy is part of the security boundary. Dokploy/Traefik must discard
+client-supplied forwarding headers and supply the real client IP in
+`X-Forwarded-For`. Only trust configured upstream proxy addresses. The backend
+port must be reachable only by this proxy, never directly from the internet.
+Astro's hostname allowlist is not a substitute for this network restriction.
+
+Serve only `dist/client` as public static assets. Never mount the repository,
+`dist/server`, environment files, or dependency directories in a public file
+server. The app blocks sensitive paths and source maps, enforces a 16 KB body
+limit, rejects cross-origin mutations, and disables shared caching of private
+responses. Production CSP hashes Astro scripts and the theme initializer;
+inline styles remain permitted for the component and chart libraries.
+
+## Deploying the new rankings
+
+The unique-chat ranking is schema version 7. Install the updated definitions
+through Operations or the documented manual SQL procedure, and apply the new
+indexes from `database/002_stats_snapshot_indexes.sql` outside a transaction.
+Rebuild rolling and daily snapshots so all four ranking periods have
+`ranking_version = 2`. The app refuses to show old event-count rankings while
+that refresh is pending. Install and refresh before switching production traffic
+to the new build.
+
+The source bot tables are not rewritten. Added source indexes support identity,
+legacy-link, and first-download comparisons. Legacy links retain an exact text
+comparison alongside their hash index. Timestamp gaps produce an unknown first
+downloader rather than treating a cache miss as proof of being first.
+
+Validation includes `bun run lint`, `bun run typecheck`, `bun run test`,
+`bun run build`, `bun run test:browser`, and
+`bun scripts/check-production-proxy.mjs`. Database integration requires an
+explicit `TEST_DB_URL` whose database name includes `test`; the suite destroys
+only that disposable test schema. Browser tests include production CSP checks
+and therefore require a current build.
 
 ## Telegram chat details
 
@@ -289,16 +386,16 @@ endpoint; credentials and Telegram file URLs never reach the browser. Telegram's
 20 MB. Larger, expired, or unsupported files can still be opened at the original
 post.
 
-**Other downloaders** is available only on cache-hit history entries with a
-video identity. It lists other users and groups sharing that identity, including
-their cache hits and misses, and links to their user lookup pages. The selected
-chat is excluded.
+**Other downloaders** is available only to admins. It lists other users and
+groups sharing a video identity and links to their user lookup pages. The
+selected chat is excluded. Personal history shows anonymous counts and a
+separate first-downloader badge regardless of cache status.
 
 **Top videos** at `/dashboard/videos` is public and shows up to 1,000 videos per
-period: 24 hours, 7 days, 31 days, and Total. Saved-media previews and individual
-user lookups still require admin access.
-Ranking counts include all video download events, including repeat downloads,
-with a separate unique-chat count. It excludes image albums.
+period: 24 hours, 7 days, 31 days, and Total. Published Top videos previews are
+public, other previews require ownership or admin access, and arbitrary user
+lookups require admin access. Ranking counts distinct chats, counting each group
+as one chat and excluding placeholder ID zero. It excludes image albums.
 Linked events are grouped by `video_details_id`; unlinked legacy events are
 grouped by exact shared URL and cannot be merged across URL aliases. This is a
 snapshot for each period. The 24-hour ranking updates every five minutes and
@@ -306,7 +403,7 @@ ends at the last completed half-hour. The 7- and 31-day rankings use complete UT
 days and refresh daily, together with Total. Records with missing timestamps
 appear only in Total. Page reads use the stored rank index; opening or paging
 this view does not scan download history. The background jobs calculate
-distinct-chat counts only for the top 1,000 and keep the previous snapshot
+distinct-chat counts across every candidate before selecting the top 1,000 and keep the previous snapshot
 readable until the new one commits.
 
 After upgrading, open Operations and use **Update database definitions**, which
@@ -330,7 +427,7 @@ References: [Telegram user fields](https://core.telegram.org/constructor/user), 
 
 Connect this repository as a Bun application. `bun run build` builds Astro and the notification monitor. `bun run start` starts the monitor and Astro's standalone server on Bun from `dist/server/entry.mjs`. Set `HOST=0.0.0.0` and the platform-provided `PORT`. Supply production secrets through the platform environment. Bun automatically loads `.env` files, including `.env.local`, so keep local secret files out of the deployment image.
 
-The Astro configuration trusts forwarded HTTPS requests for `tt-stats.karilaa.dev`. If the public hostname changes, update `site` and `security.allowedDomains` in `astro.config.mjs`. Keep origin checking enabled. `bun scripts/check-production-proxy.mjs` tests the built server with proxy headers and confirms that unrelated origins remain blocked.
+Set `APP_ORIGIN` to the public HTTPS origin at build time and runtime; it configures Astro's site and allowed proxy hostname as well as the OAuth callback. Keep origin checking enabled. `bun scripts/check-production-proxy.mjs` tests the built server with proxy headers and confirms that unrelated origins remain blocked.
 
 Railpack detects Bun from `packageManager` and `bun.lock`. Keep its generated install step: it copies the package manifest and lockfile before running `bun install --frozen-lockfile`, including the development dependencies needed by Astro. Replacing `steps.install.commands` also removes those copy commands and causes a missing `package.json` error. The checked-in `railpack.json` only sets the Bun start command. CI builds the deployment image with Railpack 0.15.4, matching Dokploy.
 

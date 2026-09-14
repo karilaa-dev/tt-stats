@@ -21,7 +21,6 @@ export interface PopularVideos {
   items: {
     downloadId: string
     sharedLink: string
-    downloads: string
     uniqueChats: string
   }[]
   page: number

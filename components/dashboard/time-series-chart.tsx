@@ -40,12 +40,14 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   points,
   range,
   color = "var(--chart-1)",
+  intervalDescription,
 }: {
   title: string
   description: string
   points: TimeSeriesPoint[]
   range: StatsRange
   color?: string
+  intervalDescription?: string
 }) {
   const [view, setView] = useState<"line" | "bars">("line")
   const time = useBrowserTime()
@@ -63,6 +65,7 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
     }
   }, [points])
   const resolution = useMemo(() => {
+    if (intervalDescription) return intervalDescription
     const fallback = range === "24h" ? 1800 : range === "7d" ? 3600 : 86_400
     const seconds =
       points.length > 1
@@ -74,7 +77,7 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
     return days === 1
       ? "Daily completed intervals"
       : `${days}-day grouped intervals`
-  }, [points, range])
+  }, [points, range, intervalDescription])
   const plotRef = useRef<HTMLDivElement>(null)
   const [visible, setVisible] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(true)

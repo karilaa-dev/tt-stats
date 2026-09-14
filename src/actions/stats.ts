@@ -1,3 +1,5 @@
+import { getPrincipal } from "@/lib/auth/session"
+import { parseTelegramId } from "@/lib/stats/validation"
 import { defineAction, ActionError } from "astro:actions"
 import { getSafeDatabaseError } from "@/lib/db/errors"
 import { z } from "zod"
@@ -47,8 +49,12 @@ const statsRange = z.enum(STATS_RANGES)
 const chatScope = z.enum(CHAT_SCOPES)
 const seriesMetric = z.enum(SERIES_METRICS)
 const statsDataset = z.enum(STATS_DATASETS)
-const telegramId = z.string().regex(/^-?\d+$/u)
-const positivePage = z.number().int().positive()
+const telegramId = z
+  .string()
+  .max(20)
+  .refine((value) => parseTelegramId(value) !== null)
+  .transform((value) => parseTelegramId(value)!)
+const positivePage = z.number().int().positive().max(1_000_000)
 const requestId = z.string().regex(/^\d+$/u)
 const cronSchedule = z
   .string()
@@ -146,9 +152,63 @@ export const getReferralStats = defineAction({
 })
 
 export const getOtherStats = defineAction({
-  handler: safeHandler(() =>
-    isFakeDataEnabled() ? getFakeOtherStats() : getOtherStatsRaw()
-  ),
+  handler: async (_input, context) => {
+    const data = await safeHandler(() =>
+      isFakeDataEnabled() ? getFakeOtherStats() : getOtherStatsRaw()
+    )(undefined)
+    return {
+      ...data,
+      topDownloaders: getPrincipal(context.cookies).admin
+        ? data.topDownloaders
+        : [],
+    }
+  },
+})
+
+const historyFilters = {
+  range: statsRange.default("all"),
+  mediaKind: z.enum(["all", "video", "images"]).default("all"),
+}
+export const getMyStats = defineAction({
+  handler: async (_input, context) => {
+    const user = getPrincipal(context.cookies).user
+    if (!user)
+      throw new ActionError({
+        code: "UNAUTHORIZED",
+        message: "Log in with Telegram to continue.",
+      })
+    return safeHandler(() =>
+      isFakeDataEnabled() ? getFakeUserStats(user.id) : getUserStatsRaw(user.id)
+    )(undefined)
+  },
+})
+export const getMyDownloads = defineAction({
+  input: z
+    .object({
+      page: positivePage,
+      pageSize: positivePage.max(50),
+      ...historyFilters,
+    })
+    .strict(),
+  handler: async (data, context) => {
+    const user = getPrincipal(context.cookies).user
+    if (!user)
+      throw new ActionError({
+        code: "UNAUTHORIZED",
+        message: "Log in with Telegram to continue.",
+      })
+    return safeHandler(() =>
+      isFakeDataEnabled()
+        ? getFakeUserDownloads(user.id, data.page, data.pageSize, data)
+        : getUserDownloadsRaw(
+            user.id,
+            data.page,
+            data.pageSize,
+            undefined,
+            data
+          )
+    )(undefined)
+  },
 })
 
 export const getUserStats = defineAction({
@@ -165,11 +225,18 @@ export const getUserDownloads = defineAction({
     userId: telegramId,
     page: positivePage,
     pageSize: positivePage.max(50),
+    ...historyFilters,
   }),
   handler: safeHandler((data) =>
     isFakeDataEnabled()
-      ? getFakeUserDownloads(data.userId, data.page, data.pageSize)
-      : getUserDownloadsRaw(data.userId, data.page, data.pageSize)
+      ? getFakeUserDownloads(data.userId, data.page, data.pageSize, data)
+      : getUserDownloadsRaw(
+          data.userId,
+          data.page,
+          data.pageSize,
+          undefined,
+          data
+        )
   ),
 })
 

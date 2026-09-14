@@ -86,6 +86,15 @@ export interface UserStats {
   fileMode: boolean
   downloads: string
   images: string
+  uniqueVideos?: string
+  firstDownloadAt?: number | null
+  latestDownloadAt?: number | null
+  activity?: TimeSeriesPoint[]
+}
+
+export interface HistoryFilters {
+  range: StatsRange
+  mediaKind: "all" | "video" | "images"
 }
 
 export interface UserDownload {
@@ -95,6 +104,8 @@ export interface UserDownload {
   mediaKind: "video" | "images"
   cacheHit: boolean
   videoDetailsId: string | null
+  otherUniqueChats?: string
+  isFirstDownloader?: boolean | null
 }
 
 export interface PaginatedUserDownloads {

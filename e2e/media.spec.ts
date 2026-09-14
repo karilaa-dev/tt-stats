@@ -13,15 +13,15 @@ test("history opens media and links cache-hit downloads to other chats", async (
   page,
 }) => {
   await page.goto("/dashboard/users?id=123456789")
-  const history = page.getByRole("table", {
+  const history = page.getByRole("list", {
     name: "Download history",
     exact: true,
   })
   await expect(history).toBeVisible()
-  const rows = history.getByRole("row")
+  const rows = history.getByRole("listitem")
   await expect(
-    rows.nth(1).getByRole("button", { name: "Other downloaders" })
-  ).toHaveCount(0)
+    rows.nth(0).getByRole("button", { name: "Other downloaders" })
+  ).toHaveCount(1)
   await history.getByRole("button", { name: "View media" }).first().click()
   const media = page.getByRole("dialog", { name: "Saved media" })
   await expect(
@@ -39,7 +39,7 @@ test("history opens media and links cache-hit downloads to other chats", async (
   await expect(others.getByRole("table")).toBeVisible()
   await others.getByRole("link", { name: "9007199254740993" }).click()
   await expect(page).toHaveURL(/id=9007199254740993/)
-  await expect(page.getByText("Saved bot records")).toBeVisible()
+  await expect(page.getByText("Download statistics")).toBeVisible()
 })
 
 test("top videos show ranked counts and preserve page navigation", async ({
@@ -48,9 +48,9 @@ test("top videos show ranked counts and preserve page navigation", async ({
   await page.goto("/dashboard/videos?range=all")
   const table = page.getByRole("table", { name: "Most downloaded videos" })
   await expect(table).toBeVisible()
-  await expect(table.getByRole("row").nth(1)).toContainText("120")
+  await expect(table.getByRole("row").nth(1)).toContainText("60")
   await expect(
-    table.getByRole("columnheader", { name: "Unique chats" })
+    table.getByRole("columnheader", { name: "People downloaded" })
   ).toBeVisible()
   await table.getByRole("button", { name: "View media" }).first().click()
   await expect(page.getByRole("dialog", { name: "Saved media" })).toBeVisible()

@@ -4,6 +4,7 @@ import type { Pool, QueryResult, QueryResultRow } from "pg"
 
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import type {
+  HistoryFilters,
   ChatScope,
   OtherStats,
   OverviewStats,
@@ -224,25 +225,44 @@ export async function getUserStatsRaw(
 ): Promise<UserStats | null> {
   const result = await safeQuery<{
     user_id: string
-    registered_at: string | number | null
+    registered_at: string | null
     lang: string
     link: string | null
     file_mode: boolean
     downloads: string
     images: string
+    unique_videos: string
+    first_download_at: string | null
+    latest_download_at: string | null
   }>(
     pool,
     `SELECT u.user_id::text, u.registered_at, u.lang, u.link, u.file_mode,
-            COUNT(v.pk_id)::text AS downloads,
-            COUNT(v.pk_id) FILTER (WHERE v.media_kind = 'images')::text AS images
-     FROM public.users u
-     LEFT JOIN public.videos v ON v.user_id = u.user_id
-     WHERE u.user_id = $1::bigint
-     GROUP BY u.user_id, u.registered_at, u.lang, u.link, u.file_mode`,
+      count(v.pk_id)::text AS downloads,
+      count(v.pk_id) FILTER (WHERE v.media_kind = 'images')::text AS images,
+      count(DISTINCT CASE WHEN v.video_details_id IS NOT NULL THEN 'id:' || v.video_details_id::text ELSE 'link:' || v.shared_link END)
+        FILTER (WHERE v.media_kind = 'video')::text AS unique_videos,
+      min(v.downloaded_at) FILTER (WHERE v.downloaded_at >= 946684800 AND v.downloaded_at <= extract(epoch FROM now()))::text AS first_download_at,
+      max(v.downloaded_at) FILTER (WHERE v.downloaded_at >= 946684800 AND v.downloaded_at <= extract(epoch FROM now()))::text AS latest_download_at
+    FROM public.users u LEFT JOIN public.videos v ON v.user_id = u.user_id
+    WHERE u.user_id = $1::bigint GROUP BY u.user_id`,
     [userId]
   )
   const row = result.rows[0]
   if (!row) return null
+  const activity = await safeQuery<{ bucket: string; count: string }>(
+    pool,
+    `
+    WITH days AS (SELECT generate_series(
+      (floor(extract(epoch FROM now()) / 86400)::bigint - 30) * 86400,
+      floor(extract(epoch FROM now()) / 86400)::bigint * 86400, 86400) AS bucket),
+    counts AS (SELECT (downloaded_at / 86400) * 86400 AS bucket, count(*) AS count
+      FROM public.videos WHERE user_id = $1::bigint
+      AND downloaded_at >= (SELECT min(bucket) FROM days) AND downloaded_at <= extract(epoch FROM now())
+      GROUP BY 1)
+    SELECT days.bucket::text, coalesce(counts.count, 0)::text AS count
+    FROM days LEFT JOIN counts USING (bucket) ORDER BY days.bucket`,
+    [userId]
+  )
   return {
     userId: row.user_id,
     registeredAt: row.registered_at === null ? null : Number(row.registered_at),
@@ -251,6 +271,15 @@ export async function getUserStatsRaw(
     fileMode: row.file_mode,
     downloads: row.downloads,
     images: row.images,
+    uniqueVideos: row.unique_videos,
+    firstDownloadAt:
+      row.first_download_at === null ? null : Number(row.first_download_at),
+    latestDownloadAt:
+      row.latest_download_at === null ? null : Number(row.latest_download_at),
+    activity: activity.rows.map((point) => ({
+      bucketEpoch: Number(point.bucket),
+      count: Number(point.count),
+    })),
   }
 }
 
@@ -258,31 +287,58 @@ export async function getUserDownloadsRaw(
   userId: string,
   requestedPage: number,
   pageSize: number,
-  pool: Pool = getPool()
+  pool: Pool = getPool(),
+  filters: HistoryFilters = { range: "all", mediaKind: "all" }
 ): Promise<PaginatedUserDownloads> {
+  const days = { "24h": 1, "7d": 7, "31d": 31, all: 0 }[filters.range]
+  const start = days ? Math.floor(Date.now() / 1000) - days * 86400 : null
+  const kind = filters.mediaKind === "all" ? null : filters.mediaKind
+  const predicate = `user_id = $1::bigint AND ($2::bigint IS NULL OR downloaded_at >= $2 AND downloaded_at <= extract(epoch FROM now())) AND ($3::text IS NULL OR media_kind = $3)`
   const countResult = await safeQuery<CountRow>(
     pool,
-    "SELECT COUNT(*)::text AS count FROM public.videos WHERE user_id = $1::bigint",
-    [userId]
+    `SELECT count(*)::text AS count FROM public.videos WHERE ${predicate}`,
+    [userId, start, kind]
   )
   const total = countResult.rows[0]?.count ?? "0"
   const totalPages = Math.ceil(Number(total) / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
   const result = await safeQuery<{
     id: string
-    downloaded_at: string | number | null
+    downloaded_at: string | null
     shared_link: string
     media_kind: "video" | "images"
     cache_hit: boolean
     video_details_id: string | null
+    other_chats: string
+    first_user: string | null
+    uncertain: boolean
   }>(
     pool,
-    `SELECT pk_id::text AS id, downloaded_at, shared_link, media_kind, cache_hit, video_details_id::text
-     FROM public.videos
-     WHERE user_id = $1::bigint
-     ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC
-     LIMIT $2 OFFSET $3`,
-    [userId, pageSize, (page - 1) * pageSize]
+    `WITH page AS (
+    SELECT * FROM public.videos WHERE ${predicate}
+    ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC LIMIT $4 OFFSET $5
+  ) SELECT page.pk_id::text AS id, page.downloaded_at, page.shared_link, page.media_kind,
+    page.cache_hit, page.video_details_id::text, comparison.other_chats, comparison.uncertain,
+    first_download.user_id::text AS first_user
+  FROM page
+  CROSS JOIN LATERAL (
+    SELECT count(DISTINCT matched.user_id) FILTER (WHERE matched.user_id <> $1::bigint)::text AS other_chats,
+      coalesce(bool_or(matched.downloaded_at IS NULL OR matched.downloaded_at < 946684800 OR matched.downloaded_at > extract(epoch FROM now())), true) AS uncertain
+    FROM (
+      SELECT user_id, downloaded_at FROM public.videos WHERE page.video_details_id IS NOT NULL AND video_details_id = page.video_details_id AND user_id <> 0
+      UNION ALL
+      SELECT user_id, downloaded_at FROM public.videos WHERE page.video_details_id IS NULL AND video_details_id IS NULL AND md5(shared_link) = md5(page.shared_link) AND shared_link = page.shared_link AND media_kind = page.media_kind AND user_id <> 0
+    ) matched
+  ) comparison
+  LEFT JOIN LATERAL (
+    SELECT user_id FROM (
+      SELECT user_id, downloaded_at, pk_id FROM public.videos WHERE page.video_details_id IS NOT NULL AND video_details_id = page.video_details_id AND user_id <> 0
+      UNION ALL
+      SELECT user_id, downloaded_at, pk_id FROM public.videos WHERE page.video_details_id IS NULL AND video_details_id IS NULL AND md5(shared_link) = md5(page.shared_link) AND shared_link = page.shared_link AND media_kind = page.media_kind AND user_id <> 0
+    ) matched ORDER BY downloaded_at ASC NULLS LAST, pk_id ASC LIMIT 1
+  ) first_download ON true
+  ORDER BY page.downloaded_at DESC NULLS LAST, page.pk_id DESC`,
+    [userId, start, kind, pageSize, (page - 1) * pageSize]
   )
   return {
     items: result.rows.map((row) => ({
@@ -293,6 +349,8 @@ export async function getUserDownloadsRaw(
       mediaKind: row.media_kind,
       cacheHit: row.cache_hit,
       videoDetailsId: row.video_details_id,
+      otherUniqueChats: row.other_chats,
+      isFirstDownloader: row.uncertain ? null : row.first_user === userId,
     })),
     page,
     pageSize,

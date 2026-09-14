@@ -1,3 +1,4 @@
+import { safeExternalUrl } from "@/lib/security/links"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
@@ -45,14 +46,14 @@ export function VideosPage() {
   const page = Math.min(requestedPage, 1_000_000)
   const time = useBrowserTime()
   const navigate = useDashboardNavigate()
-  const { authenticated, requireAdmin } = useAdminAccess()
+  const { authenticated } = useAdminAccess()
   const query = useQuery(popularVideosQueryOptions(page, range))
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
   return (
     <>
       <PageHeading
         title="Most downloaded videos"
-        description="Ranked by downloads in the selected period. Repeated downloads by the same chat count each time."
+        description="Ranked by people who downloaded each video. Each user or group counts once in the selected period."
       />
       <StatsFilters
         range={range}
@@ -71,9 +72,7 @@ export function VideosPage() {
         <CardHeader>
           <CardTitle>Top 1,000 videos</CardTitle>
           <CardDescription>
-            Includes cache hits and misses. Older records without a video
-            identity are grouped by their exact saved link. Image albums are
-            excluded.{" "}
+            Each user or group counts once. Image albums are excluded.{" "}
             {range === "24h"
               ? "24 hours through the last completed half-hour. Rankings update every five minutes."
               : range === "all"
@@ -124,8 +123,7 @@ export function VideosPage() {
                 <TableRow>
                   <TableHead>Rank</TableHead>
                   <TableHead>Video</TableHead>
-                  <TableHead>Downloads</TableHead>
-                  <TableHead>Unique chats</TableHead>
+                  <TableHead>People downloaded</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,7 +136,7 @@ export function VideosPage() {
                       <div className="flex flex-col items-start gap-2">
                         <a
                           className="block max-w-full truncate text-primary underline"
-                          href={item.sharedLink}
+                          href={safeExternalUrl(item.sharedLink)}
                           target="_blank"
                           rel="noreferrer"
                           title={item.sharedLink}
@@ -150,7 +148,6 @@ export function VideosPage() {
                           size="sm"
                           variant="outline"
                           onClick={async () => {
-                            if (!(await requireAdmin())) return
                             setSelection({
                               id: item.downloadId,
                               sharedLink: item.sharedLink,
@@ -161,9 +158,6 @@ export function VideosPage() {
                           View media
                         </Button>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {BigInt(item.downloads).toLocaleString("en-US")}
                     </TableCell>
                     <TableCell>
                       {BigInt(item.uniqueChats).toLocaleString("en-US")}

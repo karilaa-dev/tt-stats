@@ -1,3 +1,5 @@
+import { TelegramLoginButton } from "./session-access"
+import { useAdminAccess } from "./admin-access"
 import {
   useIsFetching,
   useMutation,
@@ -11,7 +13,6 @@ import {
   MoonIcon,
   RefreshCwIcon,
   SunIcon,
-  SearchIcon,
   CheckIcon,
   AudioLinesIcon,
 } from "lucide-react"
@@ -59,6 +60,7 @@ function isSnapshotQuery(query: { queryKey: readonly unknown[] }) {
 }
 
 export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
+  const { authenticated } = useAdminAccess()
   const hydrated = useHydrated()
   const queryClient = useQueryClient()
   const time = useBrowserTime()
@@ -122,8 +124,8 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
           {staleSnapshot ? (
             <Badge
               variant="destructive"
-              render={<a href="/dashboard/jobs" />}
-              title="Statistics are overdue for an update. Check database jobs."
+              render={authenticated ? <a href="/dashboard/jobs" /> : undefined}
+              title="Statistics are overdue for an update."
             >
               <span className="sm:hidden">Stale</span>
               <span className="hidden sm:inline">
@@ -132,16 +134,12 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
               </span>
             </Badge>
           ) : null}
-          {fakeMode ? <Badge variant="secondary">Demo data</Badge> : null}
-          <Button
-            variant="outline"
-            render={<a href="/dashboard/users" />}
-            nativeButton={false}
-            className="ml-2 hidden md:inline-flex"
-          >
-            <SearchIcon data-icon="inline-start" />
-            Find a user
-          </Button>
+          {fakeMode ? (
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              Demo data
+            </Badge>
+          ) : null}
+          <TelegramLoginButton compact />
           <Tooltip>
             <TooltipTrigger
               render={

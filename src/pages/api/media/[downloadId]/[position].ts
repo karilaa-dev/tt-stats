@@ -1,5 +1,11 @@
 import type { APIRoute } from "astro"
-import { ADMIN_COOKIE, verifyAdminSession } from "@/lib/admin/session"
+import { getPrincipal } from "@/lib/auth/session"
+import { canReadMedia } from "@/lib/media/access"
+import {
+  acquireStream,
+  principalKey,
+  trackStream,
+} from "@/lib/security/rate-limit"
 import { getStoredMedia } from "@/lib/media/queries"
 import {
   MediaError,
@@ -8,7 +14,20 @@ import {
 } from "@/lib/media/telegram"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 
-export const GET: APIRoute = async ({ params, request, cookies }) => {
+// Astro otherwise invokes GET for HEAD and discards its streaming body without
+// cancellation, leaving the upstream request and concurrency slot open.
+export const HEAD: APIRoute = () =>
+  new Response(null, {
+    status: 405,
+    headers: { Allow: "GET", "Cache-Control": "no-store" },
+  })
+
+export const GET: APIRoute = async ({
+  params,
+  request,
+  cookies,
+  clientAddress,
+}) => {
   const fail = (message: string, status: number) =>
     Response.json(
       { message },
@@ -17,8 +36,7 @@ export const GET: APIRoute = async ({ params, request, cookies }) => {
         headers: { "Cache-Control": "no-store" },
       }
     )
-  if (!verifyAdminSession(cookies.get(ADMIN_COOKIE)?.value))
-    return fail("Admin access required.", 401)
+  const principal = getPrincipal(cookies)
   const { downloadId = "", position = "" } = params
   if (
     !/^[1-9]\d{0,18}$/u.test(downloadId) ||
@@ -28,16 +46,39 @@ export const GET: APIRoute = async ({ params, request, cookies }) => {
     return fail("Invalid media request.", 400)
   if (isFakeDataEnabled())
     return fail("Saved media is unavailable in demo mode.", 404)
+  let release: (() => void) | undefined
   try {
+    if (!(await canReadMedia(principal, downloadId)))
+      return fail("Saved media is unavailable.", 404)
+    if (!principal.admin) {
+      release =
+        acquireStream(principalKey(principal, clientAddress)) ?? undefined
+      if (!release)
+        return Response.json(
+          { message: "Too many previews open. Close one and try again." },
+          {
+            status: 429,
+            headers: { "Retry-After": "2", "Cache-Control": "no-store" },
+          }
+        )
+    }
     const media = await getStoredMedia(downloadId)
     const reason = mediaUnavailableReason(media)
-    if (reason) return fail(reason, 404)
+    if (reason) {
+      release?.()
+      return fail(reason, 404)
+    }
     const file = media?.telegram_files?.find(
       (item) => item.position === Number(position)
     )
-    if (!file) return fail("Media item not found.", 404)
-    return await streamTelegramFile(file, request)
+    if (!file) {
+      release?.()
+      return fail("Media item not found.", 404)
+    }
+    const response = await streamTelegramFile(file, request)
+    return release ? trackStream(response, release, request.signal) : response
   } catch (error) {
+    release?.()
     return fail(
       error instanceof MediaError
         ? error.message

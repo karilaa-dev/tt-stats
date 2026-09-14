@@ -1,3 +1,4 @@
+import { useAdminAccess } from "./admin-access"
 import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -11,7 +12,14 @@ export function DashboardError({
   error?: unknown
   reset: () => void
 }) {
-  const presentation = getSafeDatabaseError(error)
+  const { authenticated } = useAdminAccess()
+  const presentation = authenticated
+    ? getSafeDatabaseError(error)
+    : {
+        title: "Statistics are unavailable",
+        description: "Please try again in a moment.",
+        kind: "unavailable",
+      }
   const showJobs = [
     "snapshotSchema",
     "snapshotsMissing",
@@ -28,7 +36,7 @@ export function DashboardError({
       </Alert>
       <div className="flex flex-wrap gap-2">
         <Button onClick={reset}>Try again</Button>
-        {showJobs ? (
+        {showJobs && authenticated ? (
           <a
             href="/dashboard/jobs"
             className={buttonVariants({ variant: "outline" })}

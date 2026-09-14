@@ -35,7 +35,11 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
       [parsedId]
     )
     const source = client.query(query)
-    const records = stringify({ header: true, columns: ["Time", "Video"] })
+    const records = stringify({
+      header: true,
+      escape_formulas: true,
+      columns: ["Time", "Video"],
+    })
     const output = Readable.from(
       (async function* (): AsyncGenerator<HistoryCsvRow> {
         for await (const row of source as AsyncIterable<{

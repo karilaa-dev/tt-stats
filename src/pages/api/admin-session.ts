@@ -29,8 +29,7 @@ export const POST: APIRoute = async ({ request, url, cookies }) => {
   if (!secret)
     return Response.json(
       {
-        message:
-          "Admin access is not configured. Set ADMIN_TOKEN on the server.",
+        message: "Admin login is temporarily unavailable.",
       },
       { status: 503, headers }
     )
@@ -55,7 +54,7 @@ export const POST: APIRoute = async ({ request, url, cookies }) => {
   cookies.set(ADMIN_COOKIE, createAdminSession(secret), {
     path: "/",
     httpOnly: true,
-    secure: url.protocol === "https:",
+    secure: import.meta.env.PROD || url.protocol === "https:",
     sameSite: "strict",
     maxAge: ADMIN_SESSION_SECONDS,
   })

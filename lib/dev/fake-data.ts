@@ -88,6 +88,8 @@ const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
       : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
     mediaKind: images ? "images" : "video",
     cacheHit: index % 3 !== 0,
+    otherUniqueChats: String(index % 7),
+    isFirstDownloader: index % 4 === 0 ? true : index % 4 === 3 ? null : false,
     videoDetailsId: index % 4 === 3 ? null : String(index + 1),
   }
 })
@@ -230,15 +232,46 @@ export function getFakeStatsJobs(): StatsJob[] {
 }
 
 export function getFakeUserStats(userId: string): UserStats | null {
-  return fakeUsers[userId] ?? null
+  const user = fakeUsers[userId]
+  return user
+    ? {
+        ...user,
+        uniqueVideos: "1280",
+        firstDownloadAt: FAKE_NOW_EPOCH - 31_622_400,
+        latestDownloadAt: FAKE_NOW_EPOCH - 3600,
+        activity: Array.from({ length: 31 }, (_, index) => ({
+          bucketEpoch:
+            Math.floor(FAKE_NOW_EPOCH / 86400) * 86400 - (30 - index) * 86400,
+          count: (index * 7) % 19,
+        })),
+      }
+    : null
 }
 
 export function getFakeUserDownloads(
   userId: string,
   requestedPage: number,
-  pageSize: number
+  pageSize: number,
+  filters?: { range: string; mediaKind: string }
 ): PaginatedUserDownloads {
-  const downloads = fakeUsers[userId] ? fakeDownloads : []
+  const downloads = (fakeUsers[userId] ? fakeDownloads : []).filter((item) => {
+    const days =
+      filters?.range === "24h"
+        ? 1
+        : filters?.range === "7d"
+          ? 7
+          : filters?.range === "31d"
+            ? 31
+            : 0
+    return (
+      (!filters ||
+        filters.mediaKind === "all" ||
+        filters.mediaKind === item.mediaKind) &&
+      (!days ||
+        (item.downloadedAt !== null &&
+          item.downloadedAt >= FAKE_NOW_EPOCH - days * 86400))
+    )
+  })
   const totalPages = Math.ceil(downloads.length / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
   const offset = (page - 1) * pageSize
