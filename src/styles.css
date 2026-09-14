@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
@@ -828,4 +829,34 @@ a:focus-visible {
   .telegram-login-compact svg {
     display: none;
   }
+}
+
+.database-progress-bar {
+  appearance: none;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--primary);
+}
+.database-progress-bar::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--muted);
+}
+.database-progress-bar::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--primary);
+}
+.database-progress-bar::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--primary);
+}
+.database-progress-bar:indeterminate {
+  background: linear-gradient(
+    90deg,
+    var(--muted),
+    var(--primary),
+    var(--muted)
+  );
+  opacity: 0.7;
 }

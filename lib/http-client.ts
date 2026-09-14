@@ -1,4 +1,15 @@
 type Kind = "read" | "metadata" | "media" | "csv" | "login"
+export class RequestCancelledError extends Error {
+  readonly code = "REQUEST_CANCELLED"
+  constructor() {
+    super("Loading cancelled. You can change the filters or try again.")
+  }
+}
+export const isRequestCancelled = (error: unknown) =>
+  error instanceof RequestCancelledError
+export const databaseRefreshInterval =
+  (milliseconds: number) => (query: { state: { error: Error | null } }) =>
+    isRequestCancelled(query.state.error) ? false : milliseconds
 const cooldowns = new Map<Kind, { until: number; error: Error }>()
 export function noteCooldown(kind: Kind, seconds: number) {
   const error = Object.assign(

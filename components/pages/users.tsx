@@ -1,7 +1,10 @@
+import { databaseRefreshInterval } from "@/lib/http-client"
+import { HistoryExport } from "@/components/dashboard/history-export"
+import { databaseAction } from "@/lib/tasks/action"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { actions } from "astro:actions"
-import { DownloadIcon, UserRoundIcon } from "lucide-react"
+import { UserRoundIcon } from "lucide-react"
 import {
   useDashboardContext,
   useDashboardSearch,
@@ -40,7 +43,7 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Badge } from "@/components/ui/badge"
@@ -163,14 +166,14 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   const historySearch = { fromDate, throughDate, mediaKind, discovery, sort }
   const userQuery = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
         own
-          ? actions.getMyStats.orThrow()
-          : actions.getUserStats.orThrow({ userId })
+          ? databaseAction(actions.getMyStats, undefined, signal)
+          : databaseAction(actions.getUserStats, { userId }, signal)
       ),
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: databaseRefreshInterval(60_000),
     retry: false,
   })
   const history = useQuery({
@@ -183,19 +186,27 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
       page,
       filters,
     ],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
         own
-          ? actions.getMyDownloads.orThrow({ page, pageSize: 20, ...filters })
-          : actions.getUserDownloads.orThrow({
-              userId,
-              page,
-              pageSize: 20,
-              ...filters,
-            })
+          ? databaseAction(
+              actions.getMyDownloads,
+              { page, pageSize: 20, ...filters },
+              signal
+            )
+          : databaseAction(
+              actions.getUserDownloads,
+              {
+                userId,
+                page,
+                pageSize: 20,
+                ...filters,
+              },
+              signal
+            )
       ),
     staleTime: 60_000,
-    refetchInterval: 60_000,
+    refetchInterval: databaseRefreshInterval(60_000),
     retry: false,
     placeholderData: (previous) => previous,
   })
@@ -340,17 +351,14 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             </ToggleGroup>
           </div>
           {user ? (
-            <a
-              className={buttonVariants({ variant: "outline" })}
+            <HistoryExport
+              userId={userId}
               href={
                 own
                   ? "/api/me/history.csv"
                   : `/api/users/${encodeURIComponent(userId)}/history.csv`
               }
-            >
-              <DownloadIcon data-icon="inline-start" />
-              Export full history
-            </a>
+            />
           ) : null}
         </div>
         {discovery === "first" ? (
@@ -469,11 +477,11 @@ function UserActivityChart({
   const [range, setRange] = useState<UserActivityRange>("31d")
   const query = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId, "activity", range],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
         own
-          ? actions.getMyActivity.orThrow({ range })
-          : actions.getUserActivity.orThrow({ userId, range })
+          ? databaseAction(actions.getMyActivity, { range }, signal)
+          : databaseAction(actions.getUserActivity, { userId, range }, signal)
       ),
     enabled: range !== "31d",
     staleTime: 300_000,
@@ -555,10 +563,17 @@ function QueryError({
 }) {
   return (
     <Alert variant="destructive">
-      <AlertTitle>{title}</AlertTitle>
+      <AlertTitle>
+        {"code" in error && error.code === "REQUEST_CANCELLED"
+          ? "Loading cancelled"
+          : title}
+      </AlertTitle>
       <AlertDescription>
         <p>
-          {"code" in error && error.code === "TOO_MANY_REQUESTS"
+          {"code" in error &&
+          ["TOO_MANY_REQUESTS", "REQUEST_CANCELLED"].includes(
+            String(error.code)
+          )
             ? error.message
             : "Please try again in a moment."}
         </p>

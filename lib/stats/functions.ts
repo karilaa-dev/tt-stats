@@ -1,50 +1,59 @@
+import { databaseAction } from "@/lib/tasks/action"
 import { requestWithCooldown } from "@/lib/http-client"
 import { actions } from "astro:actions"
 
 export const getDashboardMeta = () =>
   requestWithCooldown("read", () => actions.getDashboardMeta.orThrow())
 
-export const getSnapshotMetadata = () =>
-  requestWithCooldown("read", () => actions.getSnapshotMetadata.orThrow())
+export const getSnapshotMetadata = (signal?: AbortSignal) =>
+  databaseAction(actions.getSnapshotMetadata, undefined, signal)
 
-export const getOverview = () =>
-  requestWithCooldown("read", () => actions.getOverview.orThrow())
+export const getOverview = (signal?: AbortSignal) =>
+  databaseAction(actions.getOverview, undefined, signal)
 
 export const getStatsBreakdown = ({
   data,
+  signal,
 }: {
   data: Parameters<typeof actions.getStatsBreakdown>[0]
-}) => requestWithCooldown("read", () => actions.getStatsBreakdown.orThrow(data))
+  signal?: AbortSignal
+}) => databaseAction(actions.getStatsBreakdown, data, signal)
 
 export const getTimeSeries = ({
   data,
+  signal,
 }: {
   data: Parameters<typeof actions.getTimeSeries>[0]
-}) => requestWithCooldown("read", () => actions.getTimeSeries.orThrow(data))
+  signal?: AbortSignal
+}) => databaseAction(actions.getTimeSeries, data, signal)
 
-export const getReferralStats = () =>
-  requestWithCooldown("read", () => actions.getReferralStats.orThrow())
+export const getReferralStats = (signal?: AbortSignal) =>
+  databaseAction(actions.getReferralStats, undefined, signal)
 
-export const getOtherStats = () =>
-  requestWithCooldown("read", () => actions.getOtherStats.orThrow())
+export const getOtherStats = (signal?: AbortSignal) =>
+  databaseAction(actions.getOtherStats, undefined, signal)
 
 export const getUserStats = ({
   data,
+  signal,
 }: {
   data: Parameters<typeof actions.getUserStats>[0]
-}) => requestWithCooldown("read", () => actions.getUserStats.orThrow(data))
+  signal?: AbortSignal
+}) => databaseAction(actions.getUserStats, data, signal)
 
 export const getUserDownloads = ({
   data,
+  signal,
 }: {
   data: Parameters<typeof actions.getUserDownloads>[0]
-}) => requestWithCooldown("read", () => actions.getUserDownloads.orThrow(data))
+  signal?: AbortSignal
+}) => databaseAction(actions.getUserDownloads, data, signal)
 
-export const getStatsJobs = () =>
-  requestWithCooldown("read", () => actions.getStatsJobs.orThrow())
+export const getStatsJobs = (signal?: AbortSignal) =>
+  databaseAction(actions.getStatsJobs, undefined, signal)
 
-export const getDatabaseSetupStatus = () =>
-  requestWithCooldown("read", () => actions.getDatabaseSetupStatus.orThrow())
+export const getDatabaseSetupStatus = (signal?: AbortSignal) =>
+  databaseAction(actions.getDatabaseSetupStatus, undefined, signal)
 
 export const configureDatabaseJobs = ({
   data,
@@ -64,9 +73,11 @@ export const updateDatabaseDefinitions = ({
 
 export const getStatsJobRuns = ({
   data,
+  signal,
 }: {
   data: Parameters<typeof actions.getStatsJobRuns>[0]
-}) => requestWithCooldown("read", () => actions.getStatsJobRuns.orThrow(data))
+  signal?: AbortSignal
+}) => databaseAction(actions.getStatsJobRuns, data, signal)
 
 export const updateStatsJobSchedule = ({
   data,

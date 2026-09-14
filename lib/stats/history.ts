@@ -1,6 +1,7 @@
 import "@/lib/server-only"
 import type { Pool } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
+import { getHistoryComparisons } from "./history-comparisons"
 import type { HistoryFilters, PaginatedUserDownloads } from "./types"
 
 // Match stable identities first, with exact-link matching for legacy records.
@@ -103,17 +104,18 @@ export async function getUserDownloadsRaw(
             : "other_chats > 0 AND NOT uncertain AND first_user = $1::bigint"
       const order =
         filters.sort === "popular" ? `page.other_chats DESC, ${newest}` : newest
-      const result = await pool.query<HistoryRow>(
-        `WITH candidates AS MATERIALIZED (
-          SELECT *, CASE WHEN video_details_id IS NOT NULL THEN 'id:' || video_details_id::text
-            ELSE 'link:' || media_kind || ':' || shared_link END AS identity
-          FROM public.videos WHERE ${predicate}
-        ), identities AS (
-          SELECT min(pk_id) AS content_id, identity, video_details_id,
-            CASE WHEN video_details_id IS NULL THEN shared_link END AS shared_link,
-            CASE WHEN video_details_id IS NULL THEN media_kind END AS media_kind
-          FROM candidates GROUP BY 2, 3, 4, 5
-        ), matched AS MATERIALIZED (
+      const cached = await getHistoryComparisons(
+        pool,
+        userId,
+        predicate,
+        values
+      )
+      const comparisonCtes = cached
+        ? `compared AS (
+        SELECT * FROM jsonb_to_recordset($7::jsonb)
+          AS c(content_id bigint, other_chats bigint, uncertain boolean, first_user bigint)
+      ), first_downloads AS (SELECT content_id, first_user FROM compared)`
+        : `matched AS MATERIALIZED (
           SELECT identities.content_id, v.user_id, v.downloaded_at, v.pk_id
           FROM identities JOIN public.videos v ON identities.video_details_id IS NOT NULL
             AND v.video_details_id = identities.video_details_id AND v.user_id <> 0
@@ -132,7 +134,18 @@ export async function getUserDownloadsRaw(
         ), first_downloads AS (
           SELECT DISTINCT ON (content_id) content_id, user_id AS first_user FROM matched
           ORDER BY content_id, downloaded_at ASC NULLS LAST, pk_id ASC
-        ), annotated AS MATERIALIZED (
+        )`
+      const result = await pool.query<HistoryRow>(
+        `WITH candidates AS MATERIALIZED (
+          SELECT *, CASE WHEN video_details_id IS NOT NULL THEN 'id:' || video_details_id::text
+            ELSE 'link:' || media_kind || ':' || shared_link END AS identity
+          FROM public.videos WHERE ${predicate}
+        ), identities AS (
+          SELECT min(pk_id) AS content_id, identity, video_details_id,
+            CASE WHEN video_details_id IS NULL THEN shared_link END AS shared_link,
+            CASE WHEN video_details_id IS NULL THEN media_kind END AS media_kind
+          FROM candidates GROUP BY 2, 3, 4, 5
+        ), ${comparisonCtes}, annotated AS MATERIALIZED (
           SELECT candidates.*, compared.other_chats, compared.uncertain, first_downloads.first_user
           FROM candidates JOIN identities USING (identity)
           JOIN compared USING (content_id) JOIN first_downloads USING (content_id)
@@ -147,7 +160,12 @@ export async function getUserDownloadsRaw(
         ) selected ON true
         ORDER BY ${filters.sort === "popular" ? "selected.other_chats::bigint DESC," : ""}
           selected.downloaded_at DESC NULLS LAST, selected.id::bigint DESC`,
-        [...values, pageSize, requestedPage]
+        [
+          ...values,
+          pageSize,
+          requestedPage,
+          ...(cached ? [JSON.stringify(cached)] : []),
+        ]
       )
       total = result.rows[0]?.total ?? "0"
       page = Math.min(

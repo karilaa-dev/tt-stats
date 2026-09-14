@@ -4,6 +4,7 @@ import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { getSafeDatabaseError } from "@/lib/db/errors"
+import { isRequestCancelled } from "@/lib/http-client"
 
 export function DashboardError({
   error,
@@ -13,13 +14,19 @@ export function DashboardError({
   reset: () => void
 }) {
   const { authenticated } = useAdminAccess()
-  const presentation = authenticated
-    ? getSafeDatabaseError(error)
-    : {
-        title: "Statistics are unavailable",
-        description: "Please try again in a moment.",
-        kind: "unavailable",
+  const presentation = isRequestCancelled(error)
+    ? {
+        title: "Loading cancelled",
+        description: "You can try again when you are ready.",
+        kind: "cancelled",
       }
+    : authenticated
+      ? getSafeDatabaseError(error)
+      : {
+          title: "Statistics are unavailable",
+          description: "Please try again in a moment.",
+          kind: "unavailable",
+        }
   const showJobs = [
     "snapshotSchema",
     "snapshotsMissing",

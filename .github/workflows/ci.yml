@@ -42,6 +42,7 @@ jobs:
       - run: bun run build
       - run: bun run test:browser
       - run: bun scripts/check-production-proxy.mjs
+      - run: bun scripts/check-database-progress.mjs
 
   deployment-build:
     runs-on: ubuntu-latest

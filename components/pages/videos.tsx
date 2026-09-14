@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { getSafeDatabaseError } from "@/lib/db/errors"
+import { isRequestCancelled } from "@/lib/http-client"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Empty,
@@ -89,12 +90,16 @@ export function VideosPage() {
           ) : query.isError ? (
             <Alert variant="destructive">
               <AlertTitle>
-                {authenticated
-                  ? getSafeDatabaseError(query.error).title
-                  : "Rankings are unavailable"}
+                {isRequestCancelled(query.error)
+                  ? "Loading cancelled"
+                  : authenticated
+                    ? getSafeDatabaseError(query.error).title
+                    : "Rankings are unavailable"}
               </AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-2">
-                {authenticated ? (
+                {isRequestCancelled(query.error) ? (
+                  <p>You can try again when you are ready.</p>
+                ) : authenticated ? (
                   <>
                     <p>{getSafeDatabaseError(query.error).description}</p>
                     <p>

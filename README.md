@@ -483,9 +483,46 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 
 ## Security and privacy
 
+### Database request progress
+
+Database reads, saved-media metadata, and CSV exports show a cancellable dialog
+after 650 ms. Fast requests keep their inline loading state. Popularity sorting
+reports completed comparison batches; CSV exports report processed rows. Remaining
+time is estimated from completed work. Other queries use the previous request's
+duration when available, with an approximate percentage. A first request with no
+measurable progress stays indeterminate rather than inventing a percentage.
+
+History comparisons run in batches of 1,024 distinct posts using the identity
+indexes in `002_stats_snapshot_indexes.sql`. Completed comparisons are reused
+across pages, dates, media filters, and sorting for two minutes. The cache is
+account-scoped, limited to 50,000 comparisons and approximately 16 MB per process.
+Counts and first-downloader badges in these filtered views can therefore lag by
+up to two minutes. Histories above 20,000 distinct posts use the database-only
+ranking path to bound application memory. No new database objects are required.
+
+Progress and cancellation use `/api/tasks`, bound to the verified browser session
+or trusted anonymous IP. Requests have a two-minute deadline, a limit of eight
+active tasks per session, and a global limit of 500. Progress checks share one
+batched request every 1.5 seconds and respect read cooldowns. Cancellation remains
+available during a cooldown. Closing private views or logging out cancels their
+requests. These controls affect reads; admin job mutations retain their existing
+job controls.
+
+PostgreSQL cancellation uses the application's own checked-out backend ID and
+the same database role. It needs no superuser or `pg_signal_backend` grant.
+Reserve two additional database connections beyond `DB_POOL_SIZE` for cancellation.
+The read connection is discarded after cancellation, and the existing statement
+timeout remains the fallback if the control connection cannot be reached.
+See [PostgreSQL's cancellation permissions](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADMIN-SIGNAL).
+
+All task state and cached comparisons live in RAM and disappear on restart.
+Keep one application process, as with login sessions and usage limits.
+
+### Access controls
+
 - The database connection should use the constrained PostgreSQL role described above.
 - Server authorization protects mutations and individual user data, including direct action and CSV requests.
-- Aggregate browser queries read database snapshots without blocking navigation; user lookups remain live and fresh for one minute.
+- Aggregate queries read database snapshots. User histories refresh every minute; cached popularity comparisons expire after two minutes.
 - Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two TT Stats jobs.
 - The optional notification monitor can update only its singleton escalation-state row; webhook and ntfy credentials remain server-only.
 - Treat `ADMIN_TOKEN`, `BOT_TOKEN`, `TELEGRAM_API_HASH`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.

@@ -8,6 +8,7 @@ import { AppSidebar } from "./app-sidebar"
 import { DashboardHeader } from "./dashboard-header"
 import { DashboardContext } from "@/lib/dashboard-context"
 import { AdminLockButton, AdminProvider } from "./admin-access"
+import { DatabaseProgress } from "./database-progress"
 
 export interface DashboardShellProps {
   pathname: string
@@ -56,6 +57,7 @@ export function DashboardShell({ children, ...context }: DashboardShellProps) {
                 </SidebarInset>
               </SidebarProvider>
               <Toaster richColors closeButton />
+              <DatabaseProgress />
             </AdminProvider>
           </TooltipProvider>
         </ThemeProvider>

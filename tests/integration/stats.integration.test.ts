@@ -1,6 +1,8 @@
 import { canReadMedia } from "@/lib/media/access"
 import { getUserActivityRaw } from "@/lib/stats/user-activity"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
+import { cancellableQuery } from "@/lib/db/cancellation"
+import { DatabaseTask, withDatabaseTask } from "@/lib/tasks/server"
 import { readFile } from "node:fs/promises"
 import { Pool } from "pg"
 
@@ -36,6 +38,129 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
+  it("reuses comparisons when a date filter selects a later repeat of the same post", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query("INSERT INTO users(user_id) VALUES (998001), (998002)")
+      await client.query(`INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface)
+        VALUES (998001, 1700000000, 'https://example.test/repeated-cache', 'video', 'chat'),
+          (998001, 1700000100, 'https://example.test/repeated-cache', 'video', 'chat'),
+          (998002, 1700000200, 'https://example.test/repeated-cache', 'video', 'chat')`)
+      const execute = vi.fn((text: string, values: unknown[]) =>
+        client.query(text, values)
+      )
+      const adapter = { query: execute } as unknown as Pool
+      const filters = {
+        mediaKind: "all",
+        discovery: "first",
+        sort: "popular",
+      } as const
+      const all = await getUserDownloadsRaw("998001", 1, 20, adapter, filters)
+      expect(all.total).toBe("2")
+      const filtered = await getUserDownloadsRaw("998001", 1, 20, adapter, {
+        ...filters,
+        from: 1700000050,
+      })
+      expect(filtered.total).toBe("1")
+      expect(filtered.items[0]).toMatchObject({
+        downloadedAt: 1700000100,
+        otherUniqueChats: "1",
+        isFirstDownloader: true,
+      })
+      expect(
+        execute.mock.calls.filter(([sql]) => sql.includes("WITH identities AS"))
+      ).toHaveLength(1)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("keeps a tracked CSV cancellable until its stream finishes", async () => {
+    const task = new DatabaseTask()
+    const response = await withDatabaseTask(task, () =>
+      getHistoryCsvResponse("1")
+    )
+    expect(response.status).toBe(200)
+    expect(task.status().phase).toBe("Exporting downloads")
+    task.controller.abort()
+    await expect(response.text()).rejects.toThrow()
+    expect((await getPool().query("SELECT 1 AS healthy")).rows[0].healthy).toBe(
+      1
+    )
+  })
+  it("reuses completed popularity comparisons across pages and discovery filters", async () => {
+    const execute = vi.fn((text: string, values: unknown[]) =>
+      pool.query(text, values)
+    )
+    const adapter = { query: execute } as unknown as Pool
+    await getUserDownloadsRaw("1", 1, 1, adapter, {
+      mediaKind: "all",
+      discovery: "all",
+      sort: "popular",
+    })
+    const comparisons = () =>
+      execute.mock.calls.filter(([sql]) => sql.includes("WITH identities AS"))
+        .length
+    expect(comparisons()).toBe(1)
+    await getUserDownloadsRaw("1", 2, 1, adapter, {
+      mediaKind: "all",
+      discovery: "others",
+      sort: "popular",
+    })
+    expect(comparisons()).toBe(1)
+    await getUserDownloadsRaw("2", 1, 1, adapter, {
+      mediaKind: "all",
+      discovery: "others",
+      sort: "popular",
+    })
+    expect(comparisons()).toBe(2)
+  })
+
+  it("cancels the actual PostgreSQL query even when the read pool is full", async () => {
+    const readPool = new Pool({
+      connectionString: process.env.TEST_DB_URL,
+      max: 1,
+      application_name: "tt-stats-cancellation-test",
+      statement_timeout: 5000,
+    })
+    const controller = new AbortController()
+    const query = cancellableQuery(
+      readPool,
+      "SELECT pg_sleep(10)",
+      [],
+      controller.signal
+    ).then(
+      () => "unexpected completion",
+      (error) => error.code
+    )
+    try {
+      let active = false
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const result = await pool.query(
+          "SELECT 1 FROM pg_stat_activity WHERE application_name = 'tt-stats-cancellation-test' AND state = 'active'"
+        )
+        if (result.rowCount) {
+          active = true
+          break
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      expect(active).toBe(true)
+      const started = Date.now()
+      controller.abort()
+      expect(await query).toBe("57014")
+      expect(Date.now() - started).toBeLessThan(2000)
+      expect(
+        (await readPool.query("SELECT 1 AS healthy")).rows[0].healthy
+      ).toBe(1)
+    } finally {
+      controller.abort()
+      await query
+      await readPool.end()
+    }
+  })
   beforeAll(async () => {
     const connectionString = process.env.TEST_DB_URL
     if (

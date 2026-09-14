@@ -1,10 +1,18 @@
 import { defineMiddleware } from "astro:middleware"
 import { ActionError, getActionContext } from "astro:actions"
 import { getPrincipal } from "@/lib/auth/session"
+import { databaseReads } from "@/lib/tasks/types"
+import {
+  databaseTasks,
+  taskOwner,
+  validTaskId,
+  withDatabaseTask,
+} from "@/lib/tasks/server"
 import {
   principalKey,
   rateLimiter,
   type RateClass,
+  trackStream,
 } from "@/lib/security/rate-limit"
 
 const publicActions = new Set([
@@ -97,7 +105,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
       path.startsWith("/dashboard") ||
       path === "/admin" ||
       path === ""
-    if (dynamic && !principal.admin && path !== "/api/health") {
+    if (
+      dynamic &&
+      !principal.admin &&
+      path !== "/api/health" &&
+      !(path === "/api/tasks" && context.request.method === "DELETE")
+    ) {
       let ip = "unknown"
       try {
         ip = context.clientAddress
@@ -130,7 +143,47 @@ export const onRequest = defineMiddleware(async (context, next) => {
         )
     }
     try {
-      const response = await next()
+      const taskId = context.request.headers.get("X-Database-Task")
+      let response: Response
+      if (
+        ((name && Object.hasOwn(databaseReads, name)) ||
+          /^\/api\/media\/[^/]+$/u.test(path) ||
+          /^\/api\/(?:me|users\/[^/]+)\/history\.csv$/u.test(path)) &&
+        taskId &&
+        validTaskId(taskId)
+      ) {
+        let ip = "unknown"
+        try {
+          ip = context.clientAddress
+        } catch {
+          /* Shared anonymous identity. */
+        }
+        const task = databaseTasks.start(
+          taskId,
+          taskOwner(principal, context.cookies, ip)
+        )
+        if (!task)
+          return fail(429, "Please wait 2 seconds before trying again.", 2)
+        const abort = () => task.controller.abort()
+        context.request.signal.addEventListener("abort", abort, { once: true })
+        const deadline = setTimeout(abort, 120_000)
+        const finish = () => {
+          clearTimeout(deadline)
+          context.request.signal.removeEventListener("abort", abort)
+          databaseTasks.finish(taskId)
+        }
+        let streaming = false
+        if (context.request.signal.aborted) abort()
+        try {
+          response = await withDatabaseTask(task, next)
+          if (path.endsWith("/history.csv") && response.ok && response.body) {
+            streaming = true
+            response = trackStream(response, finish, task.controller.signal)
+          }
+        } finally {
+          if (!streaming) finish()
+        }
+      } else response = await next()
       if (!principal.admin && action && response.status >= 500)
         return fail(
           response.status,

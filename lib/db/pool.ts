@@ -3,6 +3,7 @@ import "@/lib/server-only"
 import { Pool, type PoolClient, type QueryResultRow } from "pg"
 
 import { getDbEnv } from "@/lib/env"
+import { trackPool } from "@/lib/db/cancellation"
 import { DATABASE_ERROR_COPY, type DatabaseErrorKind } from "@/lib/db/errors"
 
 export class DataAccessError extends Error {
@@ -79,8 +80,8 @@ export function getPool(): Pool {
     console.error("[database] idle client error", { code })
   })
 
-  globalForDatabase.ttStatsPool = pool
-  return pool
+  globalForDatabase.ttStatsPool = trackPool(pool)
+  return globalForDatabase.ttStatsPool
 }
 
 export async function query<Row extends QueryResultRow>(

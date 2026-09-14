@@ -1,3 +1,4 @@
+import { clearBrowserTasks } from "@/lib/tasks/client"
 import {
   createContext,
   useContext,
@@ -46,6 +47,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return
     }
     if (cacheIdentity !== identity) {
+      clearBrowserTasks()
       clearCooldowns()
       // Removal cancels in-flight queries too. Keep the workspace unmounted
       // until the old cache is gone so new requests cannot be removed with it.
@@ -72,6 +74,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [client])
   async function logout(admin = false) {
     try {
+      await clearBrowserTasks()
       const response = await fetch(
         admin ? "/api/admin-session" : "/api/session",
         { method: "DELETE" }
@@ -79,6 +82,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!response.ok) throw new Error()
       await client.cancelQueries()
       client.clear()
+      clearBrowserTasks()
       clearCooldowns()
       const channel =
         typeof BroadcastChannel !== "undefined"
