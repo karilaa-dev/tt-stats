@@ -614,8 +614,11 @@ integration("PostgreSQL statistics queries", () => {
         )
       ).toBe(true)
       const filtered = await getUserDownloadsRaw("1", 1, 20, db, {
-        range: "24h",
+        from: epoch - 86400,
+        until: epoch + 100,
         mediaKind: "video",
+        discovery: "all",
+        sort: "newest",
       })
       expect(filtered.items.map((item) => item.id)).toEqual(["99001"])
       const anonymous = { admin: false, user: null }
@@ -648,6 +651,117 @@ integration("PostgreSQL statistics queries", () => {
           (item) => item.id === "99001"
         )?.isFirstDownloader
       ).toBeNull()
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("filters and ranks all matching history before pagination with global first-downloader comparisons", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      const base = 1786233600
+      await client.query(
+        "INSERT INTO users(user_id) VALUES (4001), (4002), (4003), (-4004)"
+      )
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id)
+        SELECT n, 'tiktok', 'discovery-' || n FROM generate_series(5501, 5504) n`)
+      await client.query(
+        `INSERT INTO videos(pk_id, user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit) VALUES
+        (91001, 4001, 5501, $1::bigint - 1000, 'https://example.test/alpha-first', 'video', 'chat', true),
+        (91002, 4001, 5501, $1::bigint + 5, 'https://example.test/alpha-repeat', 'video', 'chat', false),
+        (91003, 4002, 5501, $1::bigint + 10, 'https://example.test/alpha-alias', 'video', 'chat', false),
+        (91004, 4002, 5501, $1::bigint + 11, 'https://example.test/alpha-again', 'video', 'chat', false),
+        (91005, -4004, 5501, $1::bigint + 12, 'https://example.test/alpha-group', 'video', 'chat', false),
+        (91006, 0, 5501, NULL, 'https://example.test/placeholder', 'video', 'chat', false),
+        (91007, 4002, 5502, $1::bigint - 2000, 'https://example.test/beta-first', 'video', 'chat', false),
+        (91008, 4001, 5502, $1::bigint + 6, 'https://example.test/beta', 'video', 'chat', false),
+        (91009, 4003, 5502, $1::bigint + 8, 'https://example.test/beta-other', 'video', 'chat', false),
+        (91010, -4004, 5502, $1::bigint + 9, 'https://example.test/beta-group', 'video', 'chat', false),
+        (91011, 4001, 5503, $1::bigint + 20, 'https://example.test/tie', 'video', 'chat', true),
+        (91012, 4002, 5503, $1::bigint + 20, 'https://example.test/tie-other', 'video', 'chat', false),
+        (91013, 4001, 5504, $1::bigint + 21, 'https://example.test/uncertain', 'video', 'chat', true),
+        (91014, 4002, 5504, NULL, 'https://example.test/unknown-time', 'video', 'chat', false),
+        (91015, 4001, NULL, $1::bigint + 22, 'https://example.test/legacy', 'video', 'chat', true),
+        (91016, 4002, NULL, $1::bigint + 23, 'https://example.test/legacy', 'video', 'chat', false),
+        (91017, 4003, NULL, $1::bigint + 24, 'https://example.test/legacy?different', 'video', 'chat', false),
+        (91018, 4003, NULL, $1::bigint + 24, 'https://example.test/legacy', 'images', 'chat', false)`,
+        [base]
+      )
+      await client.query(
+        `INSERT INTO videos(user_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit)
+        SELECT 4001, $1::bigint + n, 'https://example.test/unshared/' || n, 'video', 'chat', false
+        FROM generate_series(500, 524) n`,
+        [base]
+      )
+      const filters = {
+        from: base,
+        until: base + 600,
+        mediaKind: "video" as const,
+        discovery: "others" as const,
+        sort: "popular" as const,
+      }
+      const firstPage = await getUserDownloadsRaw("4001", 1, 2, db, filters)
+      expect(firstPage).toMatchObject({ total: "5", totalPages: 3, page: 1 })
+      expect(
+        firstPage.items.map((item) => [item.id, item.otherUniqueChats])
+      ).toEqual([
+        ["91008", "3"],
+        ["91002", "2"],
+      ])
+      expect(firstPage.items[1]?.isFirstDownloader).toBe(true)
+      expect(
+        (await getUserDownloadsRaw("4001", 2, 2, db, filters)).items.map(
+          (item) => item.id
+        )
+      ).toEqual(["91015", "91013"])
+      expect(
+        await getUserDownloadsRaw("4001", 99, 2, db, filters)
+      ).toMatchObject({ page: 3, items: [{ id: "91011" }] })
+      const pioneers = await getUserDownloadsRaw("4001", 1, 20, db, {
+        ...filters,
+        discovery: "first",
+      })
+      expect(pioneers.total).toBe("3")
+      expect(pioneers.items.map((item) => item.id)).toEqual([
+        "91002",
+        "91015",
+        "91011",
+      ])
+      expect(
+        pioneers.items.every(
+          (item) =>
+            item.isFirstDownloader === true &&
+            BigInt(item.otherUniqueChats!) > 0n
+        )
+      ).toBe(true)
+      expect(
+        (
+          await getUserDownloadsRaw("4001", 1, 2, db, {
+            ...filters,
+            discovery: "all",
+          })
+        ).items.map((item) => item.id)
+      ).toEqual(["91008", "91002"])
+      const datesOnly = await getUserDownloadsRaw("4001", 1, 20, db, {
+        ...filters,
+        until: base + 20,
+        discovery: "all",
+        sort: "newest",
+      })
+      expect(datesOnly.items.map((item) => item.id)).toEqual(["91008", "91002"])
+      const empty = await getUserDownloadsRaw("4001", 99, 20, db, {
+        ...filters,
+        from: base + 600,
+      })
+      expect(empty).toMatchObject({
+        page: 1,
+        total: "0",
+        totalPages: 0,
+        items: [],
+      })
     } finally {
       await client.query("ROLLBACK")
       client.release()

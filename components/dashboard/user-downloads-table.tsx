@@ -35,6 +35,7 @@ export function UserDownloadsTable({
   onView,
   own = false,
   admin = false,
+  sort = "newest",
 }: {
   data?: PaginatedUserDownloads
   loading: boolean
@@ -43,6 +44,7 @@ export function UserDownloadsTable({
   onView?: (selection: SelectedDownload) => void
   own?: boolean
   admin?: boolean
+  sort?: "newest" | "popular"
 }) {
   const time = useBrowserTime()
   const first = data?.items.length ? (data.page - 1) * data.pageSize + 1 : 0
@@ -51,7 +53,10 @@ export function UserDownloadsTable({
       <CardHeader>
         <CardTitle>Download history</CardTitle>
         <CardDescription>
-          Newest first. Times shown in {time.timeZone}.{" "}
+          {sort === "popular"
+            ? "Most downloaded by others first."
+            : "Newest first."}{" "}
+          Times shown in {time.timeZone}.{" "}
           {refreshing ? <Spinner aria-label="Updating downloads" /> : null}
         </CardDescription>
       </CardHeader>
@@ -174,7 +179,7 @@ export function UserDownloadsTable({
               <EmptyTitle>No downloads found</EmptyTitle>
               <EmptyDescription>
                 Downloads will appear here after you use the bot. If you applied
-                filters, try a different period or media type.
+                filters, try clearing the dates or selecting all downloads.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>

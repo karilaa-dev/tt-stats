@@ -4,11 +4,9 @@ import type { Pool, QueryResult, QueryResultRow } from "pg"
 
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import type {
-  HistoryFilters,
   ChatScope,
   OtherStats,
   OverviewStats,
-  PaginatedUserDownloads,
   RankedValue,
   SeriesMetric,
   SnapshotMetadata,
@@ -21,10 +19,6 @@ import type {
   ManualRefreshRequest,
   UserStats,
 } from "@/lib/stats/types"
-
-interface CountRow {
-  count: string
-}
 
 interface BreakdownRow {
   scope: ChatScope
@@ -283,81 +277,7 @@ export async function getUserStatsRaw(
   }
 }
 
-export async function getUserDownloadsRaw(
-  userId: string,
-  requestedPage: number,
-  pageSize: number,
-  pool: Pool = getPool(),
-  filters: HistoryFilters = { range: "all", mediaKind: "all" }
-): Promise<PaginatedUserDownloads> {
-  const days = { "24h": 1, "7d": 7, "31d": 31, all: 0 }[filters.range]
-  const start = days ? Math.floor(Date.now() / 1000) - days * 86400 : null
-  const kind = filters.mediaKind === "all" ? null : filters.mediaKind
-  const predicate = `user_id = $1::bigint AND ($2::bigint IS NULL OR downloaded_at >= $2 AND downloaded_at <= extract(epoch FROM now())) AND ($3::text IS NULL OR media_kind = $3)`
-  const countResult = await safeQuery<CountRow>(
-    pool,
-    `SELECT count(*)::text AS count FROM public.videos WHERE ${predicate}`,
-    [userId, start, kind]
-  )
-  const total = countResult.rows[0]?.count ?? "0"
-  const totalPages = Math.ceil(Number(total) / pageSize)
-  const page = totalPages ? Math.min(requestedPage, totalPages) : 1
-  const result = await safeQuery<{
-    id: string
-    downloaded_at: string | null
-    shared_link: string
-    media_kind: "video" | "images"
-    cache_hit: boolean
-    video_details_id: string | null
-    other_chats: string
-    first_user: string | null
-    uncertain: boolean
-  }>(
-    pool,
-    `WITH page AS (
-    SELECT * FROM public.videos WHERE ${predicate}
-    ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC LIMIT $4 OFFSET $5
-  ) SELECT page.pk_id::text AS id, page.downloaded_at, page.shared_link, page.media_kind,
-    page.cache_hit, page.video_details_id::text, comparison.other_chats, comparison.uncertain,
-    first_download.user_id::text AS first_user
-  FROM page
-  CROSS JOIN LATERAL (
-    SELECT count(DISTINCT matched.user_id) FILTER (WHERE matched.user_id <> $1::bigint)::text AS other_chats,
-      coalesce(bool_or(matched.downloaded_at IS NULL OR matched.downloaded_at < 946684800 OR matched.downloaded_at > extract(epoch FROM now())), true) AS uncertain
-    FROM (
-      SELECT user_id, downloaded_at FROM public.videos WHERE page.video_details_id IS NOT NULL AND video_details_id = page.video_details_id AND user_id <> 0
-      UNION ALL
-      SELECT user_id, downloaded_at FROM public.videos WHERE page.video_details_id IS NULL AND video_details_id IS NULL AND md5(shared_link) = md5(page.shared_link) AND shared_link = page.shared_link AND media_kind = page.media_kind AND user_id <> 0
-    ) matched
-  ) comparison
-  LEFT JOIN LATERAL (
-    SELECT user_id FROM (
-      SELECT user_id, downloaded_at, pk_id FROM public.videos WHERE page.video_details_id IS NOT NULL AND video_details_id = page.video_details_id AND user_id <> 0
-      UNION ALL
-      SELECT user_id, downloaded_at, pk_id FROM public.videos WHERE page.video_details_id IS NULL AND video_details_id IS NULL AND md5(shared_link) = md5(page.shared_link) AND shared_link = page.shared_link AND media_kind = page.media_kind AND user_id <> 0
-    ) matched ORDER BY downloaded_at ASC NULLS LAST, pk_id ASC LIMIT 1
-  ) first_download ON true
-  ORDER BY page.downloaded_at DESC NULLS LAST, page.pk_id DESC`,
-    [userId, start, kind, pageSize, (page - 1) * pageSize]
-  )
-  return {
-    items: result.rows.map((row) => ({
-      id: row.id,
-      downloadedAt:
-        row.downloaded_at === null ? null : Number(row.downloaded_at),
-      sharedLink: row.shared_link,
-      mediaKind: row.media_kind,
-      cacheHit: row.cache_hit,
-      videoDetailsId: row.video_details_id,
-      otherUniqueChats: row.other_chats,
-      isFirstDownloader: row.uncertain ? null : row.first_user === userId,
-    })),
-    page,
-    pageSize,
-    total,
-    totalPages,
-  }
-}
+export { getUserDownloadsRaw } from "./history"
 
 export async function getReferralStatsRaw(
   pool: Pool = getPool()

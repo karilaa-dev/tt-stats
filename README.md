@@ -313,6 +313,20 @@ group ID and cannot be attributed to individual members from this schema.
 Navigation always links to **My Profile**; signed-out visitors see the Telegram
 login button on that page. Download history defaults to all time, with compact
 rows on desktop and stacked details on mobile. Preferences show language names.
+History has optional **From date** and **Through date** controls. Both use the
+browser's local calendar; the full end date is included, even on daylight-saving
+transition days. The server receives UTC boundaries and uses an exclusive upper
+bound. Changing filters resets pagination to page one; pagination and browser
+back/forward preserve the selected dates, media type, and ordering.
+**Downloaded by others** and **You were first** show posts downloaded by at
+least one other distinct chat. The latter requires a known first-downloader
+status for the account. These views default to **Most downloaded by others**;
+**Newest first** remains available. Comparisons use all recorded history,
+including events outside the selected dates, and happen before pagination.
+Repeated downloads remain separate history events. Popularity comparisons run
+once per distinct candidate post and use the indexes in
+`database/002_stats_snapshot_indexes.sql`; ordinary history only compares posts
+on the requested page. CSV export continues to include the full history.
 Personal activity offers 31 days (daily), 90 days (weekly), one year (monthly),
 and all time (monthly). PostgreSQL filters by account using the existing history
 index before aggregating. Longer periods load on demand and stay fresh in the

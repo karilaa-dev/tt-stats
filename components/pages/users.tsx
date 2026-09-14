@@ -6,6 +6,7 @@ import {
   useDashboardContext,
   useDashboardSearch,
   useDashboardNavigate,
+  useHydrated,
 } from "@/lib/dashboard-context"
 import { requestWithCooldown } from "@/lib/http-client"
 import {
@@ -18,6 +19,8 @@ import {
   type SelectedDownload,
 } from "@/components/dashboard/download-dialog"
 import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
+import { HistoryDateFilter } from "@/components/dashboard/history-date-filter"
+import { historyDateRange } from "@/lib/history-date-range"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
 import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
 import { TimeSeriesChart } from "@/components/dashboard/time-series-chart"
@@ -144,10 +147,20 @@ export function UsersPage({ own = false }: { own?: boolean }) {
 }
 function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   const session = useSession()
-  const { page, historyRange, mediaKind } = useDashboardSearch()
+  const { page, fromDate, throughDate, mediaKind, discovery, sort } =
+    useDashboardSearch()
+  const hydrated = useHydrated()
   const navigate = useDashboardNavigate()
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
-  const filters: HistoryFilters = { range: historyRange, mediaKind }
+  const dateRange = historyDateRange(fromDate, throughDate)
+  const filters: HistoryFilters = {
+    from: dateRange.from,
+    until: dateRange.until,
+    mediaKind,
+    discovery,
+    sort,
+  }
+  const historySearch = { fromDate, throughDate, mediaKind, discovery, sort }
   const userQuery = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId],
     queryFn: () =>
@@ -161,6 +174,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     retry: false,
   })
   const history = useQuery({
+    enabled: hydrated && !dateRange.error,
     queryKey: [
       "stats",
       own ? "me" : "user",
@@ -185,10 +199,15 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     retry: false,
     placeholderData: (previous) => previous,
   })
-  const changeFilters = (next: Partial<HistoryFilters>) => {
+  const changeFilters = (next: Partial<typeof historySearch>) => {
     setSelection(null)
     void navigate({
-      search: { ...(!own ? { id: userId } : {}), ...filters, ...next, page: 1 },
+      search: {
+        ...(!own ? { id: userId } : {}),
+        ...historySearch,
+        ...next,
+        page: 1,
+      },
     })
   }
   const user = userQuery.data
@@ -261,28 +280,42 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
       </div>
       <section className="profile-history" aria-label="Your download history">
         <div className="history-toolbar">
-          <div className="flex flex-wrap gap-3">
-            <ToggleGroup
-              aria-label="History period"
-              value={[filters.range]}
-              onValueChange={(value) => {
-                if (value[0])
-                  changeFilters({ range: value[0] as HistoryFilters["range"] })
-              }}
-              variant="outline"
-              size="sm"
-            >
-              {[
-                ["24h", "24 hours"],
-                ["7d", "7 days"],
-                ["31d", "31 days"],
-                ["all", "All time"],
-              ].map(([value, label]) => (
-                <ToggleGroupItem key={value} value={value}>
-                  {label}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+          <div className="history-discovery-filters">
+            <label className="history-select-field">
+              <span>Show</span>
+              <select
+                className="history-select"
+                value={discovery}
+                onChange={(event) => {
+                  const next = event.target.value as HistoryFilters["discovery"]
+                  changeFilters({
+                    discovery: next,
+                    sort: next === "all" ? "newest" : "popular",
+                  })
+                }}
+              >
+                <option value="all">All downloads</option>
+                <option value="others">Downloaded by others</option>
+                <option value="first">
+                  {own ? "You were first" : "Account was first"}
+                </option>
+              </select>
+            </label>
+            <label className="history-select-field">
+              <span>Sort</span>
+              <select
+                className="history-select"
+                value={sort}
+                onChange={(event) =>
+                  changeFilters({
+                    sort: event.target.value as HistoryFilters["sort"],
+                  })
+                }
+              >
+                <option value="newest">Newest first</option>
+                <option value="popular">Most downloaded by others</option>
+              </select>
+            </label>
             <ToggleGroup
               aria-label="Media type"
               value={[mediaKind]}
@@ -320,7 +353,25 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             </a>
           ) : null}
         </div>
-        {history.isError ? (
+        {discovery === "first" ? (
+          <p className="text-xs text-muted-foreground">
+            {own
+              ? "Only posts you downloaded first that others also downloaded."
+              : "Only posts this account downloaded first that others also downloaded."}
+          </p>
+        ) : null}
+        <HistoryDateFilter
+          key={`${fromDate}:${throughDate}`}
+          fromDate={fromDate}
+          throughDate={throughDate}
+          onApply={changeFilters}
+        />
+        {dateRange.error ? (
+          <Alert variant="destructive">
+            <AlertTitle>Invalid date range</AlertTitle>
+            <AlertDescription>{dateRange.error}</AlertDescription>
+          </Alert>
+        ) : history.isError ? (
           <QueryError
             title="Download history unavailable"
             error={history.error}
@@ -333,13 +384,14 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             data={history.data}
             loading={history.isPending}
             refreshing={history.isFetching && !history.isPending}
+            sort={sort}
             onView={setSelection}
             onPageChange={(nextPage) => {
               setSelection(null)
               void navigate({
                 search: {
                   ...(!own ? { id: userId } : {}),
-                  ...filters,
+                  ...historySearch,
                   page: nextPage,
                 },
               })

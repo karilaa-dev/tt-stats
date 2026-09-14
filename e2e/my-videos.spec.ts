@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+test.use({ timezoneId: "America/New_York" })
 
 test("personal statistics, filters, mobile access, and logout", async ({
   page,
@@ -14,6 +15,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
     headers: { origin: baseURL! },
   })
   let signedIn = true
+  const historyRequests: Record<string, unknown>[] = []
   await page.route("**/api/session", (route) => {
     if (route.request().method() === "DELETE") signedIn = false
     return route.fulfill({
@@ -34,6 +36,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await route.fulfill({ response })
   })
   await page.route("**/_actions/getMyDownloads/**", async (route) => {
+    historyRequests.push(route.request().postDataJSON())
     const response = await backend.post("/_actions/getUserDownloads", {
       data: { ...route.request().postDataJSON(), userId: "123456789" },
       headers: { origin: baseURL! },
@@ -56,6 +59,9 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await expect(page.locator(".telegram-login")).toHaveText("My Profile")
     await expect(page).toHaveTitle("My Profile · TT Stats")
     const history = page.getByRole("list", { name: "Download history" })
+    await expect(
+      page.getByRole("group", { name: "History period", exact: true })
+    ).toHaveCount(0)
     await expect(history.getByText("You were first").first()).toBeVisible()
     await expect(
       history.getByText(/other people downloaded this/).first()
@@ -141,6 +147,12 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await page.screenshot({ path: testInfo.outputPath("my-profile-dark.png") })
     await history.scrollIntoViewIfNeeded()
     await page.screenshot({ path: testInfo.outputPath("my-history-dark.png") })
+    await page
+      .getByRole("form", { name: "History date range" })
+      .scrollIntoViewIfNeeded()
+    await page.screenshot({
+      path: testInfo.outputPath("history-filters-dark.png"),
+    })
     if (isMobile) await page.setViewportSize({ width: 393, height: 851 })
     await page.evaluate(() => document.documentElement.classList.remove("dark"))
     await page
@@ -151,6 +163,84 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await expect(history.getByRole("listitem")).toHaveCount(5)
     await page.goBack()
     await expect(history.getByRole("listitem")).toHaveCount(20)
+    await page.getByRole("button", { name: "Go to next page" }).click()
+    await expect(history.getByRole("listitem")).toHaveCount(7)
+    await page.getByLabel("From date", { exact: true }).fill("2026-08-09")
+    await page.getByLabel("Through date", { exact: true }).fill("2026-08-09")
+    await page.getByRole("button", { name: "Apply dates", exact: true }).click()
+    await expect(page).toHaveURL(/page=1/)
+    await expect(history.getByRole("listitem")).toHaveCount(6)
+    await expect
+      .poll(() => historyRequests.at(-1))
+      .toMatchObject({
+        from: Date.parse("2026-08-09T04:00:00Z") / 1000,
+        until: Date.parse("2026-08-10T04:00:00Z") / 1000,
+        page: 1,
+      })
+    await expect(
+      page.getByText("Dates in America/New_York. Includes the full end date.")
+    ).toBeVisible()
+    await page.getByRole("button", { name: "Clear dates" }).click()
+    await expect(history.getByRole("listitem")).toHaveCount(20)
+    for (const [date, from, until] of [
+      ["2026-03-08", "2026-03-08T05:00:00Z", "2026-03-09T04:00:00Z"],
+      ["2026-11-01", "2026-11-01T04:00:00Z", "2026-11-02T05:00:00Z"],
+    ]) {
+      await page.getByLabel("From date", { exact: true }).fill(date!)
+      await page.getByLabel("Through date", { exact: true }).fill(date!)
+      await page
+        .getByRole("button", { name: "Apply dates", exact: true })
+        .click()
+      await expect
+        .poll(() => historyRequests.at(-1))
+        .toMatchObject({
+          from: Date.parse(from!) / 1000,
+          until: Date.parse(until!) / 1000,
+        })
+      await expect(
+        page.getByText("No downloads found", { exact: true })
+      ).toBeVisible()
+    }
+    await page.getByRole("button", { name: "Clear dates" }).click()
+    await expect(history.getByRole("listitem")).toHaveCount(20)
+    await page.getByLabel("From date", { exact: true }).fill("2026-08-11")
+    await page.getByLabel("Through date", { exact: true }).fill("2026-08-10")
+    const requestCount = historyRequests.length
+    await page.getByRole("button", { name: "Apply dates", exact: true }).click()
+    await expect(page.getByRole("alert")).toContainText(
+      "The end date must be on or after the start date."
+    )
+    expect(historyRequests).toHaveLength(requestCount)
+    await page.getByRole("button", { name: "Clear dates" }).click()
+    await page
+      .getByRole("combobox", { name: "Show", exact: true })
+      .selectOption("others")
+    await expect(
+      page.getByRole("combobox", { name: "Sort", exact: true })
+    ).toHaveValue("popular")
+    await expect(
+      page.getByText("Showing 1–20 of 23", { exact: true })
+    ).toBeVisible()
+    await expect(history.getByRole("listitem").first()).toContainText(
+      "6 other people downloaded this"
+    )
+    await page.getByRole("button", { name: "Go to next page" }).click()
+    await expect(history.getByRole("listitem")).toHaveCount(3)
+    await page
+      .getByRole("combobox", { name: "Show", exact: true })
+      .selectOption("first")
+    await expect(page).toHaveURL(/page=1/)
+    await expect(history.getByRole("listitem")).toHaveCount(6)
+    for (const row of await history.getByRole("listitem").all()) {
+      await expect(row).toContainText("You were first")
+      await expect(row).toContainText(/other (people|person) downloaded this/)
+    }
+    await page
+      .getByRole("combobox", { name: "Sort", exact: true })
+      .selectOption("newest")
+    await expect(history.getByRole("listitem").first()).toContainText(
+      "4 other people downloaded this"
+    )
     await page.getByRole("button", { name: "Log out", exact: true }).click()
     await expect(
       page.getByText("See your download history", { exact: true })

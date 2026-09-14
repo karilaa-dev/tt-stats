@@ -169,8 +169,17 @@ export const getOtherStats = defineAction({
 })
 
 const historyFilters = {
-  range: statsRange.default("all"),
+  from: z.number().int().min(0).max(253402300800).optional(),
+  until: z.number().int().min(0).max(253402300800).optional(),
   mediaKind: z.enum(["all", "video", "images"]).default("all"),
+  discovery: z.enum(["all", "others", "first"]).default("all"),
+  sort: z.enum(["newest", "popular"]).default("newest"),
+}
+const validHistoryRange = (data: { from?: number; until?: number }) =>
+  data.from === undefined || data.until === undefined || data.from < data.until
+const historyRangeError = {
+  message: "The end must be after the start.",
+  path: ["until"],
 }
 export const getMyActivity = defineAction({
   input: z.object({ range: z.enum(USER_ACTIVITY_RANGES) }).strict(),
@@ -225,7 +234,8 @@ export const getMyDownloads = defineAction({
       pageSize: positivePage.max(50),
       ...historyFilters,
     })
-    .strict(),
+    .strict()
+    .refine(validHistoryRange, historyRangeError),
   handler: async (data, context) => {
     const user = getPrincipal(context.cookies).user
     if (!user)
@@ -257,12 +267,15 @@ export const getUserStats = defineAction({
 })
 
 export const getUserDownloads = defineAction({
-  input: z.object({
-    userId: telegramId,
-    page: positivePage,
-    pageSize: positivePage.max(50),
-    ...historyFilters,
-  }),
+  input: z
+    .object({
+      userId: telegramId,
+      page: positivePage,
+      pageSize: positivePage.max(50),
+      ...historyFilters,
+    })
+    .strict()
+    .refine(validHistoryRange, historyRangeError),
   handler: safeHandler((data) =>
     isFakeDataEnabled()
       ? getFakeUserDownloads(data.userId, data.page, data.pageSize, data)

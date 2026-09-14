@@ -3,6 +3,7 @@ import "@/lib/server-only"
 import type { HistoryCsvRow } from "@/lib/csv/format"
 import { bucketSecondsForRange } from "@/lib/stats/time-series"
 import type {
+  HistoryFilters,
   ChatScope,
   OtherStats,
   OverviewStats,
@@ -281,26 +282,33 @@ export function getFakeUserDownloads(
   userId: string,
   requestedPage: number,
   pageSize: number,
-  filters?: { range: string; mediaKind: string }
+  filters: HistoryFilters = {
+    mediaKind: "all",
+    discovery: "all",
+    sort: "newest",
+  }
 ): PaginatedUserDownloads {
   const downloads = (fakeUsers[userId] ? fakeDownloads : []).filter((item) => {
-    const days =
-      filters?.range === "24h"
-        ? 1
-        : filters?.range === "7d"
-          ? 7
-          : filters?.range === "31d"
-            ? 31
-            : 0
     return (
-      (!filters ||
-        filters.mediaKind === "all" ||
-        filters.mediaKind === item.mediaKind) &&
-      (!days ||
-        (item.downloadedAt !== null &&
-          item.downloadedAt >= FAKE_NOW_EPOCH - days * 86400))
+      (filters.mediaKind === "all" || filters.mediaKind === item.mediaKind) &&
+      (filters.from === undefined ||
+        (item.downloadedAt !== null && item.downloadedAt >= filters.from)) &&
+      (filters.until === undefined ||
+        (item.downloadedAt !== null && item.downloadedAt < filters.until)) &&
+      (filters.discovery === "all" ||
+        (BigInt(item.otherUniqueChats ?? "0") > 0n &&
+          (filters.discovery !== "first" || item.isFirstDownloader === true)))
     )
   })
+  if (filters.sort === "popular")
+    downloads.sort(
+      (a, b) =>
+        Number(
+          BigInt(b.otherUniqueChats ?? "0") - BigInt(a.otherUniqueChats ?? "0")
+        ) ||
+        (b.downloadedAt ?? 0) - (a.downloadedAt ?? 0) ||
+        Number(BigInt(b.id) - BigInt(a.id))
+    )
   const totalPages = Math.ceil(downloads.length / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
   const offset = (page - 1) * pageSize

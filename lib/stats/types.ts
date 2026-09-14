@@ -99,8 +99,11 @@ export interface UserStats {
 }
 
 export interface HistoryFilters {
-  range: StatsRange
+  from?: number
+  until?: number
   mediaKind: "all" | "video" | "images"
+  discovery: "all" | "others" | "first"
+  sort: "newest" | "popular"
 }
 
 export interface UserDownload {

@@ -15,7 +15,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_videos_user_history_idx
   ON public.videos (user_id, downloaded_at DESC, pk_id DESC)
   INCLUDE (shared_link, media_kind);
 
--- Identity comparisons are bounded to the posts on a history page.
+-- Identity comparisons serve history badges and scoped popularity filters.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_videos_identity_chats_idx
   ON public.videos (video_details_id, user_id, downloaded_at, pk_id)
   WHERE video_details_id IS NOT NULL AND user_id <> 0;

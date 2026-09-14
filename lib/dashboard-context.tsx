@@ -22,9 +22,13 @@ function parseSearch(search: string) {
   const page = Number(params.get("page"))
   return {
     range: parseStatsRange(params.get("range")),
-    historyRange: params.get("range")
-      ? parseStatsRange(params.get("range"))
-      : ("all" as const),
+    fromDate: params.get("fromDate") ?? "",
+    throughDate: params.get("throughDate") ?? "",
+    discovery: (["others", "first"].includes(params.get("discovery") ?? "")
+      ? params.get("discovery")
+      : "all") as "all" | "others" | "first",
+    sort: (params.get("sort") === "popular" ? "popular" : "newest") as
+      "newest" | "popular",
     mediaKind: (["video", "images"].includes(params.get("mediaKind") ?? "")
       ? params.get("mediaKind")
       : "all") as "all" | "video" | "images",

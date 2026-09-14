@@ -51,6 +51,32 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 describe("personal action authorization", () => {
+  it("validates custom history bounds and discovery options", () => {
+    const input = {
+      page: 1,
+      pageSize: 20,
+      mediaKind: "all",
+      discovery: "others",
+      sort: "popular",
+      from: 1786226400,
+      until: 1786312800,
+    }
+    expect(downloads.input.safeParse(input).success).toBe(true)
+    for (const extra of [
+      { until: input.from },
+      { until: input.from - 1 },
+      { from: 1.5 },
+      { from: -1 },
+      { until: Infinity },
+      { discovery: "all; DROP TABLE videos" },
+      { sort: "downloads" },
+      { range: "24h" },
+    ]) {
+      expect(downloads.input.safeParse({ ...input, ...extra }).success).toBe(
+        false
+      )
+    }
+  })
   it("derives identity from the verified session and rejects a supplied user ID", async () => {
     const token = createUserSession({
       id: "123",
@@ -76,7 +102,15 @@ describe("personal action authorization", () => {
     await expect(
       arbitraryActivity.handler({ range: "all", userId: "999" }, context)
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" })
-    const input = { page: 1, pageSize: 20, range: "all", mediaKind: "all" }
+    const input = {
+      page: 1,
+      pageSize: 20,
+      mediaKind: "all",
+      discovery: "first",
+      sort: "popular",
+      from: 1786226400,
+      until: 1786312800,
+    }
     expect(downloads.input.safeParse({ ...input, userId: "999" }).success).toBe(
       false
     )
