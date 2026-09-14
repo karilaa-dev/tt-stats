@@ -278,12 +278,10 @@ and signature-verified ID tokens. Only `openid profile` is requested. The
 verified Telegram `id` claim selects bot records; the OIDC `sub` is not a bot
 user ID. Tokens and client secrets are never returned to the browser.
 
-Some Telegram token responses contain an ID token without a usable access token.
-For successful ID-token-only responses, a Telegram-specific adapter supplies the
-unused access-token fields required by `openid-client`'s response parser. This
-placeholder is never used as a credential or returned by the login API. The
-original ID token still undergoes signature, issuer, audience, expiry, and nonce
-validation; HTTP errors and malformed credentials remain rejected.
+Telegram can return an OAuth error with HTTP 200. A Telegram-specific adapter
+marks these error responses as HTTP 400 internally so `openid-client` reports
+the actual provider error instead of a misleading missing-access-token error.
+Successful responses are unchanged and undergo the library's full validation.
 
 If Telegram approves a login but the site reports that it could not be verified,
 check the application log for `[telegram-login] callback failed`. It records only

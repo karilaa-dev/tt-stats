@@ -24,37 +24,18 @@ const telegramFetch: oidc.CustomFetch = async (url, options) => {
     !body ||
     typeof body !== "object" ||
     Array.isArray(body) ||
-    "error" in body ||
-    !("id_token" in body) ||
-    typeof body.id_token !== "string" ||
-    !body.id_token ||
-    ("access_token" in body &&
-      body.access_token !== null &&
-      body.access_token !== undefined &&
-      body.access_token !== "")
+    !("error" in body) ||
+    typeof body.error !== "string" ||
+    !body.error
   )
     return response
 
-  // Telegram may return only an ID token. openid-client requires access-token
-  // fields even though this application never uses or exposes an access token.
-  // Supply a non-credential placeholder solely for its response parser. The
-  // original ID token still passes all claim and signature checks below.
-  const normalized = {
-    ...body,
-    access_token: "unused-telegram-login-access-token",
-  }
-  if (
-    !("token_type" in normalized) ||
-    normalized.token_type == null ||
-    normalized.token_type === ""
-  ) {
-    Object.assign(normalized, { token_type: "Bearer" })
-  }
-  const headers = new Headers(response.headers)
-  headers.delete("content-length")
-  headers.delete("content-encoding")
-  headers.set("cache-control", "no-store")
-  return Response.json(normalized, { headers })
+  // Telegram returns OAuth errors with HTTP 200. The library checks error
+  // bodies only for unsuccessful statuses; otherwise it reports a missing
+  // access token and hides the actual provider error. Preserve the body and
+  // let its standard OAuth error parser reject it. Successful replies are
+  // never modified or supplied with synthetic credentials.
+  return new Response(response.body, { status: 400, headers: response.headers })
 }
 
 export function getOAuthEnv(source = process.env) {

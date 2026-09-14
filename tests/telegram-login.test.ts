@@ -105,6 +105,33 @@ async function flow(
 }
 describe("official Telegram OIDC", () => {
   it.each([
+    { providerError: "invalid_client", withTokens: false },
+    { providerError: "invalid_grant", withTokens: false },
+    { providerError: "invalid_request", withTokens: false },
+    { providerError: "invalid_client", withTokens: true },
+  ])(
+    "reports Telegram OAuth errors returned with HTTP 200: %j",
+    async (test) => {
+      const { callback, transaction } = await flow({}, false, {
+        error: test.providerError,
+        error_description: "sentinel-provider-details",
+        ...(test.withTokens
+          ? {}
+          : { access_token: undefined, id_token: undefined }),
+      })
+      const error = await finishTelegramLogin(callback, transaction).catch(
+        (error: unknown) => error
+      )
+      expect(error).toBeInstanceOf(Error)
+      const details = telegramLoginFailureDetails(error)
+      expect(details).toMatchObject({
+        code: "OAUTH_RESPONSE_BODY_ERROR",
+        providerError: test.providerError,
+      })
+      expect(JSON.stringify(details)).not.toContain("sentinel")
+    }
+  )
+  it.each([
     { claims: { nonce: undefined }, reason: "missing_nonce", claim: "nonce" },
     { claims: { nonce: "wrong" }, reason: "unexpected_nonce", claim: "nonce" },
     { claims: { aud: 123456 }, reason: "invalid_aud_type", claim: "aud" },
@@ -137,13 +164,9 @@ describe("official Telegram OIDC", () => {
     { access_token: null, token_type: null },
     { access_token: "", token_type: "" },
     { access_token: "", token_type: "Bearer" },
-  ])("accepts a verified ID-token-only response: %j", async (response) => {
+  ])("rejects incomplete token responses: %j", async (response) => {
     const { callback, transaction } = await flow({}, false, response)
-    expect(await finishTelegramLogin(callback, transaction)).toEqual({
-      id: "987654321",
-      name: "Test user",
-      username: null,
-    })
+    await expect(finishTelegramLogin(callback, transaction)).rejects.toThrow()
   })
   it.each([
     { claims: { iss: "https://attacker.example" } },
@@ -162,15 +185,11 @@ describe("official Telegram OIDC", () => {
     { response: { token_type: 123 } },
     { status: 400 },
     { status: 401 },
-  ])("still rejects invalid ID-token-only responses: %j", async (test) => {
+  ])("rejects invalid token responses: %j", async (test) => {
     const { callback, transaction } = await flow(
       test.claims,
       test.forged,
-      {
-        access_token: "",
-        token_type: undefined,
-        ...test.response,
-      },
+      test.response,
       test.alg,
       test.status
     )
