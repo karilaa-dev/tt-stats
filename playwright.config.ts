@@ -21,8 +21,8 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      "TT_STATS_FAKE_DATA=true ADMIN_TOKEN=test-admin-secret-with-at-least-32-characters bun scripts/browser-server.mjs",
+      "TT_STATS_FAKE_DATA=true RATE_LIMIT_READ_COUNT=100000 RATE_LIMIT_READ_BURST=100000 RATE_LIMIT_LOGIN_COUNT=100000 RATE_LIMIT_LOGIN_BURST=100000 ADMIN_TOKEN=test-admin-secret-with-at-least-32-characters bun scripts/browser-server.mjs",
     url: "http://127.0.0.1:4175/dashboard/",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 })

@@ -1,3 +1,4 @@
+import { useAdminAccess } from "@/components/dashboard/admin-access"
 import {
   useDashboardSearch,
   useDashboardNavigate,
@@ -23,6 +24,7 @@ import { otherStatsQueryOptions } from "@/lib/stats/query-options"
 const PAGE_SIZE = 20
 
 export function OtherPage() {
+  const { authenticated } = useAdminAccess()
   const statsQuery = useQuery(otherStatsQueryOptions())
   const stats = statsQuery.data
   const { page: requestedPage } = useDashboardSearch()
@@ -105,29 +107,31 @@ export function OtherPage() {
                 />
               </CardContent>
             </Card>
-            <div className="flex min-w-0 flex-col gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Top downloaders</CardTitle>
-                  <CardDescription>
-                    Private users and groups by video history count.
-                  </CardDescription>
-                  <CardAction>
-                    <TrophyIcon
-                      className="size-5 text-muted-foreground"
-                      aria-hidden="true"
+            {authenticated ? (
+              <div className="flex min-w-0 flex-col gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Top downloaders</CardTitle>
+                    <CardDescription>
+                      Private users and groups by video history count.
+                    </CardDescription>
+                    <CardAction>
+                      <TrophyIcon
+                        className="size-5 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                    </CardAction>
+                  </CardHeader>
+                  <CardContent>
+                    <RankedTable
+                      rows={stats.topDownloaders}
+                      valueLabel="Telegram ID"
+                      countLabel="Downloads"
                     />
-                  </CardAction>
-                </CardHeader>
-                <CardContent>
-                  <RankedTable
-                    rows={stats.topDownloaders}
-                    valueLabel="Telegram ID"
-                    countLabel="Downloads"
-                  />
-                </CardContent>
-              </Card>
-            </div>
+                  </CardContent>
+                </Card>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

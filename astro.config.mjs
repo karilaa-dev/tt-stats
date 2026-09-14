@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto"
+import { createElement } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { ThemeProvider } from "next-themes"
 import { defineConfig } from "astro/config"
 import node from "@astrojs/node"
 import react from "@astrojs/react"
@@ -19,16 +23,53 @@ const allowedHosts = process.env.DEV_ALLOWED_ORIGINS?.split(",")
     }
   })
   .filter(Boolean)
+const site = new URL(process.env.APP_ORIGIN || "https://tt-stats.karilaa.dev")
 let stopMonitor
 
 export default defineConfig({
-  site: "https://tt-stats.karilaa.dev",
+  site: site.origin,
   security: {
+    actionBodySizeLimit: 16_384,
+    csp: {
+      directives: [
+        "default-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self' data:",
+        "media-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ],
+      styleDirective: { resources: ["'self'", "'unsafe-inline'"] },
+      scriptDirective: {
+        resources: ["'self'"],
+        hashes: Array.from(
+          renderToStaticMarkup(
+            createElement(ThemeProvider, {
+              attribute: "class",
+              defaultTheme: "system",
+              enableSystem: true,
+              disableTransitionOnChange: true,
+            })
+          ).matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g),
+          (match) =>
+            `sha256-${createHash("sha256").update(match[1]).digest("base64")}`
+        ),
+      },
+    },
     // Dokploy terminates HTTPS before forwarding requests to the Bun server.
-    allowedDomains: [{ protocol: "https", hostname: "tt-stats.karilaa.dev" }],
+    allowedDomains: [
+      {
+        protocol: site.protocol.slice(0, -1),
+        hostname: site.hostname,
+        ...(site.port ? { port: site.port } : {}),
+      },
+    ],
   },
+  markdown: { syntaxHighlight: "prism" },
   output: "server",
-  adapter: node({ mode: "standalone" }),
+  adapter: node({ mode: "standalone", bodySizeLimit: 16_384 }),
   integrations: [
     react(),
     {

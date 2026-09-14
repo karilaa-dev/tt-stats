@@ -21,6 +21,8 @@ const downloads: PaginatedUserDownloads = {
       mediaKind: "video",
       cacheHit: true,
       videoDetailsId: "1",
+      otherUniqueChats: "0",
+      isFirstDownloader: true,
     },
     {
       id: "1",
@@ -29,6 +31,8 @@ const downloads: PaginatedUserDownloads = {
       mediaKind: "video",
       cacheHit: false,
       videoDetailsId: "2",
+      otherUniqueChats: "5",
+      isFirstDownloader: false,
     },
   ],
   page: 1,
@@ -40,22 +44,30 @@ const downloads: PaginatedUserDownloads = {
 describe("user downloads table", () => {
   afterEach(cleanup)
 
-  it("shows whether each download was a cache hit or miss", () => {
+  it("shows first-downloader status independently of cache and other-chat counts", () => {
     render(
       <UserDownloadsTable
         data={downloads}
+        own
         loading={false}
         onPageChange={vi.fn()}
       />
     )
 
-    expect(screen.getByRole("columnheader", { name: "Cache" })).toBeTruthy()
-    const rows = screen.getAllByRole("row").slice(1)
-    expect(within(rows[0]!).getByText("Hit")).toBeTruthy()
-    expect(within(rows[1]!).getByText("Miss")).toBeTruthy()
+    const rows = screen.getAllByRole("listitem")
+    expect(within(rows[0]!).getByText("You were first")).toBeTruthy()
+    expect(
+      within(rows[0]!).getByText("No other people have downloaded this yet")
+    ).toBeTruthy()
+    expect(
+      within(rows[1]!).getByText("5 other people downloaded this")
+    ).toBeTruthy()
+    expect(
+      screen.queryByRole("button", { name: "Other downloaders" })
+    ).toBeNull()
   })
 
-  it("offers previews for all downloads and other downloaders only for linked cache hits", () => {
+  it("offers admins previews and downloader identities for linked posts regardless of cache hits", () => {
     const onView = vi.fn()
     render(
       <UserDownloadsTable
@@ -69,13 +81,14 @@ describe("user downloads table", () => {
         loading={false}
         onPageChange={vi.fn()}
         onView={onView}
+        admin
       />
     )
     expect(screen.getAllByRole("button", { name: "View media" })).toHaveLength(
       3
     )
     const others = screen.getAllByRole("button", { name: "Other downloaders" })
-    expect(others).toHaveLength(1)
+    expect(others).toHaveLength(2)
     fireEvent.click(others[0]!)
     expect(onView).toHaveBeenCalledWith({
       id: "2",
@@ -119,7 +132,7 @@ describe("user downloads table", () => {
       />
     )
 
-    expect(screen.getByRole("table", { name: "Download history" })).toBeTruthy()
+    expect(screen.getByRole("list", { name: "Download history" })).toBeTruthy()
     for (const name of ["Go to previous page", "Go to next page"]) {
       const button = screen.getByRole("button", { name })
       expect((button as HTMLButtonElement).disabled).toBe(true)

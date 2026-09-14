@@ -1,3 +1,5 @@
+import { getPrincipal } from "@/lib/auth/session"
+import { canReadMedia } from "@/lib/media/access"
 import { ActionError, defineAction } from "astro:actions"
 import { z } from "zod"
 import { isFakeDataEnabled, getFakeUserDownloads } from "@/lib/dev/fake-data"
@@ -23,6 +25,7 @@ function safe<Input, Output>(handler: (input: Input) => Promise<Output>) {
     try {
       return await handler(input)
     } catch (error) {
+      if (error instanceof ActionError) throw error
       throw new ActionError({
         code: "INTERNAL_SERVER_ERROR",
         message: getSafeDatabaseError(error).description,
@@ -33,14 +36,27 @@ function safe<Input, Output>(handler: (input: Input) => Promise<Output>) {
 
 export const getDownloadMedia = defineAction({
   input: z.object({ downloadId }),
-  handler: safe(async ({ downloadId }) =>
-    isFakeDataEnabled()
-      ? {
-          items: [],
-          unavailableReason: "Saved media is unavailable in demo mode.",
-        }
-      : describeMedia(downloadId, await getStoredMedia(downloadId))
-  ),
+  handler: async ({ downloadId }, context) => {
+    try {
+      if (!(await canReadMedia(getPrincipal(context.cookies), downloadId)))
+        throw new ActionError({
+          code: "NOT_FOUND",
+          message: "Saved media is unavailable.",
+        })
+      return isFakeDataEnabled()
+        ? {
+            items: [],
+            unavailableReason: "Saved media is unavailable in demo mode.",
+          }
+        : describeMedia(downloadId, await getStoredMedia(downloadId))
+    } catch (error) {
+      if (error instanceof ActionError) throw error
+      throw new ActionError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Saved media is temporarily unavailable.",
+      })
+    }
+  },
 })
 
 export const getDownloaders = defineAction({
@@ -52,7 +68,7 @@ export const getDownloaders = defineAction({
     )
     return {
       items:
-        source?.cacheHit && page === 1
+        source?.videoDetailsId && page === 1
           ? [
               {
                 userId: "9007199254740993",
@@ -82,7 +98,6 @@ export const getPopularVideos = defineAction({
       .map((item, index) => ({
         downloadId: item.id,
         sharedLink: item.sharedLink,
-        downloads: String(Math.ceil((120 - index * 4) * scale)),
         uniqueChats: String(Math.ceil((60 - index * 2) * scale)),
       }))
     return {

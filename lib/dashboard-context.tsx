@@ -22,6 +22,12 @@ function parseSearch(search: string) {
   const page = Number(params.get("page"))
   return {
     range: parseStatsRange(params.get("range")),
+    historyRange: params.get("range")
+      ? parseStatsRange(params.get("range"))
+      : ("all" as const),
+    mediaKind: (["video", "images"].includes(params.get("mediaKind") ?? "")
+      ? params.get("mediaKind")
+      : "all") as "all" | "video" | "images",
     scope: parseChatScope(params.get("scope")),
     id: params.get("id") ?? "",
     page: Number.isInteger(page) && page > 0 ? page : 1,

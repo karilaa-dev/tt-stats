@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 
 vi.mock("@/components/dashboard/admin-access", () => ({
-  useAdminAccess: () => ({ authenticated: true }),
+  useAdminAccess: () => ({ authenticated: false }),
 }))
 vi.mock("@/lib/media/query-options", () => ({
   mediaQueryOptions: (id: string) => ({
@@ -21,6 +21,10 @@ vi.mock("@/lib/media/query-options", () => ({
 }))
 import { DownloadDialog } from "@/components/dashboard/download-dialog"
 
+beforeEach(() => {
+  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {})
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => {})
+})
 afterEach(cleanup)
 describe("download preview", () => {
   it("renders video controls and album images, keeping the source link when a file fails", async () => {
@@ -44,6 +48,10 @@ describe("download preview", () => {
     )) as HTMLVideoElement
     expect(video.controls).toBe(true)
     expect(video.getAttribute("src")).toBe("/api/media/1/0")
+    expect(screen.queryByRole("img")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Next item" }))
+    expect(video.getAttribute("src")).toBeNull()
+    expect(video.pause).toHaveBeenCalled()
     const photo = screen.getByRole("img", { name: "Downloaded image 2" })
     expect(photo.getAttribute("src")).toBe("/api/media/1/1")
     fireEvent.error(photo)

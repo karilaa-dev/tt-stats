@@ -9,9 +9,9 @@ export function mediaUnavailableReason(
   if (!media?.telegram_files?.length)
     return "No saved media is available for this download."
   if (!token || !/^\d+:[A-Za-z0-9_-]+$/u.test(token))
-    return "Configure BOT_TOKEN on the server to view saved media."
+    return "Saved media previews are temporarily unavailable."
   if (media.telegram_bot_id !== token.split(":")[0])
-    return "The saved media belongs to a different Telegram bot."
+    return "This saved file is unavailable. Open the original post."
   return null
 }
 

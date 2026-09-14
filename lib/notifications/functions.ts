@@ -1,3 +1,4 @@
+import { requestWithCooldown } from "@/lib/http-client"
 import { actions } from "astro:actions"
 
 export interface VideoNotificationStatus {
@@ -7,7 +8,9 @@ export interface VideoNotificationStatus {
 }
 
 export const getVideoNotificationStatus = () =>
-  actions.getVideoNotificationStatus.orThrow()
+  requestWithCooldown("read", () =>
+    actions.getVideoNotificationStatus.orThrow()
+  )
 
 export const sendVideoNotificationTest = () =>
-  actions.sendVideoNotificationTest.orThrow()
+  requestWithCooldown("read", () => actions.sendVideoNotificationTest.orThrow())

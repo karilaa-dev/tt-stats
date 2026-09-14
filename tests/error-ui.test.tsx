@@ -6,8 +6,15 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DATABASE_ERROR_COPY, isSafeDatabaseError } from "@/lib/db/errors"
 
+const access = vi.hoisted(() => ({ authenticated: false }))
+vi.mock("@/components/dashboard/admin-access", () => ({
+  useAdminAccess: () => access,
+}))
 describe("dashboard infrastructure failures", () => {
-  afterEach(cleanup)
+  afterEach(() => {
+    cleanup()
+    access.authenticated = false
+  })
 
   it("renders an accessible generic alert without leaking exception details", () => {
     const reset = vi.fn()
@@ -19,7 +26,7 @@ describe("dashboard infrastructure failures", () => {
     )
 
     expect(screen.getByRole("alert").textContent).toContain(
-      "Statistics could not be loaded"
+      "Statistics are unavailable"
     )
     expect(screen.queryByText(/database\.internal/u)).toBeNull()
     fireEvent.click(screen.getByRole("button", { name: "Try again" }))
@@ -27,6 +34,7 @@ describe("dashboard infrastructure failures", () => {
   })
 
   it("shows a specific safe message for a recognized database failure", () => {
+    access.authenticated = true
     const safeError = new Error(DATABASE_ERROR_COPY.snapshotSchema.description)
     expect(isSafeDatabaseError(safeError)).toBe(true)
     expect(isSafeDatabaseError(new Error("postgresql://secret@host/db"))).toBe(

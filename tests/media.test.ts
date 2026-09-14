@@ -45,10 +45,10 @@ describe("saved media", () => {
     expect(
       mediaUnavailableReason({ ...media, telegram_files: [] }, token)
     ).toContain("No saved media")
-    expect(mediaUnavailableReason(media, "")).toContain("Configure BOT_TOKEN")
-    expect(mediaUnavailableReason(media, "456:secret")).toContain(
-      "different Telegram bot"
+    expect(mediaUnavailableReason(media, "")).toContain(
+      "temporarily unavailable"
     )
+    expect(mediaUnavailableReason(media, "456:secret")).toContain("unavailable")
   })
 
   it("proxies byte ranges and streams media without upstream credentials or cookies", async () => {

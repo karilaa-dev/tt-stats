@@ -6,7 +6,11 @@ export interface HistoryCsvRow {
 }
 
 export function historyCsv(rows: HistoryCsvRow[]): string {
-  return stringify(rows, { header: true, columns: ["Time", "Video"] })
+  return stringify(rows, {
+    header: true,
+    escape_formulas: true,
+    columns: ["Time", "Video"],
+  })
 }
 
 export function utcIsoFromEpoch(epoch: string | number): string {

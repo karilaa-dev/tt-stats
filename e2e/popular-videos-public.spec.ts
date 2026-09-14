@@ -19,10 +19,10 @@ test("visitors can browse every period and keep filters through pagination and h
     page.getByRole("dialog", { name: "Admin access", exact: true })
   ).toHaveCount(0)
   for (const [label, range, count] of [
-    ["24 hours", "24h", "12"],
-    ["7 days", "7d", "36"],
-    ["31 days", "31d", "72"],
-    ["Total", "all", "120"],
+    ["24 hours", "24h", "6"],
+    ["7 days", "7d", "18"],
+    ["31 days", "31d", "36"],
+    ["Total", "all", "60"],
   ]) {
     await page.getByRole("button", { name: label, exact: true }).click()
     await expect(
@@ -53,11 +53,11 @@ test("visitors can browse every period and keep filters through pagination and h
   await expect(table).toBeVisible()
   await table.getByRole("button", { name: "View media" }).first().click()
   await expect(
-    page.getByRole("dialog", { name: "Admin access", exact: true })
+    page.getByRole("dialog", { name: "Saved media", exact: true })
   ).toBeVisible()
 })
 
-test("ranking actions are public while saved media and downloader identities stay private", async ({
+test("ranking actions and top previews are public while private media and identities are protected", async ({
   request,
   baseURL,
 }) => {
@@ -79,7 +79,7 @@ test("ranking actions are public while saved media and downloader identities sta
       })
     ).status()
   ).toBe(400)
-  for (const action of ["getDownloadMedia", "getDownloaders", "getUserStats"]) {
+  for (const action of ["getDownloaders", "getUserStats"]) {
     expect(
       (
         await request.post(`/_actions/${action}`, {
@@ -89,5 +89,5 @@ test("ranking actions are public while saved media and downloader identities sta
       ).status()
     ).toBe(401)
   }
-  expect((await request.get("/api/media/9999/0")).status()).toBe(401)
+  expect((await request.get("/api/media/9999/0")).status()).toBe(404)
 })

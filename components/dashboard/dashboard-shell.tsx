@@ -23,7 +23,7 @@ export function DashboardShell({ children, ...context }: DashboardShellProps) {
           queries: {
             gcTime: 60 * 60 * 1000,
             refetchOnWindowFocus: false,
-            retry: 1,
+            retry: false,
           },
         },
       })
