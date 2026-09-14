@@ -48,6 +48,7 @@ const reasons = new Map<string, { reason: string; claim?: string }>([
     { reason: "unexpected_nonce", claim: "nonce" },
   ],
   ["Invalid Telegram identity", { reason: "invalid_telegram_id", claim: "id" }],
+  ["Missing Telegram user ID", { reason: "missing_telegram_id", claim: "id" }],
   ["Missing Telegram identity", { reason: "missing_id_token" }],
 ])
 for (const field of ["code", "state", "iss", "response"]) {

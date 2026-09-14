@@ -112,6 +112,32 @@ async function flow(
   return { ...result, callback, calls }
 }
 describe("official Telegram OIDC", () => {
+  it.each(["987654321", "4503599627370495"])(
+    "accepts a verified decimal-string Telegram ID: %s",
+    async (id) => {
+      const { callback, transaction } = await flow({ id })
+      expect(await finishTelegramLogin(callback, transaction)).toMatchObject({
+        id,
+      })
+    }
+  )
+  it.each([
+    "",
+    "0",
+    "-1",
+    "1.5",
+    "1e3",
+    " 123",
+    "123 ",
+    "00123",
+    "9007199254740992",
+    null,
+    true,
+    {},
+    [],
+  ])("rejects invalid Telegram ID representations: %j", (id) => {
+    expect(() => telegramUserFromClaims({ id, sub: "123" })).toThrow()
+  })
   it.each(["secret_with_underscores", "test+oauth/secret=with:%characters"])(
     "sends client secret %s exactly as Telegram documents",
     async (clientSecret) => {

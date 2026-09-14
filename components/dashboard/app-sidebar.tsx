@@ -28,8 +28,8 @@ import { useAdminAccess } from "./admin-access"
 const navigation = [
   {
     href: "/dashboard/me",
-    label: "My profile",
-    short: "My profile",
+    label: "My Profile",
+    short: "My Profile",
     icon: UserRoundIcon,
     description: "Your downloads and statistics",
   },
@@ -92,6 +92,7 @@ const navigation = [
 ]
 
 export function DesktopNavigation() {
+  const { user } = useSession()
   const { authenticated } = useAdminAccess()
   const visibleNavigation = navigation.filter(
     (item) =>
@@ -105,11 +106,15 @@ export function DesktopNavigation() {
       {visibleNavigation.map(({ href, label, icon: Icon }) => (
         <a
           key={href}
-          href={href}
+          href={
+            href === "/dashboard/me" && !user
+              ? "/api/auth/telegram/start"
+              : href
+          }
           aria-current={current === href ? "page" : undefined}
         >
           <Icon aria-hidden="true" />
-          {label}
+          {href === "/dashboard/me" && !user ? "Log in with Telegram" : label}
         </a>
       ))}
     </nav>
@@ -146,7 +151,11 @@ export function AppSidebar() {
             aria-current={current === href ? "page" : undefined}
           >
             <Icon aria-hidden="true" />
-            <span>{short}</span>
+            <span>
+              {href === "/dashboard/me" && !user
+                ? "Log in with Telegram"
+                : short}
+            </span>
           </a>
         ))}
         <Button
@@ -176,14 +185,26 @@ export function AppSidebar() {
                 ({ href, label, description, icon: Icon }) => (
                   <a
                     key={href}
-                    href={href}
+                    href={
+                      href === "/dashboard/me" && !user
+                        ? "/api/auth/telegram/start"
+                        : href
+                    }
                     aria-current={current === href ? "page" : undefined}
-                    aria-label={label}
+                    aria-label={
+                      href === "/dashboard/me" && !user
+                        ? "Log in with Telegram"
+                        : label
+                    }
                     onClick={() => setOpenMobile(false)}
                   >
                     <Icon aria-hidden="true" />
                     <span>
-                      <strong>{label}</strong>
+                      <strong>
+                        {href === "/dashboard/me" && !user
+                          ? "Log in with Telegram"
+                          : label}
+                      </strong>
                       <small>{description}</small>
                     </span>
                     <ArrowUpRightIcon aria-hidden="true" />

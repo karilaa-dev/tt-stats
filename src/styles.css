@@ -469,6 +469,7 @@ a:focus-visible {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    text-align: center;
     gap: 0.3rem;
     min-height: 3.25rem;
     height: auto;

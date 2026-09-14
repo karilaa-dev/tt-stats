@@ -8,7 +8,9 @@ test("login is visible and admin menus are hidden until visiting /admin", async 
   await page.goto("/dashboard")
   await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
   await expect(page.locator(".telegram-login")).toBeInViewport()
-  await expect(page.locator(".telegram-login")).toHaveText("My profile")
+  await expect(page.locator(".telegram-login")).toHaveText(
+    "Log in with Telegram"
+  )
   await expect(
     page.getByRole("link", { name: "Operations", exact: true })
   ).toHaveCount(0)
@@ -18,7 +20,7 @@ test("login is visible and admin menus are hidden until visiting /admin", async 
   if (isMobile) {
     const dock = page.getByRole("navigation", { name: "Quick navigation" })
     await expect(
-      dock.getByRole("link", { name: "My profile", exact: true })
+      dock.getByRole("link", { name: "Log in with Telegram", exact: true })
     ).toBeInViewport()
     await expect(
       dock.getByRole("link", { name: "Videos", exact: true })
@@ -152,7 +154,7 @@ test("personal page explains login and cancelled or expired attempts", async ({
   ]) {
     await page.goto(`/dashboard/me?login=${status}`)
     await expect(
-      page.getByRole("heading", { name: "My videos", exact: true })
+      page.getByRole("heading", { name: "My Profile", exact: true })
     ).toBeVisible()
     await expect(page.getByRole("status")).toContainText(message)
     await expect(page.locator(".telegram-login").first()).toBeInViewport()

@@ -125,7 +125,7 @@ export function TelegramLoginButton({
       )}
     >
       <UserRoundIcon aria-hidden="true" data-icon="inline-start" />
-      My profile
+      {user ? "My Profile" : "Log in with Telegram"}
     </a>
   )
 }

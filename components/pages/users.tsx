@@ -65,7 +65,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
     return (
       <>
         <PageHeading
-          title="My videos"
+          title="My Profile"
           description="Your downloads, all in one place."
         />
         <Card className="mx-auto w-full max-w-xl">
@@ -95,7 +95,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
   return (
     <>
       <PageHeading
-        title={own ? "My videos" : "User lookup"}
+        title={own ? "My Profile" : "User lookup"}
         description={
           own
             ? "Revisit your downloads and see what caught on."

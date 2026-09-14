@@ -127,7 +127,11 @@ export function telegramUserFromClaims(
   claims: Record<string, unknown>
 ): TelegramUser {
   // Telegram's OIDC subject is not the numeric Bot API user ID.
-  const id = claims.id
+  if (claims.id === undefined) throw new Error("Missing Telegram user ID")
+  const id =
+    typeof claims.id === "string" && /^[1-9]\d{0,15}$/u.test(claims.id)
+      ? Number(claims.id)
+      : claims.id
   if (!(typeof id === "number" && Number.isSafeInteger(id) && id > 0))
     throw new Error("Invalid Telegram identity")
   return {

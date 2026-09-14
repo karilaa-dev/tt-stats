@@ -44,9 +44,10 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await page.goto("/dashboard/me")
     await expect(page.getByText("Alex Example", { exact: true })).toBeVisible()
     await expect(
-      page.getByRole("heading", { name: "My videos", exact: true })
+      page.getByRole("heading", { name: "My Profile", exact: true })
     ).toBeVisible()
-    await expect(page.locator(".telegram-login")).toHaveText("My profile")
+    await expect(page.locator(".telegram-login")).toHaveText("My Profile")
+    await expect(page).toHaveTitle("My Profile · TT Stats")
     const history = page.getByRole("list", { name: "Download history" })
     await expect(history.getByText("You were first").first()).toBeVisible()
     await expect(
@@ -65,7 +66,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
       await expect(
         page
           .getByRole("navigation", { name: "Quick navigation" })
-          .getByRole("link", { name: "My profile" })
+          .getByRole("link", { name: "My Profile" })
       ).toBeInViewport()
     expect(
       await page.evaluate(
@@ -92,6 +93,29 @@ test("personal statistics, filters, mobile access, and logout", async ({
       page.getByRole("list", { name: "Download history" })
     ).toHaveCount(0)
     await expect(page.getByText("Alex Example", { exact: true })).toHaveCount(0)
+    await expect(
+      page.getByRole("heading", { name: "My Profile", exact: true })
+    ).toBeVisible()
+    for (const login of await page.locator(".telegram-login").all()) {
+      await expect(login).toHaveText("Log in with Telegram")
+      await expect(login).toHaveAttribute("href", "/api/auth/telegram/start")
+      await expect(login).toBeVisible()
+    }
+    await expect(page.getByText("My videos", { exact: true })).toHaveCount(0)
+    if (isMobile) {
+      await expect(
+        page
+          .getByRole("navigation", { name: "Quick navigation" })
+          .getByRole("link", { name: "Log in with Telegram" })
+      ).toBeInViewport()
+      await page.setViewportSize({ width: 320, height: 720 })
+      await expect(page.locator(".telegram-login-compact")).toBeInViewport()
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    ).toBe(true)
   } finally {
     await backend.dispose()
   }
