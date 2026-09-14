@@ -21,6 +21,7 @@ const downloads: PaginatedUserDownloads = {
       mediaKind: "video",
       cacheHit: true,
       videoDetailsId: "1",
+      hasSavedMedia: true,
       otherUniqueChats: "0",
       isFirstDownloader: true,
     },
@@ -31,6 +32,7 @@ const downloads: PaginatedUserDownloads = {
       mediaKind: "video",
       cacheHit: false,
       videoDetailsId: "2",
+      hasSavedMedia: true,
       otherUniqueChats: "5",
       isFirstDownloader: false,
     },
@@ -75,7 +77,13 @@ describe("user downloads table", () => {
           ...downloads,
           items: [
             ...downloads.items,
-            { ...downloads.items[0]!, id: "3", videoDetailsId: null },
+            {
+              ...downloads.items[0]!,
+              id: "3",
+              videoDetailsId: null,
+              hasSavedMedia: false,
+            },
+            { ...downloads.items[0]!, id: "4", hasSavedMedia: false },
           ],
         }}
         loading={false}
@@ -85,10 +93,10 @@ describe("user downloads table", () => {
       />
     )
     expect(screen.getAllByRole("button", { name: "View media" })).toHaveLength(
-      3
+      2
     )
     const others = screen.getAllByRole("button", { name: "Other downloaders" })
-    expect(others).toHaveLength(2)
+    expect(others).toHaveLength(3)
     fireEvent.click(others[0]!)
     expect(onView).toHaveBeenCalledWith({
       id: "2",

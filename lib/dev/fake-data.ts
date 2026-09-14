@@ -20,6 +20,7 @@ import type {
   UserActivity,
   UserActivityRange,
 } from "@/lib/stats/types"
+import type { PopularVideos } from "@/lib/media/types"
 
 const FAKE_NOW_EPOCH = 1_786_338_000
 
@@ -94,8 +95,41 @@ const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
     otherUniqueChats: String(index % 7),
     isFirstDownloader: index % 4 === 0 ? true : index % 4 === 3 ? null : false,
     videoDetailsId: index % 4 === 3 ? null : String(index + 1),
+    hasSavedMedia: index % 4 !== 3 && index % 6 !== 4,
   }
 })
+
+export function getFakePopularVideos(
+  page: number,
+  range: StatsRange,
+  pageSize = 20
+): PopularVideos {
+  const linked = fakeDownloads.filter(
+    (item) => item.mediaKind === "video" && item.videoDetailsId !== null
+  )
+  const scale = { "24h": 0.1, "7d": 0.3, "31d": 0.6, all: 1 }[range]
+  const items = Array.from({ length: 25 }, (_, index) => {
+    const source = linked[index]
+    const videoId = String(
+      7539876543210000000n + BigInt(source?.videoDetailsId ?? 1000 + index)
+    )
+    return {
+      downloadId: source?.id ?? String(20_000 + index),
+      videoId,
+      sharedLink:
+        source?.sharedLink ?? `https://www.tiktok.com/@demo/video/${videoId}`,
+      hasSavedMedia: source?.hasSavedMedia ?? index % 4 !== 3,
+      uniqueChats: String(Math.ceil(Math.max(1, 60 - index * 2) * scale)),
+    }
+  })
+  return {
+    items: items.slice((page - 1) * pageSize, page * pageSize),
+    page,
+    hasMore: items.length > page * pageSize,
+    range,
+    refreshedAt: 1_800_000_000,
+  }
+}
 
 export function isFakeDataEnabled(): boolean {
   return (
@@ -290,6 +324,7 @@ export function getFakeUserDownloads(
 ): PaginatedUserDownloads {
   const downloads = (fakeUsers[userId] ? fakeDownloads : []).filter((item) => {
     return (
+      (!filters.savedMediaOnly || item.hasSavedMedia) &&
       (filters.mediaKind === "all" || filters.mediaKind === item.mediaKind) &&
       (filters.from === undefined ||
         (item.downloadedAt !== null && item.downloadedAt >= filters.from)) &&

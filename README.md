@@ -318,6 +318,10 @@ browser's local calendar; the full end date is included, even on daylight-saving
 transition days. The server receives UTC boundaries and uses an exclusive upper
 bound. Changing filters resets pagination to page one; pagination and browser
 back/forward preserve the selected dates, media type, and ordering.
+**Only saved media** limits history to posts with a saved Telegram file ID. This
+filter runs before counts, sorting, and pagination, and combines with the other
+filters. **View media** appears only on records with saved media, including albums.
+The browser receives an availability flag, never the stored file IDs.
 **Downloaded by others** and **You were first** show posts downloaded by at
 least one other distinct chat. The latter requires a known first-downloader
 status for the account. These views default to **Most downloaded by others**;
@@ -384,13 +388,14 @@ inline styles remain permitted for the component and chart libraries.
 
 ## Deploying the new rankings
 
-The unique-chat ranking is schema version 7. Install the updated definitions
-through Operations or the documented manual SQL procedure, and apply the new
-indexes from `database/002_stats_snapshot_indexes.sql` outside a transaction.
-Rebuild rolling and daily snapshots so all four ranking periods have
-`ranking_version = 2`. The app refuses to show old event-count rankings while
-that refresh is pending. Install and refresh before switching production traffic
-to the new build.
+The ranking that excludes entries without video IDs is schema version 8. In
+Operations, **Update database definitions** installs the change and queues both
+rolling and daily rebuilds. A manual installation uses the documented SQL
+procedure. Apply any missing indexes from `database/002_stats_snapshot_indexes.sql`
+outside a transaction. All four ranking periods must reach
+`ranking_version = 3`. The app refuses to show old rankings that include legacy
+links while that refresh is pending. Schedule the update during deployment;
+Top videos is unavailable until the definitions and rankings are ready.
 
 The source bot tables are not rewritten. Added source indexes support identity
 and first-download comparisons. Personal history comparisons require a stable
@@ -448,8 +453,11 @@ period: 24 hours, 7 days, 31 days, and Total. Published Top videos previews are
 public, other previews require ownership or admin access, and arbitrary user
 lookups require admin access. Ranking counts distinct chats, counting each group
 as one chat and excluding placeholder ID zero. It excludes image albums.
-Linked events are grouped by `video_details_id`; unlinked legacy events are
-grouped by exact shared URL and cannot be merged across URL aliases. This is a
+Only events with a stable `video_details_id` and a non-empty platform video ID
+participate. Legacy links are excluded before selecting the top 1,000. The table
+displays the platform video ID instead of the shared URL, and **View media** appears
+only while the video has saved Telegram file IDs. Availability is checked when
+reading each page, so removed files do not require rebuilding rankings. This is a
 snapshot for each period. The 24-hour ranking updates every five minutes and
 ends at the last completed half-hour. The 7- and 31-day rankings use complete UTC
 days and refresh daily, together with Total. Records with missing timestamps

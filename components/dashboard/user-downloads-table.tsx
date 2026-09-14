@@ -137,21 +137,25 @@ export function UserDownloadsTable({
                       ) : null}
                     </div>
                   </div>
-                  {onView ? (
+                  {onView &&
+                  (download.hasSavedMedia ||
+                    (admin && download.videoDetailsId)) ? (
                     <div className="download-actions">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                          onView({
-                            id: download.id,
-                            sharedLink: download.sharedLink,
-                            mode: "media",
-                          })
-                        }
-                      >
-                        View media
-                      </Button>
+                      {download.hasSavedMedia ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            onView({
+                              id: download.id,
+                              sharedLink: download.sharedLink,
+                              mode: "media",
+                            })
+                          }
+                        >
+                          View media
+                        </Button>
+                      ) : null}
                       {admin && download.videoDetailsId ? (
                         <Button
                           size="sm"

@@ -3,6 +3,7 @@ import type { Pool } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import { withDatabaseStage } from "@/lib/db/diagnostics"
 import { getHistoryComparisons } from "./history-comparisons"
+import { savedMediaSql } from "@/lib/media/saved"
 import type { HistoryFilters, PaginatedUserDownloads } from "./types"
 
 // Only stable video identities can establish other downloaders or who was first.
@@ -27,7 +28,8 @@ function comparisons(source: string) {
 }
 
 const fields = `page.pk_id::text AS id, page.downloaded_at, page.shared_link, page.media_kind,
-  page.cache_hit, page.video_details_id::text`
+  page.cache_hit, page.video_details_id::text,
+  ${savedMediaSql("page.video_details_id")} AS has_saved_media`
 interface HistoryRow {
   id: string | null
   downloaded_at: string | null
@@ -35,6 +37,7 @@ interface HistoryRow {
   media_kind: "video" | "images"
   cache_hit: boolean
   video_details_id: string | null
+  has_saved_media: boolean
   other_chats: string
   first_user: string | null
   uncertain: boolean
@@ -61,7 +64,8 @@ export async function getUserDownloadsRaw(
   const predicate = `user_id = $1::bigint
     AND ($2::bigint IS NULL OR downloaded_at >= $2::bigint)
     AND ($3::bigint IS NULL OR downloaded_at < $3::bigint)
-    AND ($4::text IS NULL OR media_kind = $4)`
+    AND ($4::text IS NULL OR media_kind = $4)
+    ${filters.savedMediaOnly ? `AND ${savedMediaSql("videos.video_details_id")}` : ""}`
   const newest = "page.downloaded_at DESC NULLS LAST, page.pk_id DESC"
   let rows: HistoryRow[]
   let total: string
@@ -176,6 +180,7 @@ export async function getUserDownloadsRaw(
         mediaKind: row.media_kind,
         cacheHit: row.cache_hit,
         videoDetailsId: row.video_details_id,
+        hasSavedMedia: row.has_saved_media,
         otherUniqueChats: row.other_chats,
         isFirstDownloader: row.uncertain ? null : row.first_user === userId,
       })),

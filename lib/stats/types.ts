@@ -99,6 +99,7 @@ export interface UserStats {
 }
 
 export interface HistoryFilters {
+  savedMediaOnly?: boolean
   from?: number
   until?: number
   mediaKind: "all" | "video" | "images"
@@ -113,6 +114,7 @@ export interface UserDownload {
   mediaKind: "video" | "images"
   cacheHit: boolean
   videoDetailsId: string | null
+  hasSavedMedia: boolean
   otherUniqueChats?: string
   isFirstDownloader?: boolean | null
 }

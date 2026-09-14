@@ -38,6 +38,92 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
+  it("filters saved media before pagination and discovery without exposing file IDs", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      await client.query("INSERT INTO users(user_id) VALUES (998051), (998052)")
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id, telegram_bot_id, telegram_files) VALUES
+        (998051, 'tiktok', 'saved-video', 123, '[{"position":0,"media_type":"video","file_id":"private-saved-video","file_unique_id":"unique-saved-video"}]'),
+        (998052, 'instagram', 'saved-album', 123, '[{"position":0,"media_type":"photo","file_id":"private-saved-photo","file_unique_id":"unique-saved-photo"}]'),
+        (998053, 'tiktok', 'without-file-id', NULL, NULL)`)
+      await client.query(`INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit) VALUES
+        (998051, 998051, 1700000000, 'https://example.test/saved-first', 'video', 'chat', false),
+        (998051, 998051, 1700000001, 'https://example.test/saved-repeat', 'video', 'chat', true),
+        (998052, 998051, 1700000002, 'https://example.test/saved-other', 'video', 'chat', true),
+        (998051, 998052, 1700000003, 'https://example.test/album', 'images', 'chat', false),
+        (998051, 998053, 1700000004, 'https://example.test/no-media', 'video', 'chat', true),
+        (998051, NULL, 1700000005, 'https://example.test/saved-first', 'video', 'chat', true)`)
+      const all = await getUserDownloadsRaw("998051", 1, 20, db)
+      expect(all.total).toBe("5")
+      expect(all.items.map((item) => item.hasSavedMedia)).toEqual([
+        false,
+        false,
+        true,
+        true,
+        true,
+      ])
+      for (const sort of ["newest", "popular"] as const) {
+        const filters = {
+          mediaKind: "all" as const,
+          discovery: "all" as const,
+          sort,
+          savedMediaOnly: true,
+        }
+        const first = await getUserDownloadsRaw("998051", 1, 2, db, filters)
+        const last = await getUserDownloadsRaw("998051", 99, 2, db, filters)
+        expect(first).toMatchObject({ total: "3", totalPages: 2, page: 1 })
+        expect(first.items).toHaveLength(2)
+        expect(last).toMatchObject({ total: "3", page: 2 })
+        expect(last.items).toHaveLength(1)
+        expect(
+          [...first.items, ...last.items].every((item) => item.hasSavedMedia)
+        ).toBe(true)
+        expect(JSON.stringify(first)).not.toMatch(
+          /private-saved|telegram_files|file_id/
+        )
+        for (const discovery of ["others", "first"] as const) {
+          const filtered = await getUserDownloadsRaw("998051", 1, 20, db, {
+            ...filters,
+            discovery,
+            from: 1700000001,
+            until: 1700000004,
+          })
+          expect(filtered.total).toBe("1")
+          expect(filtered.items[0]).toMatchObject({
+            downloadedAt: 1700000001,
+            hasSavedMedia: true,
+            otherUniqueChats: "1",
+            isFirstDownloader: true,
+          })
+        }
+        const album = await getUserDownloadsRaw("998051", 1, 20, db, {
+          ...filters,
+          mediaKind: "images",
+        })
+        expect(album.total).toBe("1")
+        expect(album.items[0]?.mediaKind).toBe("images")
+      }
+      await client.query(
+        "UPDATE video_details SET telegram_files = NULL, telegram_bot_id = NULL WHERE pk_id IN (998051, 998052)"
+      )
+      expect(
+        (
+          await getUserDownloadsRaw("998051", 1, 20, db, {
+            mediaKind: "all",
+            discovery: "all",
+            sort: "popular",
+            savedMediaOnly: true,
+          })
+        ).total
+      ).toBe("0")
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
   it("keeps legacy entries in the large-account fallback while filtering only stable IDs", async () => {
     const client = await pool.connect()
     try {
@@ -723,11 +809,17 @@ integration("PostgreSQL statistics queries", () => {
       expect(ranked.items[0]).toMatchObject({
         downloadId: "100",
         uniqueChats: "3",
+        videoId: "same-post",
+        hasSavedMedia: true,
       })
-      expect(ranked.items[1]).toMatchObject({
-        sharedLink: "https://example.test/legacy",
-        uniqueChats: "2",
-      })
+      expect(ranked.items).toHaveLength(1)
+      expect(JSON.stringify(ranked)).not.toContain("video-file")
+      await client.query(
+        "UPDATE video_details SET telegram_files = NULL, telegram_bot_id = NULL WHERE pk_id = 100"
+      )
+      expect((await getPopularVideosRaw(1, db)).items[0]?.hasSavedMedia).toBe(
+        false
+      )
       expect((await getPopularVideosRaw(2, db)).items).toEqual([])
     } finally {
       await client.query("ROLLBACK")
@@ -740,11 +832,21 @@ integration("PostgreSQL statistics queries", () => {
     try {
       await client.query("BEGIN")
       const db = client as unknown as Pool
-      await client.query(`INSERT INTO videos (user_id, shared_link, media_kind, delivery_surface)
-        SELECT 1, 'https://example.test/ranking/' || n, 'video', 'chat'
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id)
+        SELECT 700000 + n, 'tiktok', 'ranking-' || n FROM generate_series(1, 1101) n`)
+      await client.query(`INSERT INTO videos (user_id, video_details_id, shared_link, media_kind, delivery_surface)
+        SELECT 1, 700000 + n, 'https://example.test/ranking/' || n, 'video', 'chat'
         FROM generate_series(1, 1100) n CROSS JOIN generate_series(1, 5) repeats`)
+      await client.query(`INSERT INTO videos (user_id, video_details_id, shared_link, media_kind, delivery_surface)
+        VALUES (1, 701101, 'https://example.test/unique-winner', 'video', 'chat'), (2, 701101, 'https://example.test/unique-winner', 'video', 'chat')`)
       await client.query(`INSERT INTO videos (user_id, shared_link, media_kind, delivery_surface)
-        VALUES (1, 'https://example.test/unique-winner', 'video', 'chat'), (2, 'https://example.test/unique-winner', 'video', 'chat')`)
+        SELECT user_id, 'https://example.test/legacy-most-popular', 'video', 'chat'
+        FROM users WHERE user_id <> 0`)
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id)
+        VALUES (701102, 'tiktok', '   ')`)
+      await client.query(`INSERT INTO videos (user_id, video_details_id, shared_link, media_kind, delivery_surface)
+        SELECT user_id, 701102, 'https://example.test/missing-video-id', 'video', 'chat'
+        FROM users WHERE user_id <> 0`)
       await client.query(
         "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1))",
         [now]
@@ -753,13 +855,25 @@ integration("PostgreSQL statistics queries", () => {
         "SELECT count(*)::int AS count FROM tt_stats_cache.popular_videos WHERE range = 'all'"
       )
       expect(count.rows[0].count).toBe(1000)
-      expect((await getPopularVideosRaw(1, db)).items[0]?.sharedLink).toBe(
-        "https://example.test/unique-winner"
-      )
+      const winner = (await getPopularVideosRaw(1, db)).items[0]!
+      expect(winner.videoId).toBe("ranking-1101")
       const lastPage = await getPopularVideosRaw(50, db)
       expect(lastPage.items).toHaveLength(20)
       expect(lastPage.hasMore).toBe(false)
       expect((await getPopularVideosRaw(51, db)).items).toEqual([])
+      expect(
+        await canReadMedia({ admin: false, user: null }, winner.downloadId, db)
+      ).toBe(true)
+      // Old snapshots must not restore legacy public media or stale rankings.
+      await client.query(
+        "UPDATE tt_stats_cache.popular_videos_metadata SET ranking_version = 2"
+      )
+      await expect(getPopularVideosRaw(1, db)).rejects.toMatchObject({
+        kind: "snapshotsMissing",
+      })
+      expect(
+        await canReadMedia({ admin: false, user: null }, winner.downloadId, db)
+      ).toBe(false)
     } finally {
       await client.query("ROLLBACK")
       client.release()
@@ -777,7 +891,7 @@ integration("PostgreSQL statistics queries", () => {
       })
       await client.query("DELETE FROM tt_stats_cache.popular_videos")
       await client.query(
-        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 2)",
+        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 3)",
         [now]
       )
       expect(await getPopularVideosRaw(1, db)).toEqual({
@@ -830,16 +944,13 @@ integration("PostgreSQL statistics queries", () => {
           [end + 600, range]
         )
       }
-      for (const [range, , uniqueChats, legacyDownloads] of cases) {
+      for (const [range, , uniqueChats] of cases) {
         const ranking = await getPopularVideosRaw(1, db, range)
         expect(ranking.range).toBe(range)
         expect(ranking.items[0]).toMatchObject({ uniqueChats })
         expect(ranking.items[0]).not.toHaveProperty("downloads")
-        expect(ranking.items[1]).toMatchObject({
-          sharedLink: "https://example.test/period-legacy",
-          uniqueChats: legacyDownloads,
-        })
-        expect(ranking.items).toHaveLength(2)
+        expect(ranking.items[0]?.videoId).toBe("period-test")
+        expect(ranking.items).toHaveLength(1)
       }
       await client.query(
         "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1), '24h')",

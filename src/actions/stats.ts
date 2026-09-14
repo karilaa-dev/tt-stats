@@ -169,6 +169,7 @@ export const getOtherStats = defineAction({
 })
 
 const historyFilters = {
+  savedMediaOnly: z.boolean().default(false),
   from: z.number().int().min(0).max(253402300800).optional(),
   until: z.number().int().min(0).max(253402300800).optional(),
   mediaKind: z.enum(["all", "video", "images"]).default("all"),

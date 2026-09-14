@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/empty"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Badge } from "@/components/ui/badge"
@@ -150,8 +152,15 @@ export function UsersPage({ own = false }: { own?: boolean }) {
 }
 function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   const session = useSession()
-  const { page, fromDate, throughDate, mediaKind, discovery, sort } =
-    useDashboardSearch()
+  const {
+    page,
+    fromDate,
+    throughDate,
+    mediaKind,
+    discovery,
+    sort,
+    savedMediaOnly,
+  } = useDashboardSearch()
   const hydrated = useHydrated()
   const navigate = useDashboardNavigate()
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
@@ -162,8 +171,16 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     mediaKind,
     discovery,
     sort,
+    savedMediaOnly,
   }
-  const historySearch = { fromDate, throughDate, mediaKind, discovery, sort }
+  const historySearch = {
+    fromDate,
+    throughDate,
+    mediaKind,
+    discovery,
+    sort,
+    savedMediaOnly,
+  }
   const userQuery = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId],
     queryFn: ({ signal }) =>
@@ -349,6 +366,18 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+            <Field orientation="horizontal" className="w-auto">
+              <Switch
+                id="saved-media-only"
+                checked={savedMediaOnly}
+                onCheckedChange={(checked) =>
+                  changeFilters({ savedMediaOnly: checked })
+                }
+              />
+              <FieldLabel htmlFor="saved-media-only">
+                Only saved media
+              </FieldLabel>
+            </Field>
           </div>
           {user ? (
             <HistoryExport

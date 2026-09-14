@@ -2,7 +2,11 @@ import { getPrincipal } from "@/lib/auth/session"
 import { canReadMedia } from "@/lib/media/access"
 import { ActionError, defineAction } from "astro:actions"
 import { z } from "zod"
-import { isFakeDataEnabled, getFakeUserDownloads } from "@/lib/dev/fake-data"
+import {
+  isFakeDataEnabled,
+  getFakeUserDownloads,
+  getFakePopularVideos,
+} from "@/lib/dev/fake-data"
 import {
   getDownloadersRaw,
   getPopularVideosRaw,
@@ -92,20 +96,6 @@ export const getPopularVideos = defineAction({
   input: z.object({ page, range: z.enum(STATS_RANGES).default("all") }),
   handler: safe(async ({ page, range }) => {
     if (!isFakeDataEnabled()) return getPopularVideosRaw(page, undefined, range)
-    const scale = { "24h": 0.1, "7d": 0.3, "31d": 0.6, all: 1 }[range]
-    const items = getFakeUserDownloads("123456789", 1, 50)
-      .items.filter((item) => item.mediaKind === "video")
-      .map((item, index) => ({
-        downloadId: item.id,
-        sharedLink: item.sharedLink,
-        uniqueChats: String(Math.ceil((60 - index * 2) * scale)),
-      }))
-    return {
-      items: items.slice((page - 1) * 20, page * 20),
-      page,
-      hasMore: items.length > page * 20,
-      refreshedAt: 1_800_000_000,
-      range,
-    }
+    return getFakePopularVideos(page, range)
   }),
 })

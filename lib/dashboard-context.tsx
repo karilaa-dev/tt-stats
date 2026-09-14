@@ -24,6 +24,7 @@ function parseSearch(search: string) {
     range: parseStatsRange(params.get("range")),
     fromDate: params.get("fromDate") ?? "",
     throughDate: params.get("throughDate") ?? "",
+    savedMediaOnly: params.get("savedMediaOnly") === "true",
     discovery: (["others", "first"].includes(params.get("discovery") ?? "")
       ? params.get("discovery")
       : "all") as "all" | "others" | "first",

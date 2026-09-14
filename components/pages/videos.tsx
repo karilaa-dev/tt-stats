@@ -1,4 +1,3 @@
-import { safeExternalUrl } from "@/lib/security/links"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
@@ -73,7 +72,8 @@ export function VideosPage() {
         <CardHeader>
           <CardTitle>Top 1,000 videos</CardTitle>
           <CardDescription>
-            Each user or group counts once. Image albums are excluded.{" "}
+            Each user or group counts once. Image albums and legacy downloads
+            without a video ID are excluded.{" "}
             {range === "24h"
               ? "24 hours through the last completed half-hour. Rankings update every five minutes."
               : range === "all"
@@ -127,7 +127,7 @@ export function VideosPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Rank</TableHead>
-                  <TableHead>Video</TableHead>
+                  <TableHead>Video ID</TableHead>
                   <TableHead>People downloaded</TableHead>
                 </TableRow>
               </TableHeader>
@@ -139,29 +139,24 @@ export function VideosPage() {
                     </TableCell>
                     <TableCell className="max-w-48 sm:max-w-96">
                       <div className="flex flex-col items-start gap-2">
-                        <a
-                          className="block max-w-full truncate text-primary underline"
-                          href={safeExternalUrl(item.sharedLink)}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={item.sharedLink}
-                        >
-                          {item.sharedLink}
-                          <span className="sr-only"> opens in a new tab</span>
-                        </a>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            setSelection({
-                              id: item.downloadId,
-                              sharedLink: item.sharedLink,
-                              mode: "media",
-                            })
-                          }}
-                        >
-                          View media
-                        </Button>
+                        <span className="max-w-full font-mono text-sm break-all">
+                          {item.videoId}
+                        </span>
+                        {item.hasSavedMedia ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={async () => {
+                              setSelection({
+                                id: item.downloadId,
+                                sharedLink: item.sharedLink,
+                                mode: "media",
+                              })
+                            }}
+                          >
+                            View media
+                          </Button>
+                        ) : null}
                       </div>
                     </TableCell>
                     <TableCell>

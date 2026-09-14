@@ -3,6 +3,8 @@ import type { Pool, QueryResultRow } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import type { StatsRange } from "@/lib/stats/types"
 import type { Downloaders, PopularVideos } from "./types"
+import { POPULAR_RANKING_VERSION } from "./types"
+import { savedMediaSql } from "./saved"
 
 async function read<T extends QueryResultRow>(
   pool: Pool,
@@ -82,24 +84,27 @@ export async function getPopularVideosRaw(
   const rows = await read<{
     download_id: string | null
     shared_link: string | null
+    video_id: string | null
+    has_saved_media: boolean
     unique_chats: string | null
     refreshed_at: string
   }>(
     pool,
-    `SELECT ranking.download_id::text, ranking.shared_link,
+    `SELECT ranking.download_id::text, ranking.shared_link, ranking.video_id,
+            ${savedMediaSql("ranking.video_details_id")} AS has_saved_media,
             ranking.unique_chats::text,
             extract(epoch FROM metadata.refreshed_at)::text AS refreshed_at
      FROM tt_stats_cache.popular_videos_metadata metadata
      LEFT JOIN LATERAL (
-       SELECT download_id, shared_link, unique_chats, position
+       SELECT download_id, shared_link, video_details_id, video_id, unique_chats, position
        FROM tt_stats_cache.popular_videos
        WHERE range = $2 AND position > $1::bigint
        ORDER BY position
        LIMIT 21
      ) ranking ON true
-     WHERE metadata.singleton AND metadata.range = $2 AND metadata.ranking_version = 2
+     WHERE metadata.singleton AND metadata.range = $2 AND metadata.ranking_version = $3
      ORDER BY ranking.position`,
-    [(page - 1) * 20, range]
+    [(page - 1) * 20, range, POPULAR_RANKING_VERSION]
   )
   if (!rows.length) throw new DataAccessError(undefined, "snapshotsMissing")
   const items = rows.flatMap((row) =>
@@ -109,6 +114,8 @@ export async function getPopularVideosRaw(
           {
             downloadId: row.download_id,
             sharedLink: row.shared_link!,
+            videoId: row.video_id!,
+            hasSavedMedia: row.has_saved_media,
             uniqueChats: row.unique_chats!,
           },
         ]

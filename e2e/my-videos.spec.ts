@@ -64,6 +64,35 @@ test("personal statistics, filters, mobile access, and logout", async ({
     ).toHaveCount(0)
     await expect(history.getByText("You were first").first()).toBeVisible()
     await expect(
+      history
+        .getByRole("listitem")
+        .nth(3)
+        .getByRole("button", { name: "View media" })
+    ).toHaveCount(0)
+    await expect(
+      history
+        .getByRole("listitem")
+        .nth(4)
+        .getByRole("button", { name: "View media" })
+    ).toHaveCount(0)
+    const savedOnly = page.getByRole("switch", { name: "Only saved media" })
+    await savedOnly.click()
+    await expect(savedOnly).toBeChecked()
+    await expect(page).toHaveURL(/savedMediaOnly=true/)
+    await expect(history.getByRole("listitem")).toHaveCount(17)
+    await expect(
+      history.getByRole("button", { name: "View media" })
+    ).toHaveCount(17)
+    await expect
+      .poll(() => historyRequests.at(-1))
+      .toMatchObject({ savedMediaOnly: true, page: 1 })
+    await page.reload()
+    await expect(savedOnly).toBeChecked()
+    await expect(history.getByRole("listitem")).toHaveCount(17)
+    await page.goBack()
+    await expect(savedOnly).not.toBeChecked()
+    await expect(history.getByRole("listitem")).toHaveCount(20)
+    await expect(
       history.getByText(/other people downloaded this/).first()
     ).toBeVisible()
     await expect(
