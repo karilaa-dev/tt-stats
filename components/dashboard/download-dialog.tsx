@@ -8,16 +8,16 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
+import { Button, buttonVariants } from "@/components/controls"
+import { Alert, AlertDescription } from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import {
   Empty,
   EmptyHeader,
   EmptyTitle,
   EmptyDescription,
-} from "@/components/ui/empty"
+} from "@/components/controls"
 import {
   Table,
   TableBody,
@@ -25,7 +25,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/controls"
 import {
   mediaQueryOptions,
   downloadersQueryOptions,

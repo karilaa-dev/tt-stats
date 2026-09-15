@@ -46,7 +46,8 @@ export const downloadersQueryOptions = (downloadId: string, page: number) =>
       requestWithCooldown("read", () =>
         databaseAction(actions.getDownloaders, { downloadId, page }, signal)
       ),
-    staleTime: 60_000,
+    staleTime: 300_000,
+    refetchInterval: databaseRefreshInterval(300_000),
   })
 export const popularVideosQueryOptions = (page: number, range: StatsRange) =>
   queryOptions({

@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query"
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/controls"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/components/controls"
+import { Skeleton } from "@/components/controls"
 import { telegramChatQueryOptions } from "@/lib/telegram/query-options"
 import type { TelegramChatProfile } from "@/lib/telegram/types"
 

@@ -34,11 +34,15 @@ describe("statistics cards", () => {
     render(<StatsCards stats={stats} />)
 
     const hitsCard = cardFor("Cache hits")
-    expect(within(hitsCard).getByText("1")).toBeTruthy()
+    expect(
+      within(hitsCard).getByText("1", { selector: ".sr-only" })
+    ).toBeTruthy()
     expect(within(hitsCard).getByText("33.3% hit rate")).toBeTruthy()
 
     const missesCard = cardFor("Cache misses")
-    expect(within(missesCard).getByText("2")).toBeTruthy()
+    expect(
+      within(missesCard).getByText("2", { selector: ".sr-only" })
+    ).toBeTruthy()
     expect(within(missesCard).getByText("66.7% miss rate")).toBeTruthy()
   })
 

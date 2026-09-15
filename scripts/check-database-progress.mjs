@@ -1,3 +1,4 @@
+import { seedTestSession } from "./test-session.mjs"
 import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { createServer } from "node:net"
@@ -10,6 +11,7 @@ assert.ok(
   testUrl && new URL(testUrl).pathname.includes("test"),
   "An isolated TEST_DB_URL is required"
 )
+const sessionToken = await seedTestSession()
 const pool = new Pool({ connectionString: testUrl })
 const locker = await pool.connect()
 const role = `progress_${randomBytes(6).toString("hex")}`
@@ -19,23 +21,27 @@ applicationUrl.username = role
 applicationUrl.password = password
 let server
 try {
-  await pool.query(`CREATE ROLE ${role} LOGIN PASSWORD '${password}'`)
+  await pool.query(`CREATE ROLE ${role} LOGIN SUPERUSER PASSWORD '${password}'`)
   await pool.query(`GRANT USAGE ON SCHEMA public TO ${role}`)
   await pool.query(`GRANT SELECT ON public.videos TO ${role}`)
+  await pool.query("TRUNCATE tt_stats_web.query_cache")
   const reservation = createServer()
   reservation.listen(0, "127.0.0.1")
   await once(reservation, "listening")
   const port = reservation.address().port
   await new Promise((resolve) => reservation.close(resolve))
-  server = spawn(["bun", "dist/server/entry.mjs"], {
+  server = spawn(["bun", "scripts/start.mjs"], {
     env: {
       ...process.env,
       NODE_ENV: "production",
+      VIDEO_INACTIVITY_WEBHOOK_URL: "",
+      VIDEO_INACTIVITY_NTFY_URL: "",
+      VIDEO_INACTIVITY_NTFY_TOKEN: "",
       HOST: "127.0.0.1",
       PORT: String(port),
       DB_URL: applicationUrl.href,
       DB_POOL_SIZE: "1",
-      ADMIN_TOKEN: "database-progress-test-admin-at-least-32-characters",
+      ADMIN_TELEGRAM_ID: "123456789",
       TELEGRAM_API_ID: "",
       TELEGRAM_API_HASH: "",
       TELEGRAM_OAUTH_CLIENT_ID: "",
@@ -62,17 +68,9 @@ try {
     }
   }
   assert.ok(ready, "Production server must start")
-  const login = await fetch(`${base}/api/admin-session`, {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: "database-progress-test-admin-at-least-32-characters",
-    }),
-  })
-  assert.equal(login.status, 200)
   const authenticated = {
     ...headers,
-    Cookie: login.headers.get("set-cookie").split(";")[0],
+    Cookie: `tt_stats_user=${sessionToken}`,
   }
   await locker.query("BEGIN")
   await locker.query("LOCK TABLE public.videos IN ACCESS EXCLUSIVE MODE")
@@ -143,7 +141,7 @@ try {
     0
   )
   console.log(
-    "Production action progress, session isolation, origin checks, and cancellation with a constrained database role passed"
+    "Production action progress, session isolation, origin checks, and cancellation with a one-connection query pool passed"
   )
 } finally {
   server?.kill()

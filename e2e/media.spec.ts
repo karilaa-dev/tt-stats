@@ -1,12 +1,8 @@
+import { loginAsAdmin } from "./session-fixture"
 import { expect, test } from "@playwright/test"
 
-const token = "test-admin-secret-with-at-least-32-characters"
-
-test.beforeEach(async ({ page, baseURL }) => {
-  await page.request.post("/api/admin-session", {
-    data: { token },
-    headers: { origin: baseURL! },
-  })
+test.beforeEach(async ({ context, baseURL }) => {
+  await loginAsAdmin(context, baseURL!)
 })
 
 test("history opens media and links cache-hit downloads to other chats", async ({
@@ -135,7 +131,7 @@ test("an unbuilt ranking shows setup instructions without automatic retries", as
         type: "AstroActionError",
         code: "INTERNAL_SERVER_ERROR",
         message:
-          "The TT Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
+          "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
       }),
     })
   })

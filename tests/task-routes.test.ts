@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest"
+vi.mock("@/lib/auth/store", () => import("./auth-store-fixture"))
+import { describe, expect, it, vi } from "vitest"
 import type { APIContext, AstroCookies } from "astro"
 import {
   createUserSession,
@@ -24,12 +25,20 @@ function context(id: string, token: string, method = "GET") {
 }
 describe("task route ownership", () => {
   it("does not expose or cancel another session's request, even for the same account", async () => {
-    const token = createUserSession({ id: "42", name: "Owner", username: null })
-    const other = createUserSession({ id: "42", name: "Owner", username: null })
+    const token = await createUserSession({
+      id: "42",
+      name: "Owner",
+      username: null,
+    })
+    const other = await createUserSession({
+      id: "42",
+      name: "Owner",
+      username: null,
+    })
     const id = crypto.randomUUID()
     const own = context(id, token)
     const owner = taskOwner(
-      getPrincipal(own.cookies),
+      await getPrincipal(own.cookies),
       own.cookies,
       own.clientAddress
     )
@@ -41,12 +50,12 @@ describe("task route ownership", () => {
       expect(task.controller.signal.aborted).toBe(false)
       await DELETE(context(id, token, "DELETE"))
       expect(task.controller.signal.aborted).toBe(true)
-      deleteUserSession(token)
-      expect(await (await GET(own)).json()).toEqual({})
+      await deleteUserSession(token)
+      expect(await (await GET(context(id, token))).json()).toEqual({})
     } finally {
       databaseTasks.finish(id)
-      deleteUserSession(token)
-      deleteUserSession(other)
+      await deleteUserSession(token)
+      await deleteUserSession(other)
     }
   })
   it("rejects invalid IDs and unbounded batches", async () => {

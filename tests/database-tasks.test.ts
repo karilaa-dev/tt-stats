@@ -5,7 +5,6 @@ import {
   withDatabaseTask,
   reportDatabaseProgress,
 } from "@/lib/tasks/server"
-import { ComparisonCache } from "@/lib/stats/history-comparisons"
 
 afterEach(() => vi.useRealTimers())
 describe("database task control", () => {
@@ -65,31 +64,5 @@ describe("database task control", () => {
     expect(() =>
       withDatabaseTask(task, () => reportDatabaseProgress("Next query"))
     ).toThrow()
-  })
-})
-
-describe("history comparison cache", () => {
-  const value = { other_chats: "10", first_user: "1", uncertain: false }
-  it("expires counts even when repeatedly read", () => {
-    let now = 0
-    const cache = new ComparisonCache(() => now)
-    cache.set("1:id:10", value)
-    now = 119_999
-    expect(cache.get("1:id:10")).toEqual(value)
-    expect(cache.get("2:id:10")).toBeUndefined()
-    now = 120_000
-    expect(cache.get("1:id:10")).toBeUndefined()
-  })
-  it("evicts least recently used entries and refuses oversized keys", () => {
-    const cache = new ComparisonCache(Date.now, 2, 1000)
-    cache.set("a", value)
-    cache.set("b", value)
-    cache.get("a")
-    cache.set("c", value)
-    expect(cache.get("b")).toBeUndefined()
-    expect(cache.get("a")).toEqual(value)
-    cache.set("x".repeat(1000), value)
-    expect(cache.get("x".repeat(1000))).toBeUndefined()
-    expect(cache.get("a")).toEqual(value)
   })
 })

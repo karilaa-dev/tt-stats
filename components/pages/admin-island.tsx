@@ -1,53 +1,42 @@
-import { useState } from "react"
 import {
   DashboardShell,
   type DashboardShellProps,
 } from "@/components/dashboard/dashboard-shell"
-import { useSession } from "@/components/dashboard/session-access"
-import { useHydrated } from "@/lib/dashboard-context"
-import { Button } from "@/components/ui/button"
 import {
+  useSession,
+  TelegramLoginButton,
+} from "@/components/dashboard/session-access"
+import {
+  Button,
   Card,
   CardHeader,
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card"
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldError,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
 export default function AdminIsland(
   props: Omit<DashboardShellProps, "children">
 ) {
   return (
     <DashboardShell {...props}>
-      <AdminLogin />
+      <AdminAccess />
     </DashboardShell>
   )
 }
-function AdminLogin() {
-  const { admin } = useSession()
-  const hydrated = useHydrated()
-  const [token, setToken] = useState("")
-  const [error, setError] = useState("")
-  const [pending, setPending] = useState(false)
-  const [retryAt, setRetryAt] = useState(0)
+function AdminAccess() {
+  const { admin, user, ready } = useSession()
   return (
-    <Card className="mx-auto w-full max-w-md">
+    <Card className="mx-auto w-full max-w-lg">
       <CardHeader>
         <CardTitle>Admin access</CardTitle>
         <CardDescription>
-          Use your admin token to access user lookup and operations. Access
-          lasts eight hours.
+          Log in with the Telegram account assigned to this website.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {admin ? (
+        {!ready ? (
+          <p role="status">Checking your session…</p>
+        ) : admin ? (
           <div className="flex flex-wrap gap-3">
             <Button nativeButton={false} render={<a href="/dashboard/users" />}>
               User lookup
@@ -60,68 +49,16 @@ function AdminLogin() {
               Operations
             </Button>
           </div>
+        ) : user ? (
+          <p>
+            Your Telegram account does not have admin access.{" "}
+            <a href="/dashboard/me" className="underline">
+              View your profile
+            </a>
+            .
+          </p>
         ) : (
-          <form
-            aria-busy={!hydrated || pending}
-            onSubmit={async (event) => {
-              event.preventDefault()
-              if (!hydrated || pending || Date.now() < retryAt) return
-              setPending(true)
-              setError("")
-              try {
-                const response = await fetch("/api/admin-session", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ token }),
-                })
-                const result = await response.json()
-                if (!response.ok) {
-                  setToken("")
-                  if (response.status === 429)
-                    setRetryAt(
-                      Date.now() +
-                        (Number(response.headers.get("Retry-After")) || 60) *
-                          1000
-                    )
-                  setError(result.message ?? "Could not log in. Try again.")
-                  return
-                }
-                setToken("")
-                const channel =
-                  typeof BroadcastChannel !== "undefined"
-                    ? new BroadcastChannel("tt-stats-session")
-                    : null
-                channel?.postMessage("changed")
-                channel?.close()
-                window.location.assign("/dashboard/jobs")
-              } catch {
-                setError("Could not reach the server. Try again.")
-              } finally {
-                setPending(false)
-              }
-            }}
-          >
-            <FieldGroup>
-              <Field data-invalid={Boolean(error)}>
-                <FieldLabel htmlFor="admin-token">Admin token</FieldLabel>
-                <Input
-                  id="admin-token"
-                  type="password"
-                  autoComplete="current-password"
-                  maxLength={4096}
-                  value={token}
-                  onChange={(event) => setToken(event.target.value)}
-                  disabled={!hydrated || pending}
-                  required
-                  aria-invalid={Boolean(error)}
-                />
-                {error ? <FieldError role="alert">{error}</FieldError> : null}
-              </Field>
-              <Button type="submit" disabled={!hydrated || pending || !token}>
-                {pending ? <Spinner /> : null}Unlock admin access
-              </Button>
-            </FieldGroup>
-          </form>
+          <TelegramLoginButton />
         )}
       </CardContent>
     </Card>

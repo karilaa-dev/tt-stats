@@ -1,6 +1,6 @@
 import { useId, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Button } from "@/components/controls"
+import { Input } from "@/components/controls"
 import { useBrowserTime } from "@/lib/browser-time"
 import { historyDateRange } from "@/lib/history-date-range"
 

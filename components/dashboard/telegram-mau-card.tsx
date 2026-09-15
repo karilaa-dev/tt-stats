@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/controls"
+import { Skeleton } from "@/components/controls"
 import { telegramMauQueryOptions } from "@/lib/telegram/query-options"
 
 export function TelegramMauCard() {

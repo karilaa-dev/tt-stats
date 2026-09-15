@@ -1,3 +1,4 @@
+import { getCachedDownloaders } from "@/lib/stats/cached"
 import { getPrincipal } from "@/lib/auth/session"
 import { canReadMedia } from "@/lib/media/access"
 import { ActionError, defineAction } from "astro:actions"
@@ -7,11 +8,7 @@ import {
   getFakeUserDownloads,
   getFakePopularVideos,
 } from "@/lib/dev/fake-data"
-import {
-  getDownloadersRaw,
-  getPopularVideosRaw,
-  getStoredMedia,
-} from "@/lib/media/queries"
+import { getPopularVideosRaw, getStoredMedia } from "@/lib/media/queries"
 import { describeMedia } from "@/lib/media/telegram"
 import { STATS_RANGES } from "@/lib/stats/types"
 import { getSafeDatabaseError } from "@/lib/db/errors"
@@ -42,7 +39,9 @@ export const getDownloadMedia = defineAction({
   input: z.object({ downloadId }),
   handler: async ({ downloadId }, context) => {
     try {
-      if (!(await canReadMedia(getPrincipal(context.cookies), downloadId)))
+      if (
+        !(await canReadMedia(await getPrincipal(context.cookies), downloadId))
+      )
         throw new ActionError({
           code: "NOT_FOUND",
           message: "Saved media is unavailable.",
@@ -66,7 +65,7 @@ export const getDownloadMedia = defineAction({
 export const getDownloaders = defineAction({
   input: z.object({ downloadId, page }),
   handler: safe(async ({ downloadId, page }) => {
-    if (!isFakeDataEnabled()) return getDownloadersRaw(downloadId, page)
+    if (!isFakeDataEnabled()) return getCachedDownloaders(downloadId, page)
     const source = getFakeUserDownloads("123456789", 1, 50).items.find(
       (item) => item.id === downloadId
     )

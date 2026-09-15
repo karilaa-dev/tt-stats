@@ -62,12 +62,12 @@ describe("database setup diagnostics", () => {
     expect(screen.getByText("Database connection verified")).toBeTruthy()
     expect(screen.getByText("DB_URL connected successfully.")).toBeTruthy()
     expect(
-      screen.getByText("One or more TT Stats database objects are missing.")
+      screen.getByText(
+        "One or more @ttgrab Stats database objects are missing."
+      )
     ).toBeTruthy()
     expect(
-      screen.getByText(
-        "All required database-scoped grants exist. This role is not a superuser."
-      )
+      screen.getByText("All required database privileges are available.")
     ).toBeTruthy()
     expect(
       screen.queryByRole("heading", {
@@ -81,7 +81,7 @@ describe("database setup diagnostics", () => {
 
     fireEvent.click(
       screen.getByRole("switch", {
-        name: "DB_URL has the listed non-superuser grants",
+        name: "DB_URL has the listed administrative privileges",
       })
     )
 
@@ -107,7 +107,7 @@ describe("database setup diagnostics", () => {
     expect(
       screen
         .getByRole("switch", {
-          name: "DB_URL has the listed non-superuser grants",
+          name: "DB_URL has the listed administrative privileges",
         })
         .hasAttribute("data-disabled")
     ).toBe(true)
@@ -151,25 +151,24 @@ describe("database setup diagnostics", () => {
     ).toBe(true)
   })
 
-  it("blocks guided setup when DB_URL is a PostgreSQL superuser", () => {
+  it("accepts a superuser for guided setup", () => {
     renderSetup({
       ...missingSetup,
       databaseRole: { ...missingSetup.databaseRole, superuser: true },
     })
-
-    expect(screen.getByText("DB_URL is too privileged")).toBeTruthy()
-    expect(
-      screen.getByText(
-        "Setup is disabled while DB_URL uses a PostgreSQL superuser."
-      )
-    ).toBeTruthy()
+    expect(screen.queryByText("DB_URL is too privileged")).toBeNull()
+    fireEvent.click(
+      screen.getByRole("switch", {
+        name: "DB_URL has the listed administrative privileges",
+      })
+    )
     expect(
       (
         screen.getByRole("button", {
           name: "Install or repair database jobs",
         }) as HTMLButtonElement
       ).disabled
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it("offers a definition update before the new monitor grants exist", () => {
@@ -209,14 +208,14 @@ describe("database setup diagnostics", () => {
 
     fireEvent.click(
       screen.getByRole("switch", {
-        name: "DB_URL owns the installed TT Stats schema",
+        name: "DB_URL can update the installed statistics schema",
       })
     )
     expect(updateButton.disabled).toBe(false)
     fireEvent.click(updateButton)
     expect(
       screen.getByRole("heading", {
-        name: "Update TT Stats database definitions?",
+        name: "Update @ttgrab Stats database definitions?",
       })
     ).toBeTruthy()
     expect(

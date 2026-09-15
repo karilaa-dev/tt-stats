@@ -1,12 +1,8 @@
+import { loginAsAdmin } from "./session-fixture"
 import { expect, test } from "@playwright/test"
 
-test.beforeEach(async ({ request, context, baseURL }) => {
-  const response = await request.post("/api/admin-session", {
-    data: { token: "test-admin-secret-with-at-least-32-characters" },
-    headers: { origin: baseURL! },
-  })
-  expect(response.ok()).toBe(true)
-  await context.addCookies((await request.storageState()).cookies)
+test.beforeEach(async ({ context, baseURL }) => {
+  await loginAsAdmin(context, baseURL!)
 })
 
 test("slow ranking shows measured progress and cancellation permits a retry", async ({

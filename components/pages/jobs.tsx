@@ -8,7 +8,7 @@ import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsJobCard } from "@/components/dashboard/stats-job-card"
 import { VideoInactivityCard } from "@/components/dashboard/video-inactivity-card"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import {
   databaseSetupQueryOptions,
   statsJobsQueryOptions,

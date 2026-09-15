@@ -25,7 +25,7 @@ export const statsQueryKey = ["stats"] as const
 const AGGREGATE_STALE_TIME = 30 * 1000
 const ROLLING_REFRESH_INTERVAL = 60 * 1000
 const DAILY_REFRESH_INTERVAL = 15 * 60 * 1000
-const USER_STALE_TIME = 60 * 1000
+const USER_STALE_TIME = 5 * 60 * 1000
 
 const rollingRefreshOptions = {
   placeholderData: keepPreviousData,

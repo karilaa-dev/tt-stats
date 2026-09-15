@@ -1,5 +1,5 @@
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Field, FieldGroup, FieldLabel } from "@/components/controls"
+import { ToggleGroup, ToggleGroupItem } from "@/components/controls"
 import type { ChatScope, StatsRange } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
 

@@ -131,7 +131,7 @@ export function buildTestNotification(nowMs = Date.now()): VideoNotification {
   return {
     event: "test",
     severity: "test",
-    title: "TT Stats notification test",
+    title: "@ttgrab Stats notification test",
     message:
       "The video-download inactivity notification destination is configured correctly.",
     inactivityMinutes: null,

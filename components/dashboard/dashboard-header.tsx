@@ -7,34 +7,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query"
 import { useHydrated } from "@/lib/dashboard-context"
-import { useTheme } from "next-themes"
-import {
-  MonitorIcon,
-  MoonIcon,
-  RefreshCwIcon,
-  SunIcon,
-  CheckIcon,
-  AudioLinesIcon,
-} from "lucide-react"
-import { toast } from "sonner"
+import { RefreshCwIcon } from "lucide-react"
+import { toast } from "@/components/controls/toast"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { DesktopNavigation } from "./app-sidebar"
-import { Spinner } from "@/components/ui/spinner"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { Badge } from "@/components/controls"
+import { Button } from "@/components/controls"
+
+import { Spinner } from "@/components/controls"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/controls"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import {
   snapshotMetadataQueryOptions,
@@ -79,7 +59,6 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
   })
   // Fetch state can change between SSR and hydration as queries settle.
   const refreshing = hydrated && (fetching || refreshMutation.isPending)
-  const { theme, setTheme } = useTheme()
   const latestSnapshot =
     hydrated && metadataQuery.data?.length
       ? metadataQuery.data.reduce((latest, snapshot) =>
@@ -97,20 +76,21 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
         <a
           href="/dashboard"
           className="brand-lockup"
-          aria-label="TT Stats overview"
+          aria-label="@ttgrab Stats overview"
         >
-          <span className="brand-mark">
-            <AudioLinesIcon aria-hidden="true" />
-          </span>
-          <span>
-            <strong>
-              tt stats<span className="brand-period">/</span>
-            </strong>
-            <small>Your bot, in focus.</small>
-          </span>
+          <img
+            src="/ttgrab-logo.png"
+            alt=""
+            className="brand-logo"
+            width="44"
+            height="44"
+          />
+          <strong>
+            @ttgrab <span>Stats</span>
+          </strong>
         </a>
         <span className="topbar-divider" aria-hidden="true" />
-        <span className="workspace-label">Analytics workspace</span>
+        <span className="workspace-label">Download activity</span>
         <div className="topbar-actions">
           {refreshing ? (
             <Badge variant="outline" className="hidden sm:inline-flex">
@@ -159,40 +139,8 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
             </TooltipTrigger>
             <TooltipContent>Refresh statistics</TooltipContent>
           </Tooltip>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="ghost" size="icon-sm" />}
-            >
-              <SunIcon />
-              <span className="sr-only">Choose theme</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Theme</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                  <SunIcon /> Light
-                  {hydrated && theme === "light" ? (
-                    <CheckIcon className="ml-auto" aria-label="Selected" />
-                  ) : null}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                  <MoonIcon /> Dark
-                  {hydrated && theme === "dark" ? (
-                    <CheckIcon className="ml-auto" aria-label="Selected" />
-                  ) : null}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                  <MonitorIcon /> System
-                  {hydrated && theme === "system" ? (
-                    <CheckIcon className="ml-auto" aria-label="Selected" />
-                  ) : null}
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
-      <DesktopNavigation />
     </header>
   )
 }

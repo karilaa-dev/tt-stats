@@ -20,8 +20,15 @@ export default defineConfig({
     },
   ],
   webServer: {
+    env: {
+      DB_URL:
+        process.env.TEST_DB_URL ??
+        "postgresql://test:test@127.0.0.1:1/browser_test",
+      TELEGRAM_OAUTH_CLIENT_ID: "",
+      TELEGRAM_OAUTH_CLIENT_SECRET: "",
+    },
     command:
-      "TT_STATS_FAKE_DATA=true RATE_LIMIT_READ_COUNT=100000 RATE_LIMIT_READ_BURST=100000 RATE_LIMIT_LOGIN_COUNT=100000 RATE_LIMIT_LOGIN_BURST=100000 ADMIN_TOKEN=test-admin-secret-with-at-least-32-characters bun scripts/browser-server.mjs",
+      "TT_STATS_FAKE_DATA=true RATE_LIMIT_READ_COUNT=100000 RATE_LIMIT_READ_BURST=100000 RATE_LIMIT_LOGIN_COUNT=100000 RATE_LIMIT_LOGIN_BURST=100000 ADMIN_TELEGRAM_ID=123456789 bun scripts/browser-server.mjs",
     url: "http://127.0.0.1:4175/dashboard/",
     reuseExistingServer: false,
   },

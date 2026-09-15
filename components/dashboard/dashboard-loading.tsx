@@ -1,6 +1,6 @@
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
+import { Skeleton } from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import { cn } from "@/lib/utils"
 
 export function DashboardLoading({

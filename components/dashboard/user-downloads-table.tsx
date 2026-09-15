@@ -4,8 +4,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/controls"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardHeader,
@@ -13,15 +13,15 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Empty,
   EmptyHeader,
   EmptyTitle,
   EmptyDescription,
-} from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
+import { Skeleton } from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { safeExternalUrl } from "@/lib/security/links"
 import type { PaginatedUserDownloads } from "@/lib/stats/types"

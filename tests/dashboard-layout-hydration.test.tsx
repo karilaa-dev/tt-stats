@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type PropsWithChildren } from "react"
+import { act } from "react"
 import { hydrateRoot } from "react-dom/client"
 import { renderToString } from "react-dom/server"
 import { expect, it, vi } from "vitest"
@@ -20,13 +20,6 @@ vi.mock("@/components/dashboard/app-sidebar", () => ({
 }))
 vi.mock("@/components/dashboard/dashboard-header", () => ({
   DashboardHeader: () => <header>Dashboard</header>,
-}))
-vi.mock("@/components/theme-provider", () => ({
-  ThemeProvider: ({ children }: PropsWithChildren) => <>{children}</>,
-}))
-vi.mock("@/components/ui/sidebar", () => ({
-  SidebarProvider: ({ children }: PropsWithChildren) => <div>{children}</div>,
-  SidebarInset: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }))
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
 

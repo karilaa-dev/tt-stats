@@ -18,7 +18,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import { otherStatsQueryOptions } from "@/lib/stats/query-options"
 
 const PAGE_SIZE = 20

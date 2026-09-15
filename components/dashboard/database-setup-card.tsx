@@ -4,13 +4,13 @@ import {
   CheckCircle2Icon,
   CircleDashedIcon,
   DatabaseIcon,
-  ShieldAlertIcon,
   TriangleAlertIcon,
   WrenchIcon,
+  ShieldAlertIcon,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from "@/components/controls/toast"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,16 +21,16 @@ import {
   AlertDialogHeader,
   AlertDialogMedia,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+} from "@/components/controls"
+import { Badge } from "@/components/controls"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Field,
   FieldContent,
@@ -38,10 +38,10 @@ import {
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
+} from "@/components/controls"
+import { Input } from "@/components/controls"
+import { Spinner } from "@/components/controls"
+import { Switch } from "@/components/controls"
 import { DATABASE_ERROR_COPY } from "@/lib/db/errors"
 import {
   configureDatabaseJobs,
@@ -103,10 +103,7 @@ function missingSetupPrivileges(status: DatabaseSetupStatus): string[] {
 }
 
 function hasLimitedSetupPrivileges(status: DatabaseSetupStatus): boolean {
-  return (
-    !status.databaseRole.superuser &&
-    missingSetupPrivileges(status).length === 0
-  )
+  return missingSetupPrivileges(status).length === 0
 }
 
 export function DatabaseSetupCard({
@@ -147,7 +144,6 @@ export function DatabaseSetupCard({
   const canUpdate = Boolean(
     status?.appConnection.ok &&
     status.scheduler.pgCronInstalled &&
-    !status.databaseRole.superuser &&
     missingRuntimePrivileges(status).length === 0 &&
     setupPrivilegesConfirmed
   )
@@ -156,7 +152,7 @@ export function DatabaseSetupCard({
     mutationFn: () => {
       if (!setupPrivilegesConfirmed) {
         throw new Error(
-          "Confirm that DB_URL has the listed non-superuser grants before running setup."
+          "Confirm that DB_URL has the listed administrative privileges before running setup."
         )
       }
       return configureDatabaseJobs({
@@ -170,7 +166,7 @@ export function DatabaseSetupCard({
     onError: (error) => toast.error(safeActionError(error)),
     onSuccess: async (result) => {
       setConfirming(null)
-      toast.success("TT Stats database jobs are configured.")
+      toast.success("@ttgrab Stats database jobs are configured.")
       for (const warning of result.warnings) toast.warning(warning)
       await queryClient.invalidateQueries({ queryKey: statsQueryKey })
     },
@@ -180,7 +176,7 @@ export function DatabaseSetupCard({
     mutationFn: () => {
       if (!setupPrivilegesConfirmed) {
         throw new Error(
-          "Confirm that DB_URL owns the installed TT Stats schema before updating it."
+          "Confirm that DB_URL can update the installed statistics schema before updating it."
         )
       }
       return updateDatabaseDefinitions({
@@ -265,25 +261,31 @@ export function DatabaseSetupCard({
                 }
               />
               <DiagnosticRow
+                state={status.website?.ready ? "good" : "bad"}
+                title="Website storage"
+                description={
+                  status.website?.ready
+                    ? "User, session and query-cache tables are ready."
+                    : "Website tables are missing or incompatible. Check startup logs."
+                }
+              />
+              <DiagnosticRow
                 state={
                   !status.appConnection.ok
                     ? "waiting"
-                    : !status.databaseRole.superuser &&
-                        missingRolePrivileges.length === 0
+                    : missingRolePrivileges.length === 0
                       ? "good"
                       : "bad"
                 }
-                title="DB_URL limited grants"
+                title="DB_URL privileges"
                 description={
                   !status.appConnection.ok
                     ? "Not checked until DB_URL connects successfully."
-                    : status.databaseRole.superuser
-                      ? "This DB_URL role is a superuser. Replace it with the limited role described below."
-                      : missingRolePrivileges.length === 0
-                        ? installed && !status.databaseRole.canCreate
-                          ? "All runtime grants exist. Database CREATE is revoked and is needed only to reinstall a missing schema."
-                          : "All required database-scoped grants exist. This role is not a superuser."
-                        : `Missing: ${missingRolePrivileges.join(", ")}.`
+                    : missingRolePrivileges.length === 0
+                      ? installed && !status.databaseRole.canCreate
+                        ? "All runtime grants exist. Database CREATE is revoked and is needed only to reinstall a missing schema."
+                        : "All required database privileges are available."
+                      : `Missing: ${missingRolePrivileges.join(", ")}.`
                 }
               />
               <DiagnosticRow
@@ -303,8 +305,8 @@ export function DatabaseSetupCard({
                     : status.snapshot.schemaInstalled &&
                         status.snapshot.tablesInstalled &&
                         status.snapshot.jobsApiInstalled
-                      ? "All TT Stats snapshot tables and approved functions exist."
-                      : "One or more TT Stats database objects are missing."
+                      ? "All @ttgrab Stats snapshot tables and approved functions exist."
+                      : "One or more @ttgrab Stats database objects are missing."
                 }
               />
               <DiagnosticRow
@@ -360,7 +362,7 @@ export function DatabaseSetupCard({
                     ? "Not checked until pg_cron is enabled."
                     : status.scheduler.rollingJobInstalled &&
                         status.scheduler.dailyJobInstalled
-                      ? "Both TT Stats jobs are installed."
+                      ? "Both @ttgrab Stats jobs are installed."
                       : "The rolling or daily fixed job is missing."
                 }
               />
@@ -411,16 +413,15 @@ export function DatabaseSetupCard({
                   data-disabled={
                     controlsDisabled ||
                     actionPending ||
-                    status.databaseRole.superuser ||
                     missingRuntimePrivileges(status).length > 0
                   }
                 >
                   <FieldContent>
                     <FieldLabel htmlFor="update-database-definitions">
-                      DB_URL owns the installed TT Stats schema
+                      DB_URL can update the installed statistics schema
                     </FieldLabel>
                     <FieldDescription>
-                      Confirm this to replace only TT Stats function and
+                      Confirm this to replace only @ttgrab Stats function and
                       procedure definitions, then queue both snapshot rebuilds.
                     </FieldDescription>
                   </FieldContent>
@@ -430,7 +431,6 @@ export function DatabaseSetupCard({
                     disabled={
                       controlsDisabled ||
                       actionPending ||
-                      status.databaseRole.superuser ||
                       missingRuntimePrivileges(status).length > 0
                     }
                     onCheckedChange={setSetupPrivilegesConfirmed}
@@ -462,24 +462,13 @@ export function DatabaseSetupCard({
               </>
             ) : (
               <>
-                {status.databaseRole.superuser ? (
-                  <Alert variant="destructive">
-                    <ShieldAlertIcon />
-                    <AlertTitle>DB_URL is too privileged</AlertTitle>
-                    <AlertDescription>
-                      Setup is blocked for PostgreSQL superusers. Create the
-                      limited login role shown below and update DB_URL before
-                      continuing.
-                    </AlertDescription>
-                  </Alert>
-                ) : !hasLimitedSetupPrivileges(status) ? (
+                {!hasLimitedSetupPrivileges(status) ? (
                   <Alert>
                     <TriangleAlertIcon />
-                    <AlertTitle>DB_URL needs limited grants</AlertTitle>
+                    <AlertTitle>DB_URL needs additional privileges</AlertTitle>
                     <AlertDescription>
                       Grant only the missing database privileges listed above.
-                      Do not grant SUPERUSER, CREATEROLE, CREATEDB, REPLICATION,
-                      or BYPASSRLS.
+                      Use the administrative connection configured in DB_URL.
                     </AlertDescription>
                   </Alert>
                 ) : null}
@@ -497,7 +486,7 @@ export function DatabaseSetupCard({
                   >
                     <FieldContent>
                       <FieldLabel htmlFor="setup-limited-privileges">
-                        DB_URL has the listed non-superuser grants
+                        DB_URL has the listed administrative privileges
                       </FieldLabel>
                       <FieldDescription>
                         Confirm that this connection may install the additive TT
@@ -571,10 +560,6 @@ export function DatabaseSetupCard({
                     Setup is disabled until DB_URL connects successfully. Review
                     the diagnostics above.
                   </p>
-                ) : status.databaseRole.superuser ? (
-                  <p className="text-sm text-destructive">
-                    Setup is disabled while DB_URL uses a PostgreSQL superuser.
-                  </p>
                 ) : !status.scheduler.pgCronInstalled ? (
                   <p className="text-sm text-destructive">
                     Setup is disabled until a PostgreSQL administrator enables
@@ -582,7 +567,7 @@ export function DatabaseSetupCard({
                   </p>
                 ) : !hasLimitedSetupPrivileges(status) ? (
                   <p className="text-sm text-destructive">
-                    Setup is disabled until the missing limited grants are
+                    Setup is disabled until the missing required privileges are
                     applied.
                   </p>
                 ) : !setupPrivilegesConfirmed ? (
@@ -638,13 +623,13 @@ export function DatabaseSetupCard({
             </AlertDialogMedia>
             <AlertDialogTitle>
               {confirming === "update"
-                ? "Update TT Stats database definitions?"
-                : "Configure TT Stats in PostgreSQL?"}
+                ? "Update @ttgrab Stats database definitions?"
+                : "Configure @ttgrab Stats in PostgreSQL?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirming === "update"
-                ? "This replaces only TT Stats database definitions and queues rolling and daily rebuilds. Existing snapshots remain readable until each rebuild succeeds. Cron expressions, job states, extensions, and unrelated jobs are unchanged."
-                : "This uses the non-superuser DB_URL role to apply the fixed additive snapshot schema, install only the two TT Stats schedules, grant the approved access, and queue both initial refreshes. It does not install extensions, change server configuration, delete existing snapshots, or touch unrelated cron jobs."}
+                ? "This replaces only @ttgrab Stats database definitions and queues rolling and daily rebuilds. Existing snapshots remain readable until each rebuild succeeds. Cron expressions, job states, extensions, and unrelated jobs are unchanged."
+                : "This uses the administrative DB_URL connection to apply the fixed additive snapshot schema, install only the two @ttgrab Stats schedules, grant the approved access, and queue both initial refreshes. It does not install extensions, change server configuration, delete existing snapshots, or touch unrelated cron jobs."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

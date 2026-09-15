@@ -7,7 +7,7 @@ import {
 } from "@/lib/dashboard-context"
 import { ArrowUpRightIcon, SearchIcon, XIcon } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardContent,
@@ -15,16 +15,16 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Field,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
+import { Input } from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { useAdminAccess } from "./admin-access"
 

@@ -1,5 +1,5 @@
-import { startVideoInactivityMonitor } from "../dist/monitor.mjs"
-const stopMonitor = startVideoInactivityMonitor()
+import { startRuntime } from "../dist/monitor.mjs"
+const stopMonitor = await startRuntime()
 const shutdown = async () => {
   await stopMonitor?.()
   process.exit(0)

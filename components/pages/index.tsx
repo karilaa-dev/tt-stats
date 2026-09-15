@@ -6,7 +6,7 @@ import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { OverviewActivity } from "@/components/dashboard/overview-activity"
 import { PageHeading } from "@/components/dashboard/page-heading"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/controls"
 import {
   useDashboardNavigate,
   useDashboardSearch,
@@ -35,7 +35,7 @@ export function OverviewPage() {
     <div className="overview-page">
       <PageHeading
         title="Overview"
-        description="A little perspective on everything your bot is doing."
+        description="Downloads, audience and delivery across @ttgrab."
       />
       {overviewQuery.isError && !overview ? (
         <DashboardError

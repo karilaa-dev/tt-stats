@@ -1,7 +1,3 @@
-import { createHash } from "node:crypto"
-import { createElement } from "react"
-import { renderToStaticMarkup } from "react-dom/server"
-import { ThemeProvider } from "next-themes"
 import { defineConfig } from "astro/config"
 import node from "@astrojs/node"
 import react from "@astrojs/react"
@@ -44,18 +40,6 @@ export default defineConfig({
       styleDirective: { resources: ["'self'", "'unsafe-inline'"] },
       scriptDirective: {
         resources: ["'self'"],
-        hashes: Array.from(
-          renderToStaticMarkup(
-            createElement(ThemeProvider, {
-              attribute: "class",
-              defaultTheme: "system",
-              enableSystem: true,
-              disableTransitionOnChange: true,
-            })
-          ).matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g),
-          (match) =>
-            `sha256-${createHash("sha256").update(match[1]).digest("base64")}`
-        ),
       },
     },
     // Dokploy terminates HTTPS before forwarding requests to the Bun server.
@@ -77,10 +61,10 @@ export default defineConfig({
       hooks: {
         "astro:server:start": async () => {
           await buildMonitor(".astro/dev-monitor.mjs")
-          const { startVideoInactivityMonitor } = await import(
+          const { startRuntime } = await import(
             `./.astro/dev-monitor.mjs?t=${Date.now()}`
           )
-          stopMonitor = startVideoInactivityMonitor()
+          stopMonitor = await startRuntime()
         },
         "astro:server:done": async () => {
           await stopMonitor?.()
@@ -97,7 +81,7 @@ export default defineConfig({
         load(id, options) {
           if (id.endsWith("/lib/server-only.ts") && !options?.ssr) {
             throw new Error(
-              "A server-only TT Stats module was imported by browser code."
+              "A server-only @ttgrab Stats module was imported by browser code."
             )
           }
         },

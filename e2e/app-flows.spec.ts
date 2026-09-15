@@ -1,12 +1,8 @@
+import { loginAsAdmin } from "./session-fixture"
 import { expect, test } from "@playwright/test"
 
-test.beforeEach(async ({ request, context, baseURL }) => {
-  const response = await request.post("/api/admin-session", {
-    data: { token: "test-admin-secret-with-at-least-32-characters" },
-    headers: { origin: baseURL! },
-  })
-  expect(response.ok()).toBe(true)
-  await context.addCookies((await request.storageState()).cookies)
+test.beforeEach(async ({ context, baseURL }) => {
+  await loginAsAdmin(context, baseURL!)
 })
 
 test("every Astro dashboard route loads without browser errors", async ({
@@ -76,9 +72,8 @@ test("lookup, pagination, CSV and browser history work", async ({ page }) => {
   await expect(profile.getByText("Demo group", { exact: true })).toBeVisible()
   await expect(profile.getByText("@demo_group", { exact: true })).toBeVisible()
   await expect(profile.getByText("Alex Example", { exact: true })).toBeHidden()
-  await page
-    .getByRole("button", { name: "Lock admin access", exact: true })
-    .click()
+  await page.goto("/dashboard/me")
+  await page.getByRole("button", { name: "Log out", exact: true }).click()
   await expect(profile).toBeHidden()
 })
 
@@ -95,11 +90,12 @@ test("filters restore with browser back", async ({ page }) => {
   await expect(page).toHaveURL(/scope=groups/)
 })
 
-test("theme and responsive navigation work", async ({ page, isMobile }) => {
+test("dark styling and responsive navigation work", async ({
+  page,
+  isMobile,
+}) => {
   await page.goto("/dashboard")
   await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
-  await page.getByRole("button", { name: "Choose theme" }).click()
-  await page.getByRole("menuitem", { name: "Dark", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   if (isMobile)
     await page.getByRole("button", { name: "Open all sections" }).click()
@@ -112,9 +108,10 @@ test("theme and responsive navigation work", async ({ page, isMobile }) => {
 })
 
 test("Astro endpoints validate input and disable demo writes", async ({
-  request,
+  page,
   baseURL,
 }) => {
+  const request = page.request
   const health = await request.get("/api/health")
   expect(await health.json()).toEqual({ status: "ok" })
   const csv = await request.get("/api/users/123456789/history.csv")
@@ -140,7 +137,7 @@ test("mobile dock opens all sections and restores focus", async ({
   page,
   isMobile,
 }) => {
-  test.skip(!isMobile, "The desktop uses horizontal navigation")
+  test.skip(!isMobile, "The desktop uses sidebar navigation")
   await page.goto("/dashboard")
   await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
   const dock = page.getByRole("navigation", { name: "Quick navigation" })
@@ -149,7 +146,7 @@ test("mobile dock opens all sections and restores focus", async ({
   ).toHaveAttribute("aria-current", "page")
   const more = dock.getByRole("button", { name: "Open all sections" })
   await more.click()
-  const dialog = page.getByRole("dialog", { name: "Your workspace" })
+  const dialog = page.getByRole("dialog", { name: "All sections" })
   await expect(dialog).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(dialog).toBeHidden()

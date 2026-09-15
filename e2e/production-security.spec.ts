@@ -18,7 +18,7 @@ test.beforeAll(async () => {
       HOST: "127.0.0.1",
       PORT: String(port),
       DB_URL: "postgresql://test:test@127.0.0.1:1/isolated_test",
-      ADMIN_TOKEN: "production-test-token-with-at-least-32-characters",
+      ADMIN_TELEGRAM_ID: "123456789",
       BOT_TOKEN: "",
       TELEGRAM_API_ID: "",
       TELEGRAM_API_HASH: "",
@@ -44,7 +44,7 @@ test.afterAll(async () => {
   }
 })
 
-test("production CSP permits hydration and themes, and sensitive paths are denied", async ({
+test("production CSP permits hydration and dark styling, and sensitive paths are denied", async ({
   page,
   request,
 }) => {
@@ -63,8 +63,6 @@ test("production CSP permits hydration and themes, and sensitive paths are denie
   expect(response?.headers()["content-security-policy"]).toMatch(
     /script-src[^;]*sha256-/
   )
-  await page.getByRole("button", { name: "Choose theme" }).click()
-  await page.getByRole("menuitem", { name: "Dark", exact: true }).click()
   await expect(page.locator("html")).toHaveClass(/dark/)
   await page.reload()
   await expect(page.locator("astro-island[ssr]")).toHaveCount(0)

@@ -1,5 +1,9 @@
 import { getPrincipal } from "@/lib/auth/session"
-import { getUserActivityRaw } from "@/lib/stats/user-activity"
+import {
+  getCachedUserStats,
+  getCachedUserDownloads,
+  getCachedUserActivity,
+} from "@/lib/stats/cached"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { defineAction, ActionError } from "astro:actions"
 import { getSafeDatabaseError } from "@/lib/db/errors"
@@ -34,8 +38,6 @@ import {
   getStatsJobRunsRaw,
   getStatsJobsRaw,
   getTimeSeriesRaw,
-  getUserDownloadsRaw,
-  getUserStatsRaw,
   requestStatsJobRunRaw,
   setStatsJobActiveRaw,
   updateStatsJobScheduleRaw,
@@ -110,6 +112,7 @@ function getFakeDatabaseSetupStatus(): DatabaseSetupStatus {
       rollingJobInstalled: true,
       dailyJobInstalled: true,
     },
+    website: { ready: true },
     ready: true,
   }
 }
@@ -161,7 +164,7 @@ export const getOtherStats = defineAction({
     )(undefined)
     return {
       ...data,
-      topDownloaders: getPrincipal(context.cookies).admin
+      topDownloaders: (await getPrincipal(context.cookies)).admin
         ? data.topDownloaders
         : [],
     }
@@ -185,7 +188,7 @@ const historyRangeError = {
 export const getMyActivity = defineAction({
   input: z.object({ range: z.enum(USER_ACTIVITY_RANGES) }).strict(),
   handler: async ({ range }, context) => {
-    const user = getPrincipal(context.cookies).user
+    const user = (await getPrincipal(context.cookies)).user
     if (!user)
       throw new ActionError({
         code: "UNAUTHORIZED",
@@ -194,7 +197,7 @@ export const getMyActivity = defineAction({
     return safeHandler(() =>
       isFakeDataEnabled()
         ? getFakeUserActivity(user.id, range)
-        : getUserActivityRaw(user.id, range)
+        : getCachedUserActivity(user.id, range)
     )(undefined)
   },
 })
@@ -203,7 +206,7 @@ export const getUserActivity = defineAction({
     .object({ userId: telegramId, range: z.enum(USER_ACTIVITY_RANGES) })
     .strict(),
   handler: async ({ userId, range }, context) => {
-    if (!getPrincipal(context.cookies).admin)
+    if (!(await getPrincipal(context.cookies)).admin)
       throw new ActionError({
         code: "UNAUTHORIZED",
         message: "Admin access required.",
@@ -211,20 +214,22 @@ export const getUserActivity = defineAction({
     return safeHandler(() =>
       isFakeDataEnabled()
         ? getFakeUserActivity(userId, range)
-        : getUserActivityRaw(userId, range)
+        : getCachedUserActivity(userId, range)
     )(undefined)
   },
 })
 export const getMyStats = defineAction({
   handler: async (_input, context) => {
-    const user = getPrincipal(context.cookies).user
+    const user = (await getPrincipal(context.cookies)).user
     if (!user)
       throw new ActionError({
         code: "UNAUTHORIZED",
         message: "Log in with Telegram to continue.",
       })
     return safeHandler(() =>
-      isFakeDataEnabled() ? getFakeUserStats(user.id) : getUserStatsRaw(user.id)
+      isFakeDataEnabled()
+        ? getFakeUserStats(user.id)
+        : getCachedUserStats(user.id)
     )(undefined)
   },
 })
@@ -238,7 +243,7 @@ export const getMyDownloads = defineAction({
     .strict()
     .refine(validHistoryRange, historyRangeError),
   handler: async (data, context) => {
-    const user = getPrincipal(context.cookies).user
+    const user = (await getPrincipal(context.cookies)).user
     if (!user)
       throw new ActionError({
         code: "UNAUTHORIZED",
@@ -247,7 +252,7 @@ export const getMyDownloads = defineAction({
     return safeHandler(() =>
       isFakeDataEnabled()
         ? getFakeUserDownloads(user.id, data.page, data.pageSize, data)
-        : getUserDownloadsRaw(
+        : getCachedUserDownloads(
             user.id,
             data.page,
             data.pageSize,
@@ -263,7 +268,7 @@ export const getUserStats = defineAction({
   handler: safeHandler((data) =>
     isFakeDataEnabled()
       ? getFakeUserStats(data.userId)
-      : getUserStatsRaw(data.userId)
+      : getCachedUserStats(data.userId)
   ),
 })
 
@@ -280,7 +285,7 @@ export const getUserDownloads = defineAction({
   handler: safeHandler((data) =>
     isFakeDataEnabled()
       ? getFakeUserDownloads(data.userId, data.page, data.pageSize, data)
-      : getUserDownloadsRaw(
+      : getCachedUserDownloads(
           data.userId,
           data.page,
           data.pageSize,
@@ -309,7 +314,7 @@ export const configureDatabaseJobs = defineAction({
     rollingSchedule: cronSchedule,
     dailySchedule: cronSchedule,
     setupPrivilegesConfirmed: z.literal(true, {
-      error: "Confirm that DB_URL has the listed non-superuser grants.",
+      error: "Confirm that DB_URL has the listed administrative privileges.",
     }),
   }),
   handler: safeHandler(async (data) => {
@@ -330,7 +335,8 @@ export const configureDatabaseJobs = defineAction({
 export const updateDatabaseDefinitions = defineAction({
   input: z.object({
     setupPrivilegesConfirmed: z.literal(true, {
-      error: "Confirm that DB_URL owns the installed TT Stats schema.",
+      error:
+        "Confirm that DB_URL can update the installed @ttgrab Stats schema.",
     }),
   }),
   handler: safeHandler(async (data) => {

@@ -12,10 +12,10 @@ export const GET: APIRoute = async ({ cookies, url, redirect, request }) => {
     return new Response(null, { status: 403 })
   try {
     const previous = cookies.get(LOGIN_COOKIE)?.value
-    if (previous) loginTransactions.delete(previous)
+    if (previous) await loginTransactions.delete(previous)
     const { url: loginUrl, transaction } = await beginTelegramLogin()
     const token = randomToken()
-    loginTransactions.set(token, transaction, LOGIN_SECONDS * 1000)
+    await loginTransactions.set(token, transaction, LOGIN_SECONDS * 1000)
     cookies.set(
       LOGIN_COOKIE,
       token,

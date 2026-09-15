@@ -36,7 +36,7 @@ export const GET: APIRoute = async ({
         headers: { "Cache-Control": "no-store" },
       }
     )
-  const principal = getPrincipal(cookies)
+  const principal = await getPrincipal(cookies)
   const { downloadId = "", position = "" } = params
   if (
     !/^[1-9]\d{0,18}$/u.test(downloadId) ||

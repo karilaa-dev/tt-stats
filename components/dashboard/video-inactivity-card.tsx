@@ -6,19 +6,19 @@ import {
   SendIcon,
   TriangleAlertIcon,
 } from "lucide-react"
-import { toast } from "sonner"
+import { toast } from "@/components/controls/toast"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
+import { Badge } from "@/components/controls"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import {
   sendVideoNotificationTest,
   type VideoNotificationStatus,

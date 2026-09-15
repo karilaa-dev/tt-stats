@@ -1,9 +1,13 @@
 import { Pool } from "pg"
 import { trackPool } from "../lib/db/cancellation"
 import { databaseDiagnostic, withDatabaseStage } from "../lib/db/diagnostics"
-import { getUserDownloadsRaw } from "../lib/stats/history"
+import { withoutQueryCache } from "../lib/db/query-cache"
+import { getUserDownloadsRaw as readHistory } from "../lib/stats/history"
 import { parseTelegramId } from "../lib/stats/validation"
 import { DatabaseTask, withDatabaseTask } from "../lib/tasks/server"
+
+const getUserDownloadsRaw: typeof readHistory = (...args) =>
+  withoutQueryCache(() => readHistory(...args))
 
 // Run on the application's network. All connections enforce read-only mode;
 // this command never installs indexes, changes settings persistently, or prints

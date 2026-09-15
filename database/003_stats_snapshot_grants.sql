@@ -1,4 +1,4 @@
--- Usage: psql "$ADMIN_DATABASE_URL" -v app_role=tt_stats -f database/003_stats_snapshot_grants.sql
+-- Usage: psql "$DB_URL" -v app_role=tt_stats -f database/003_stats_snapshot_grants.sql
 \if :{?app_role}
 \else
   \echo 'Set -v app_role=<existing-application-role>'

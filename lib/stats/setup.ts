@@ -2,6 +2,7 @@ import "@/lib/server-only"
 
 import type { Pool, PoolClient } from "pg"
 
+import { inspectWebsiteSchema } from "@/lib/db/website"
 import snapshotSchemaSql from "@/database/001_stats_snapshot_schema.sql?raw"
 import { classifyDatabaseError, getPool } from "@/lib/db/pool"
 import type {
@@ -76,6 +77,7 @@ function emptyStatus(): DatabaseSetupStatus {
       rollingJobInstalled: false,
       dailyJobInstalled: false,
     },
+    website: { ready: false },
     ready: false,
   }
 }
@@ -118,7 +120,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
            ) AS definitions_current,
            coalesce(
              (
-               SELECT pg_get_userbyid(namespace.nspowner) = current_user
+               SELECT pg_has_role(current_user, namespace.nspowner, 'USAGE') OR (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
                FROM pg_namespace namespace
                WHERE namespace.oid = to_regnamespace('tt_stats_cache')
              ),
@@ -177,6 +179,12 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
   try {
     const app = await inspectApp(getPool())
     status.appConnection.ok = true
+    try {
+      await inspectWebsiteSchema(getPool())
+      status.website = { ready: true }
+    } catch {
+      status.website = { ready: false }
+    }
     status.databaseRole.canCreate = app.can_create
     status.databaseRole.canCreateTemporaryTables =
       app.can_create_temporary_tables
@@ -211,6 +219,7 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
   }
 
   status.ready =
+    status.website?.ready === true &&
     status.appConnection.ok &&
     status.snapshot.tablesInstalled &&
     status.snapshot.jobsApiInstalled &&
@@ -218,7 +227,6 @@ export async function getDatabaseSetupStatusRaw(): Promise<DatabaseSetupStatus> 
     status.snapshot.appCanRead &&
     status.snapshot.appCanManageJobs &&
     status.snapshot.appCanMonitorDownloads &&
-    !status.databaseRole.superuser &&
     status.databaseRole.canCreateTemporaryTables &&
     status.databaseRole.canReadSourceTables &&
     status.databaseRole.canUseCron &&
@@ -273,7 +281,7 @@ function setupFailure(step: string, error: unknown): Error {
   }
   if (kind === "permission") {
     return new Error(
-      `Database setup stopped during ${step} because DB_URL lacks a required limited grant. Follow the administrator guide on Database jobs, then retry.`
+      `Database setup stopped during ${step} because DB_URL lacks a required privilege. Follow the administrator guide on Database jobs, then retry.`
     )
   }
   if (step === "job scheduling") {
@@ -293,7 +301,7 @@ export async function configureDatabaseJobsRaw(input: {
 }): Promise<ConfigureDatabaseJobsResult> {
   if (input.setupPrivilegesConfirmed !== true) {
     throw new Error(
-      "Confirm that DB_URL has the listed non-superuser grants before running database setup."
+      "Confirm that DB_URL has the listed administrative privileges before running database setup."
     )
   }
 
@@ -308,11 +316,6 @@ export async function configureDatabaseJobsRaw(input: {
     capabilities = await inspectApp(pool)
   } catch (error) {
     throw setupFailure("connection verification", error)
-  }
-  if (capabilities.superuser) {
-    throw new Error(
-      "DB_URL is a PostgreSQL superuser. Configure the dedicated non-superuser role described on Database jobs, then retry."
-    )
   }
   if (!capabilities.pg_cron_installed) {
     throw new Error(
@@ -332,7 +335,7 @@ export async function configureDatabaseJobsRaw(input: {
   ].filter((value): value is string => Boolean(value))
   if (missingPrivileges.length) {
     throw new Error(
-      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the limited grants from the administrator guide, then retry.`
+      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the required privileges from the administrator guide, then retry.`
     )
   }
 
@@ -413,7 +416,7 @@ export async function updateDatabaseDefinitionsRaw(input: {
 }): Promise<ConfigureDatabaseJobsResult> {
   if (input.setupPrivilegesConfirmed !== true) {
     throw new Error(
-      "Confirm that DB_URL owns the installed TT Stats schema before updating it."
+      "Confirm that DB_URL can update the installed @ttgrab Stats schema."
     )
   }
 
@@ -424,14 +427,9 @@ export async function updateDatabaseDefinitionsRaw(input: {
   } catch (error) {
     throw setupFailure("connection verification", error)
   }
-  if (capabilities.superuser) {
-    throw new Error(
-      "DB_URL is a PostgreSQL superuser. Use the dedicated non-superuser TT Stats role instead."
-    )
-  }
   if (!capabilities.schema_installed || !capabilities.owns_snapshot_schema) {
     throw new Error(
-      "DB_URL does not own the installed TT Stats schema. Use the role that installed it, or transfer ownership before retrying."
+      "DB_URL needs the schema owner role privileges or superuser access to update the installed @ttgrab Stats schema."
     )
   }
 
@@ -446,7 +444,7 @@ export async function updateDatabaseDefinitionsRaw(input: {
   ].filter((value): value is string => Boolean(value))
   if (missingPrivileges.length) {
     throw new Error(
-      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the limited runtime grants from the administrator guide, then retry.`
+      `DB_URL is missing: ${missingPrivileges.join(", ")}. Apply the required runtime privileges from the administrator guide, then retry.`
     )
   }
 

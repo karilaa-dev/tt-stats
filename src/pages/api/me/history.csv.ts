@@ -1,8 +1,8 @@
 import type { APIRoute } from "astro"
 import { getHistoryCsvResponse } from "@/lib/csv/history"
 import { getPrincipal } from "@/lib/auth/session"
-export const GET: APIRoute = ({ cookies }) => {
-  const user = getPrincipal(cookies).user
+export const GET: APIRoute = async ({ cookies }) => {
+  const user = (await getPrincipal(cookies)).user
   if (!user)
     return Response.json(
       { message: "Log in with Telegram to continue." },

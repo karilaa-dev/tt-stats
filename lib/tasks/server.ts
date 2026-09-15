@@ -2,7 +2,6 @@ import "@/lib/server-only"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { createHash, randomUUID } from "node:crypto"
 import type { AstroCookies } from "astro"
-import { ADMIN_COOKIE } from "@/lib/admin/session"
 import { USER_COOKIE } from "@/lib/auth/session"
 import type { Principal } from "@/lib/auth/types"
 import type { TaskProgress } from "./types"
@@ -15,11 +14,9 @@ export function taskOwner(
 ) {
   // Bind tasks to the verified session as well as the account. Logout or a
   // different admin session must not grant access to a previous request.
-  const identity = principal.admin
-    ? `admin:${cookies.get(ADMIN_COOKIE)?.value}`
-    : principal.user
-      ? `user:${principal.user.id}:${cookies.get(USER_COOKIE)?.value}`
-      : `anonymous:${ip}`
+  const identity = principal.user
+    ? `user:${principal.user.id}:${cookies.get(USER_COOKIE)?.value}`
+    : `anonymous:${ip}`
   return createHash("sha256").update(identity).digest("hex")
 }
 
@@ -80,7 +77,15 @@ export class DatabaseTask {
   }
 }
 
-const scope = new AsyncLocalStorage<DatabaseTask>()
+// Startup and Astro are separate bundles but share the same pool. Its query
+// wrapper must read the request context established by either bundle.
+const taskRuntime = globalThis as typeof globalThis & {
+  ttStatsTaskScope?: AsyncLocalStorage<DatabaseTask>
+}
+const scope = (taskRuntime.ttStatsTaskScope ??=
+  new AsyncLocalStorage<DatabaseTask>())
+export const withoutDatabaseTask = <T>(operation: () => T) =>
+  scope.exit(operation)
 export const currentDatabaseTask = () => scope.getStore()
 export const withDatabaseTask = <T>(task: DatabaseTask, operation: () => T) =>
   scope.run(task, operation)

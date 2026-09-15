@@ -1,13 +1,12 @@
-# TT Stats
+# @ttgrab Stats
 
 An analytics website for the current [`tt-bot`](https://github.com/karilaa-dev/tt-bot) PostgreSQL schema. PostgreSQL builds complete-bucket statistics snapshots on a fixed cadence; the web application is a responsive, non-blocking read layer over those snapshots.
 
-The normal statistics read path is read-only. Guided setup can use the same
-non-superuser `DB_URL` for the fixed TT Stats schema and schedules after an
-explicit confirmation. Narrow `SECURITY DEFINER` functions let authenticated
-operators manage only the two fixed TT Stats `pg_cron` jobs. Aggregate statistics and ranked-video previews are public. Telegram OAuth gives
-users access to their own statistics, history, media, and CSV exports. A shared
-admin token at `/admin` protects Operations and lookup of other accounts.
+One administrative `DB_URL` handles reads, website storage, snapshot setup, and
+operations. Aggregate statistics and ranked-video previews are public. Telegram
+OAuth gives people access to their own statistics, history, media, and CSV exports.
+The verified account matching `ADMIN_TELEGRAM_ID` can access Operations and look
+up other accounts.
 
 ## Stack
 
@@ -16,7 +15,7 @@ admin token at `/admin` protects Operations and lookup of other accounts.
 - TanStack Charts for accessible responsive SVG time series
 - TanStack Table for ranked data and pagination
 - TanStack Form for the Telegram chat lookup
-- [Rare UI](https://www.rareui.com/) Bounce Sidebar and Animated Counter, with Base UI controls and Tailwind CSS 4
+- [Rare UI](https://www.rareui.com/) Bounce Sidebar and Animated Counter, site-owned Base UI controls, and Tailwind CSS 4
 - PostgreSQL through `pg`
 
 TanStack Charts is currently pre-alpha. The lockfile pins the tested release used by this project.
@@ -27,7 +26,10 @@ Astro routes live in `src/pages`. Each dashboard page hydrates its own React isl
 
 The notification monitor starts with the dev server and with `bun run start`, and closes its listeners on shutdown. `bun run build` bundles it separately as `dist/monitor.mjs`.
 
-The workspace uses horizontal desktop navigation and a mobile bottom dock with a full-section menu. The overview pairs exact daily totals with cache efficiency, an all-chat traffic chart, and a lifetime ledger. Audience selection stays in the URL. User lookup uses a split desktop workspace and a compact stacked mobile layout. Analytics loads interactive charts near the viewport and keeps chart summaries visible while the chart module loads. The original [Rare UI](https://www.rareui.com/components) sidebar and counter sources remain in `components/ui` for reference; the dashboard no longer loads their animation runtime.
+The always-dark workspace uses a desktop sidebar and a mobile bottom dock with
+an accessible section drawer. White text and cyan/red accents match the @ttgrab
+logo. Fonts and the Twemoji chart favicon are served locally. Components use
+Rare UI and Base UI, with no shadcn dependency or copied shadcn components.
 
 ## Requirements
 
@@ -47,8 +49,8 @@ Required runtime variables:
 ```dotenv
 DB_URL=postgresql://database-user:password@host:5432/ttbot-db
 
-# Required only to enable admin access; use a random token of at least 32 characters.
-ADMIN_TOKEN=
+# Numeric Telegram account ID; Telegram OAuth must also be configured.
+ADMIN_TELEGRAM_ID=
 ```
 
 Optional variables:
@@ -80,23 +82,29 @@ test button that sends a notification without changing monitor state. Generic
 webhooks receive JSON; ntfy destinations receive the message and priority
 headers expected by an ntfy topic URL.
 
-After upgrading an installation where `DB_URL` owns `tt_stats_cache`, use
-**Update database definitions** on the Database jobs page once. If the schema
-owner and runtime `DB_URL` role are separate, apply
-`database/001_stats_snapshot_schema.sql` as the schema owner, then reapply
-`database/003_stats_snapshot_grants.sql` with `app_role` set to the runtime role.
-The diagnostics and notification card report missing monitor-state grants.
+At startup, the app creates missing `tt_stats_web` tables and indexes under a
+database lock. Existing rows and definitions are preserved. Incompatible tables
+fail readiness with an explicit error, requiring an intentional migration.
+Builds require no database connection. Use `bun run start` for production so the
+storage checks and cleanup worker run before the HTTP server starts.
 
-The guided setup action on `/dashboard/jobs` uses `DB_URL`, but the role must not
-be a PostgreSQL superuser. The page checks the limited grants below and requires
-an explicit confirmation before it creates or repairs TT Stats objects. The URL
-is never sent to the browser.
+Website tables are `users`, `sessions`, `login_transactions`, and `query_cache`.
+Profiles contain the verified Telegram ID, display name, username, and first/last
+login times. Website users do not need a corresponding bot-owned `public.users`
+row. Session tokens are stored only as SHA-256 hashes. OAuth transactions expire
+after ten minutes and are consumed atomically once.
 
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
 tables every minute or every 15 minutes, depending on the dataset, while keeping
-the previous result visible. Personal and admin user lookup, paginated history, and CSV
-export remain live operations.
+the previous result visible. Personal and admin summaries, activity, history pages, and downloader lists use
+five-minute database cache entries. Keys include account identity, visibility,
+filters, ordering, and pagination. Expiring leases deduplicate concurrent fills
+across app instances; history comparisons share the same cache, and derived
+results inherit their earliest expiry. Errors, cancellations, and payloads over
+1 MiB are not cached. Expired entries and sessions are removed in batches of up
+to 1,000 rows per table every five minutes. CSV exports and media authorization
+remain live. Browser reloads do not bypass the cache.
 
 The rolling charts use 48 completed 30-minute buckets. All-time snapshots keep
 daily history, while the read API groups unusually long histories to at most 720
@@ -105,61 +113,28 @@ statistics so sentinel values cannot expand a graph back to 1970.
 
 All configuration is server-only. The production build does not require runtime secrets, allowing an image to be built before secrets are injected.
 
-## PostgreSQL installation and application role
+## PostgreSQL installation and database privileges
 
-`pg_cron` must be present in `shared_preload_libraries` and configured for the
-application database before installing the schedules. Set `cron.timezone` to
-`UTC` so the daily expression runs at 00:07 UTC. Follow the upstream setup
-instructions for the PostgreSQL distribution in use.
+Use the same administrative `DB_URL` for every command and for the application.
+Superusers are supported. Other roles need database CREATE/TEMPORARY, access to
+the bot source tables and cron schema, and permission to manage the existing
+`tt_stats_cache` and `tt_stats_web` objects. Setup accepts inherited ownership
+privileges as well as superuser access.
 
-After the host-level pg_cron prerequisites are in place, the Database jobs page
-can diagnose and install the additive schema, fixed jobs, and runtime grants.
-It never creates extensions or changes PostgreSQL configuration. It accepts
-only the two cron expressions; job names and SQL commands are fixed server-side.
-The page does not create source indexes because those use
-`CREATE INDEX CONCURRENTLY`; apply
-`database/002_stats_snapshot_indexes.sql` separately as an administrator.
-
-Create a dedicated login role without cluster-wide attributes:
-
-```sql
-CREATE ROLE tt_stats LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
-  NOREPLICATION NOBYPASSRLS PASSWORD 'use-a-strong-generated-password';
-```
-
-The role needs only these database-scoped privileges:
-
-- `CONNECT` on the tt-bot database.
-- `TEMPORARY` because refresh procedures build transaction-local staging
-  tables.
-- `USAGE` on `public` and `SELECT` on `public.users`, `public.videos`,
-  `public.music`, and `public.video_details` for media previews, snapshots,
-  live lookup, history, and CSV export.
-- `USAGE` on `cron` so its own fixed jobs can be scheduled and managed.
-- `CREATE` on the tt-bot database only for the initial guided install or to
-  recreate a missing schema. It can be revoked after installation; updating
-  definitions in an owned schema does not change schedules.
-- Ownership of the additive `tt_stats_cache` objects created by guided setup,
-  including the small persistent video-inactivity escalation state.
-  Browser-facing code still exposes only snapshot reads, fixed management
-  operations, and the configured notification test.
-
-It does not need `SUPERUSER`, `CREATEDB`, `CREATEROLE`, `REPLICATION`,
-`BYPASSRLS`, or privileges on any other database in the cluster.
-
-After configuring and restarting pg_cron, run the prerequisite file once as a
-PostgreSQL administrator. It creates only the pg_cron extension and grants the
-limited privileges above:
+Preload `pg_cron`, configure it for the application database, and set
+`cron.timezone` to UTC. The website does not change host PostgreSQL settings.
+Create the extension through `DB_URL`, then apply the source indexes outside a
+transaction:
 
 ```bash
-psql "$ADMIN_DATABASE_URL" -v app_role=tt_stats \
-  -f database/000_stats_snapshot_prerequisites.sql
-psql "$ADMIN_DATABASE_URL" -f database/002_stats_snapshot_indexes.sql
+psql "$DB_URL" -c 'CREATE EXTENSION IF NOT EXISTS pg_cron'
+psql "$DB_URL" -f database/002_stats_snapshot_indexes.sql
 ```
 
-Then use `/dashboard/jobs` to install or repair the schema and fixed schedules.
-For a fully manual installation, apply `001` and `004` through `DB_URL`; use
-`003` when granting runtime access to a separate existing application role.
+Log in with the configured Telegram admin account and use `/dashboard/jobs` to
+install or repair the snapshot schema and schedules. For manual setup, apply
+`001` and `004` through the same connection. Files `000` and `003` are optional
+grant helpers for an existing administrative role, also executed using `DB_URL`.
 
 The final file seeds both snapshots and installs only these named jobs:
 
@@ -175,7 +150,7 @@ Stats jobs and drops only the additive cache schema; source indexes are retained
 
 ## Upgrading an existing deployment
 
-After deploying a new TT Stats build, open `/dashboard/jobs` and use **Update
+After deploying a new @ttgrab Stats build, open `/dashboard/jobs` and use **Update
 database definitions** when diagnostics report an update. This applies the
 additive snapshot changes, including `breakdown.cache_hits`, and queues both
 snapshot rebuilds. Wait for both rebuilds to succeed. Deploying application code
@@ -185,7 +160,7 @@ Apply `database/002_stats_snapshot_indexes.sql` separately with `psql` as the
 source-table owner, outside a transaction. The tt-bot v6.0.10 source indexes
 include a BRIN time index and a user-first history index; neither replaces TT
 Stats' time-first B-tree index for the monitor's latest-download lookup. A bot
-migration that replaces `videos` may require reapplying the TT Stats indexes.
+migration that replaces `videos` may require reapplying the @ttgrab Stats indexes.
 
 The monitor runs at most one check per web process. Failed checks discard their
 database connection so an active query or aborted transaction cannot be reused
@@ -196,7 +171,7 @@ require checking database load and connectivity.
 Compatibility tests use the source-table definitions from
 [tt-bot v6.0.10](https://github.com/karilaa-dev/tt-bot/blob/v6.0.10/src/db/migrations.ts),
 including `users.richads_last_shown_at`, `video_details`, and the video history
-foreign key and delivery constraints. TT Stats reads download events from
+foreign key and delivery constraints. @ttgrab Stats reads download events from
 `videos` and does not count cache entries in `video_details` as downloads.
 
 ## Local development
@@ -247,7 +222,7 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard/analytics` — registration, video, and music time series
 - `/dashboard/detailed` — linkable scope and range filters
 - `/dashboard/me` — Telegram login, personal statistics, filtered history, and CSV export
-- `/admin` — the only admin login screen
+- `/admin` — Telegram access page for the configured administrator
 - `/dashboard/users` — admin-only user/group lookup, filtered history, and CSV export
 - `/dashboard/videos` — public most-downloaded videos by period, ranked by unique chats with public media previews
 - `/dashboard/referrals` — top referral values
@@ -302,11 +277,11 @@ validation error includes the failing claim name when available. Keep RS256
 selected in BotFather and verify that the server clock is correct. After changing
 configuration or restarting, start a new login instead of reusing a callback URL.
 
-Telegram sessions last seven days in RAM and use opaque HttpOnly cookies.
-Logout revokes the current session. Login transactions expire after ten minutes.
-A restart ends all Telegram sessions and clears rate limits. Run one app process
-and one replica; these stores are intentionally not shared across instances.
-There are no session or rate-limit database tables and no Redis requirement.
+Telegram sessions last seven days in PostgreSQL and use opaque HttpOnly cookies.
+Logout revokes the session and its admin access. Sessions and OAuth transactions
+survive process restarts and are shared across instances. Rate limits and active
+query-progress records remain process-local. Auth queries use reserved connection
+capacity so a saturated statistics pool cannot block logout or cancellation.
 
 Users can read only their own account's records. Group records belong to the
 group ID and cannot be attributed to individual members from this schema.
@@ -346,11 +321,12 @@ Metadata failures log a sanitized database error category under
 `[media] metadata unavailable`. All files
 continue through the server proxy; the Telegram Bot API 20 MB limit remains.
 
-Set `ADMIN_TOKEN` to a random value of at least 32 characters. Admin login is
-available only at `/admin`; protected page links redirect there. The existing
-eight-hour signed admin session is separate from Telegram login. An admin token
-does not create a Telegram identity. Admin-only menus, downloader identities,
-and operational diagnostics are hidden from other visitors.
+Set `ADMIN_TELEGRAM_ID` to the one numeric Telegram account ID allowed to manage
+the website. An unset value disables admin access; a malformed ID fails runtime
+validation. Admin status is checked from the verified Telegram session on every
+request, never from a username or a stored profile flag. `/admin` provides the
+Telegram login entry point. The old token endpoint and admin cookies grant no
+access. A first login is required after upgrading from in-memory sessions.
 
 ## Rate limits and production security
 
@@ -383,7 +359,7 @@ Serve only `dist/client` as public static assets. Never mount the repository,
 `dist/server`, environment files, or dependency directories in a public file
 server. The app blocks sensitive paths and source maps, enforces a 16 KB body
 limit, rejects cross-origin mutations, and disables shared caching of private
-responses. Production CSP hashes Astro scripts and the theme initializer;
+responses. Production CSP hashes Astro scripts;
 inline styles remain permitted for the component and chart libraries.
 
 ## Deploying the new rankings
@@ -507,12 +483,12 @@ measurable progress stays indeterminate rather than inventing a percentage.
 History comparisons start with 64 distinct stable video IDs to show progress
 promptly, then use batches of up to 1,024. Legacy links never trigger comparison
 queries. Joins compare each batch together using the bot's video identity index.
-Those indexes still improve performance on large databases. Completed comparisons are reused
-across pages, dates, media filters, and sorting for two minutes. The cache is
-account-scoped, limited to 50,000 comparisons and approximately 16 MB per process.
-Counts and first-downloader badges in these filtered views can therefore lag by
-up to two minutes. Histories above 20,000 distinct stable video IDs use the database-only
-ranking path to bound application memory. No new database objects are required.
+Those indexes still improve performance on large databases. Completed comparisons
+are reused across pages, dates, media filters, and sorting for five minutes in
+`tt_stats_web.query_cache`. Entries are account-scoped and shared between app
+instances. Derived history pages inherit the earliest comparison expiry; layering
+caches does not extend freshness. Histories above 20,000 distinct stable video IDs
+use the database-only ranking path to bound application memory.
 
 Progress and cancellation use `/api/tasks`, bound to the verified browser session
 or trusted anonymous IP. Requests have a two-minute deadline, a limit of eight
@@ -524,12 +500,14 @@ job controls.
 
 PostgreSQL cancellation uses the application's own checked-out backend ID and
 the same database role. It needs no superuser or `pg_signal_backend` grant.
-Reserve two additional database connections beyond `DB_POOL_SIZE` for cancellation.
+Reserve four additional database connections beyond `DB_POOL_SIZE`: two for
+cancellation and two for live session checks.
 The read connection is discarded after cancellation, and the existing statement
 timeout remains the fallback if the control connection cannot be reached.
 See [PostgreSQL's cancellation permissions](https://www.postgresql.org/docs/17/functions-admin.html#FUNCTIONS-ADMIN-SIGNAL).
 
-All task state and cached comparisons live in RAM and disappear on restart.
+Active task state is process-local and disappears on restart. Comparison results
+are stored in PostgreSQL and shared across instances.
 Keep one application process, as with login sessions and usage limits.
 
 ### Troubleshooting history requests
@@ -570,16 +548,40 @@ database; those checks modify their isolated test database.
 
 - The database connection should use the constrained PostgreSQL role described above.
 - Server authorization protects mutations and individual user data, including direct action and CSV requests.
-- Aggregate queries read database snapshots. User histories refresh every minute; cached popularity comparisons expire after two minutes.
-- Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two TT Stats jobs.
+- Aggregate queries read database snapshots. Interactive user queries and popularity comparisons share a five-minute database cache.
+- Job wrappers resolve fixed commands internally. Browser input can change only the cron expression and active state of the two @ttgrab Stats jobs.
 - The optional notification monitor can update only its singleton escalation-state row; webhook and ntfy credentials remain server-only.
-- Treat `ADMIN_TOKEN`, `BOT_TOKEN`, `TELEGRAM_API_HASH`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
+- Treat `BOT_TOKEN`, `TELEGRAM_API_HASH`, notification URLs/tokens, and the exported IDs as sensitive; they are never intentionally logged.
+
+## Website storage and browser tests
+
+Use isolated PostgreSQL databases whose names contain `test`. Test setup may
+reset fixture schemas and tables. `TEST_DB_URL` is a test-runner input; the
+application still receives only `DB_URL`.
+
+```bash
+bun run lint
+bun run typecheck
+bun run test
+TEST_DB_URL=postgresql://user:password@localhost/tt_stats_test bun run test:integration
+bun run build
+TEST_DB_URL=postgresql://user:password@localhost/tt_stats_browser_test bun run test:browser
+```
+
+Browser fixtures seed hashed Telegram sessions directly into the isolated test
+database. They do not add a production login shortcut. Production proxy and
+cancellation scripts also require `TEST_DB_URL`.
 
 ## Attribution and license
 
 The Bounce Sidebar and Animated Counter are from [Rare UI](https://www.rareui.com/), by Swami Malode. Their source has been adapted for Astro navigation, dashboard icons, accessibility, and reduced motion. Rare UI permits personal and commercial use and modification; do not resell its components as a kit.
 
-
-TT Stats is adapted from the database-backed statistics in [`tt-bot` v5.4.6](https://github.com/karilaa-dev/tt-bot/tree/v5.4.6/stats), created by Kyryl Andreiev. Changes include a web interface, current v6 schema mapping, completed UTC-duration buckets displayed in each visitor's timezone, PostgreSQL-managed snapshots, streaming CSV, and constrained job controls.
+@ttgrab Stats is adapted from the database-backed statistics in [`tt-bot` v5.4.6](https://github.com/karilaa-dev/tt-bot/tree/v5.4.6/stats), created by Kyryl Andreiev. Changes include a web interface, current v6 schema mapping, completed UTC-duration buckets displayed in each visitor's timezone, PostgreSQL-managed snapshots, streaming CSV, and constrained job controls.
 
 This repository follows tt-bot's Creative Commons Attribution-NonCommercial 4.0 International licensing posture. See [LICENSE.md](LICENSE.md).
+
+The attached @ttgrab logo is served unchanged. The chart favicon is Twemoji
+17.0.3 from https://github.com/jdecked/twemoji, graphics by Twitter and contributors,
+licensed under CC BY 4.0. A copy of the graphics license is served at
+`/twemoji-license.txt`. Barlow Condensed and IBM Plex fonts are distributed under
+their bundled open font licenses.

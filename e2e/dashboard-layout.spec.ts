@@ -53,3 +53,51 @@ for (const route of ["/dashboard/detailed", "/dashboard/analytics"]) {
     }
   })
 }
+
+test("branding, reduced motion and compact navigation", async ({
+  page,
+  isMobile,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" })
+  if (isMobile) await page.setViewportSize({ width: 320, height: 740 })
+  await page.goto("/dashboard")
+  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  await expect(page).toHaveTitle(/@ttgrab Stats/)
+  await expect(page.locator("html")).toHaveClass("dark")
+  await expect(page.locator('link[rel="icon"]')).toHaveAttribute(
+    "href",
+    "/favicon.svg"
+  )
+  await expect(page.locator('img[src="/ttgrab-logo.png"]:visible')).toHaveCount(
+    1
+  )
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth
+    )
+  ).toBe(true)
+  const target = isMobile
+    ? page.getByRole("button", { name: "Open all sections" })
+    : page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Referrals", exact: true })
+  await target.focus()
+  await expect(target).toBeFocused()
+  await page.keyboard.press("Enter")
+  if (isMobile) {
+    await expect(
+      page.getByRole("dialog", { name: "All sections" })
+    ).toBeVisible()
+    await page.keyboard.press("Escape")
+    await expect(target).toBeFocused()
+  } else {
+    await expect(page).toHaveURL(/referrals/)
+    await page.goto("/dashboard")
+    await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  }
+  await page.evaluate(() => document.fonts.ready)
+  await page.screenshot({
+    path: testInfo.outputPath("branding.png"),
+    fullPage: true,
+  })
+})

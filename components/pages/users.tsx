@@ -34,21 +34,21 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Empty,
   EmptyHeader,
   EmptyTitle,
   EmptyDescription,
   EmptyMedia,
-} from "@/components/ui/empty"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Skeleton } from "@/components/ui/skeleton"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Badge } from "@/components/ui/badge"
+} from "@/components/controls"
+import { Alert, AlertTitle, AlertDescription } from "@/components/controls"
+import { Button } from "@/components/controls"
+import { Switch } from "@/components/controls"
+import { Field, FieldLabel } from "@/components/controls"
+import { Skeleton } from "@/components/controls"
+import { ToggleGroup, ToggleGroupItem } from "@/components/controls"
+import { Badge } from "@/components/controls"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { getLanguagePresentation } from "@/lib/language"
@@ -80,28 +80,26 @@ export function UsersPage({ own = false }: { own?: boolean }) {
       <>
         <PageHeading
           title="My Profile"
-          description="Your downloads, all in one place."
+          description="Your downloads and activity. Results update every five minutes."
         />
-        <Card className="mx-auto w-full max-w-xl">
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <UserRoundIcon />
-              </EmptyMedia>
-              <EmptyTitle>See your download history</EmptyTitle>
-              <EmptyDescription>
-                Log in with Telegram to see your videos, activity, and the posts
-                you downloaded first. Your history is private.
-              </EmptyDescription>
-            </EmptyHeader>
-            {login && messages[login] ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                {messages[login]}
-              </p>
-            ) : null}
-            <TelegramLoginButton />
-          </Empty>
-        </Card>
+        <Empty className="mx-auto w-full max-w-xl border-solid bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UserRoundIcon />
+            </EmptyMedia>
+            <EmptyTitle>See your download history</EmptyTitle>
+            <EmptyDescription>
+              Log in with Telegram to see your videos, activity, and the posts
+              you downloaded first. Your history is private.
+            </EmptyDescription>
+          </EmptyHeader>
+          {login && messages[login] ? (
+            <p role="status" className="text-sm text-muted-foreground">
+              {messages[login]}
+            </p>
+          ) : null}
+          <TelegramLoginButton />
+        </Empty>
       </>
     )
   }
@@ -112,7 +110,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
         title={own ? "My Profile" : "User lookup"}
         description={
           own
-            ? "Revisit your downloads and see what caught on."
+            ? "Your downloads and activity. Results update every five minutes; reloading uses the same saved results."
             : "Download history and statistics for a user or group."
         }
       />
@@ -189,8 +187,8 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
           ? databaseAction(actions.getMyStats, undefined, signal)
           : databaseAction(actions.getUserStats, { userId }, signal)
       ),
-    staleTime: 60_000,
-    refetchInterval: databaseRefreshInterval(60_000),
+    staleTime: 300_000,
+    refetchInterval: databaseRefreshInterval(300_000),
     retry: false,
   })
   const history = useQuery({
@@ -222,8 +220,8 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               signal
             )
       ),
-    staleTime: 60_000,
-    refetchInterval: databaseRefreshInterval(60_000),
+    staleTime: 300_000,
+    refetchInterval: databaseRefreshInterval(300_000),
     retry: false,
     placeholderData: (previous) => previous,
   })
@@ -514,6 +512,7 @@ function UserActivityChart({
       ),
     enabled: range !== "31d",
     staleTime: 300_000,
+    refetchInterval: databaseRefreshInterval(300_000),
     retry: false,
   })
   const controls = (

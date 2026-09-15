@@ -7,7 +7,7 @@ import {
   DownloadDialog,
   type SelectedDownload,
 } from "@/components/dashboard/download-dialog"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardHeader,
@@ -15,7 +15,7 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Table,
   TableBody,
@@ -23,18 +23,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/controls"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { getSafeDatabaseError } from "@/lib/db/errors"
 import { isRequestCancelled } from "@/lib/http-client"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import {
   Empty,
   EmptyHeader,
   EmptyTitle,
   EmptyDescription,
-} from "@/components/ui/empty"
-import { Spinner } from "@/components/ui/spinner"
+} from "@/components/controls"
+import { Spinner } from "@/components/controls"
 import { popularVideosQueryOptions } from "@/lib/media/query-options"
 import {
   useDashboardSearch,

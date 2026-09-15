@@ -30,6 +30,7 @@ export interface DatabaseSetupStatus {
     rollingJobInstalled: boolean
     dailyJobInstalled: boolean
   }
+  website?: { ready: boolean }
   ready: boolean
 }
 

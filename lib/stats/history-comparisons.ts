@@ -1,5 +1,6 @@
 import "@/lib/server-only"
 import type { Pool } from "pg"
+import { cacheKey, readCacheBatch, cachedBatch } from "@/lib/db/query-cache"
 import { currentDatabaseTask, reportDatabaseProgress } from "@/lib/tasks/server"
 import { logHistoryCache, withDatabaseStage } from "@/lib/db/diagnostics"
 
@@ -12,52 +13,6 @@ interface Comparison {
   uncertain: boolean
   first_user: string | null
 }
-
-// Bound both entry count and approximate retained bytes. Cache only completed
-// comparisons, never credentials or entire histories. Restarts clear the cache.
-export class ComparisonCache {
-  private entries = new Map<
-    string,
-    { value: Comparison; expires: number; bytes: number }
-  >()
-  private bytes = 0
-  constructor(
-    private now = Date.now,
-    private maxEntries = 50_000,
-    private maxBytes = 16 * 1024 * 1024
-  ) {}
-  get(key: string) {
-    const entry = this.entries.get(key)
-    if (!entry) return undefined
-    this.entries.delete(key)
-    this.bytes -= entry.bytes
-    if (entry.expires <= this.now()) return undefined
-    this.entries.set(key, entry)
-    this.bytes += entry.bytes
-    return entry.value
-  }
-  set(key: string, value: Comparison) {
-    const bytes = key.length * 2 + 256
-    const previous = this.entries.get(key)
-    if (previous) {
-      this.entries.delete(key)
-      this.bytes -= previous.bytes
-    }
-    if (bytes > this.maxBytes) return
-    while (
-      this.entries.size >= this.maxEntries ||
-      this.bytes + bytes > this.maxBytes
-    ) {
-      const oldest = this.entries.entries().next().value
-      if (!oldest) break
-      this.entries.delete(oldest[0])
-      this.bytes -= oldest[1].bytes
-    }
-    this.entries.set(key, { value, bytes, expires: this.now() + 120_000 })
-    this.bytes += bytes
-  }
-}
-const caches = new WeakMap<Pool, ComparisonCache>()
 
 export async function getHistoryComparisons(
   pool: Pool,
@@ -80,17 +35,18 @@ export async function getHistoryComparisons(
     reportDatabaseProgress("Ranking a large download history")
     return undefined
   }
-  let cache = caches.get(pool)
-  if (!cache) {
-    cache = new ComparisonCache()
-    caches.set(pool, cache)
-  }
-  const key = (row: Identity) => `${userId}:id:${row.video_details_id}`
+  const key = (row: Identity) =>
+    cacheKey("history-comparison", {
+      userId,
+      visibility: "account",
+      videoDetailsId: row.video_details_id,
+    })
+  const cache = await readCacheBatch<Comparison>(identities.rows.map(key), pool)
   const results: (Comparison & { content_id: string })[] = []
   const missing: Identity[] = []
   for (const row of identities.rows) {
     const cached = cache.get(key(row))
-    if (cached) results.push({ ...cached, content_id: row.content_id })
+    if (cached) results.push({ ...cached.value, content_id: row.content_id })
     else missing.push(row)
   }
   logHistoryCache(
@@ -104,11 +60,16 @@ export async function getHistoryComparisons(
   for (let offset = 0; offset < missing.length;) {
     const batch = missing.slice(offset, offset + (offset === 0 ? 64 : 1024))
     const started = performance.now()
-    const result = await withDatabaseStage(
-      "history.compare",
-      () =>
-        pool.query<Comparison & { content_id: string }>(
-          `WITH identities AS (
+    const byKey = new Map(batch.map((row) => [key(row), row]))
+    const comparisons = await cachedBatch<Comparison>(
+      batch.map(key),
+      async (claimed) => {
+        const claimedBatch = claimed.map((key) => byKey.get(key)!)
+        const result = await withDatabaseStage(
+          "history.compare",
+          () =>
+            pool.query<Comparison & { content_id: string }>(
+              `WITH identities AS (
         SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint)
       ), matched AS MATERIALIZED (
         SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
@@ -125,25 +86,38 @@ export async function getHistoryComparisons(
       ) SELECT i.content_id::text, coalesce(compared.other_chats, 0)::text AS other_chats,
         coalesce(compared.uncertain, true) AS uncertain, first_downloads.first_user::text
       FROM identities i LEFT JOIN compared USING(content_id) LEFT JOIN first_downloads USING(content_id)`,
-          [JSON.stringify(batch), userId]
-        ),
-      {
-        batch: comparedBatches + 1,
-        batchSize: batch.length,
-        completed: offset,
-        total: missing.length,
-      }
+              [JSON.stringify(claimedBatch), userId]
+            ),
+          {
+            batch: comparedBatches + 1,
+            batchSize: claimedBatch.length,
+            completed: offset,
+            total: missing.length,
+          }
+        )
+        const byId = new Map(result.rows.map((row) => [row.content_id, row]))
+        return new Map(
+          claimedBatch.map((row) => {
+            const comparison = byId.get(row.content_id)
+            if (!comparison) throw new Error("Incomplete history comparison")
+            return [
+              key(row),
+              {
+                other_chats: comparison.other_chats,
+                uncertain: comparison.uncertain,
+                first_user: comparison.first_user,
+              },
+            ]
+          })
+        )
+      },
+      pool
     )
-    const byId = new Map(result.rows.map((row) => [row.content_id, row]))
-    for (const row of batch) {
-      const comparison = byId.get(row.content_id)!
-      cache.set(key(row), {
-        other_chats: comparison.other_chats,
-        uncertain: comparison.uncertain,
-        first_user: comparison.first_user,
+    for (const row of batch)
+      results.push({
+        ...comparisons.get(key(row))!,
+        content_id: row.content_id,
       })
-      results.push(comparison)
-    }
     offset += batch.length
     comparisonTime += performance.now() - started
     comparedBatches++

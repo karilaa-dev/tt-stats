@@ -1,8 +1,8 @@
 import { useAdminAccess } from "./admin-access"
 import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
+import { Button, buttonVariants } from "@/components/controls"
 import { getSafeDatabaseError } from "@/lib/db/errors"
 import { isRequestCancelled } from "@/lib/http-client"
 

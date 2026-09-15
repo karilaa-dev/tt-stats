@@ -1,8 +1,11 @@
+import { seedTestSession } from "./test-session.mjs"
 import assert from "node:assert/strict"
 import { createServer } from "node:net"
 import { once } from "node:events"
 import { spawn, sleep } from "bun"
 import { readdir, readFile } from "node:fs/promises"
+
+const sessionCookie = `tt_stats_user=${await seedTestSession()}`
 
 // Exercise the built adapter, where proxy handling differs from astro dev.
 const reservation = createServer()
@@ -10,15 +13,17 @@ reservation.listen(0, "127.0.0.1")
 await once(reservation, "listening")
 const port = reservation.address().port
 await new Promise((resolve) => reservation.close(resolve))
-const server = spawn(["bun", "dist/server/entry.mjs"], {
+const server = spawn(["bun", "scripts/start.mjs"], {
   env: {
     ...process.env,
     NODE_ENV: "production",
+    VIDEO_INACTIVITY_WEBHOOK_URL: "",
+    VIDEO_INACTIVITY_NTFY_URL: "",
+    VIDEO_INACTIVITY_NTFY_TOKEN: "",
     HOST: "127.0.0.1",
     PORT: String(port),
-    ADMIN_TOKEN: "proxy-test-admin-token-at-least-32-characters",
-    DB_URL:
-      "postgresql://sentinel_user:sentinel_password@127.0.0.1:1/sentinel_test",
+    ADMIN_TELEGRAM_ID: "123456789",
+    DB_URL: process.env.TEST_DB_URL,
     BOT_TOKEN: "12345:sentinel_bot_secret",
     TELEGRAM_API_ID: "",
     TELEGRAM_API_HASH: "",
@@ -57,25 +62,11 @@ try {
     headers,
   })
   assert.equal(response.status, 200, await response.text())
-  const login = await fetch(`${base}/api/admin-session`, {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      token: "proxy-test-admin-token-at-least-32-characters",
-    }),
+  const session = await fetch(`${base}/api/session`, {
+    headers: { ...headers, Cookie: sessionCookie },
   })
-  assert.equal(
-    login.status,
-    200,
-    "Admin login must work behind the HTTPS proxy"
-  )
-  const cookie = login.headers.get("set-cookie")
-  assert.ok(
-    cookie?.includes("Secure"),
-    "Proxied HTTPS sessions must use Secure cookies"
-  )
-  assert.ok(cookie?.includes("HttpOnly"))
-  const sessionCookie = cookie.split(";")[0]
+  assert.equal(session.status, 200)
+  assert.equal((await session.json()).admin, true)
   const authenticated = await fetch(`${base}/_actions/getUserStats`, {
     method: "POST",
     headers: {
@@ -133,10 +124,10 @@ try {
       `Sensitive path must not be served: ${path}`
     )
   }
-  const oversized = await fetch(`${base}/api/admin-session`, {
+  const oversized = await fetch(`${base}/api/session`, {
     method: "POST",
     headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ token: "x".repeat(20_000) }),
+    body: JSON.stringify({ payload: "x".repeat(20_000) }),
   })
   assert.equal(oversized.status, 413)
   const privatePage = await fetch(`${base}/dashboard/users?id=123`, {

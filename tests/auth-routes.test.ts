@@ -1,3 +1,4 @@
+vi.mock("@/lib/auth/store", () => import("./auth-store-fixture"))
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { APIContext, AstroCookies } from "astro"
 import { GET as callback } from "@/src/pages/api/auth/telegram/callback"
@@ -47,7 +48,7 @@ afterEach(() => {
 describe("OAuth callback and logout", () => {
   it("logs only safe diagnostics when Telegram rejects the token exchange", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {})
-    loginTransactions.set(
+    await loginTransactions.set(
       "failed-exchange",
       {
         state: "state",
@@ -133,12 +134,12 @@ describe("OAuth callback and logout", () => {
     })
   })
   it("consumes login transactions once and replaces the previous session", async () => {
-    const previous = createUserSession({
+    const previous = await createUserSession({
       id: "1",
       name: "Before",
       username: null,
     })
-    loginTransactions.set(
+    await loginTransactions.set(
       "route-test",
       {
         state: "state",
@@ -155,8 +156,8 @@ describe("OAuth callback and logout", () => {
     )
     expect((await callback(ctx)).headers.get("location")).toBe("/dashboard/me")
     const token = ctx.cookies.get(USER_COOKIE)!.value
-    expect(getUserSession(token)?.id).toBe("2")
-    expect(getUserSession(previous)).toBeNull()
+    expect((await getUserSession(token))?.id).toBe("2")
+    expect(await getUserSession(previous)).toBeNull()
     expect(ctx.cookies.set).toHaveBeenCalledWith(
       USER_COOKIE,
       token,
@@ -178,7 +179,7 @@ describe("OAuth callback and logout", () => {
     "state=state&state=state&code=code",
     "state=state&error=access_denied",
   ])("does not create a session for %s", async (query) => {
-    loginTransactions.set(
+    await loginTransactions.set(
       "reject-test",
       {
         state: "state",
@@ -195,10 +196,14 @@ describe("OAuth callback and logout", () => {
     expect((await callback(ctx)).status).toBe(303)
     expect(ctx.cookies.get(USER_COOKIE)).toBeUndefined()
     expect(finish).not.toHaveBeenCalled()
-    expect(loginTransactions.take("reject-test")).toBeUndefined()
+    expect(await loginTransactions.take("reject-test")).toBeUndefined()
   })
   it("rejects cross-origin logout and exposes only the current safe profile", async () => {
-    const token = createUserSession({ id: "123", name: "User", username: null })
+    const token = await createUserSession({
+      id: "123",
+      name: "User",
+      username: null,
+    })
     const values = { [USER_COOKIE]: token }
     const session = await getSession(
       context("https://example.test/api/session", values)
@@ -221,7 +226,7 @@ describe("OAuth callback and logout", () => {
         )
       ).status
     ).toBe(403)
-    expect(getUserSession(token)).not.toBeNull()
+    expect(await getUserSession(token)).not.toBeNull()
     expect(
       (
         await logout(
@@ -234,6 +239,6 @@ describe("OAuth callback and logout", () => {
         )
       ).status
     ).toBe(200)
-    expect(getUserSession(token)).toBeNull()
+    expect(await getUserSession(token)).toBeNull()
   })
 })

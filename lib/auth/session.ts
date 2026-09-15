@@ -1,9 +1,10 @@
 import "@/lib/server-only"
-import { createHash, randomBytes } from "node:crypto"
+import { randomBytes } from "node:crypto"
 import type { AstroCookies } from "astro"
-import { ADMIN_COOKIE, verifyAdminSession } from "@/lib/admin/session"
-import { MemoryStore } from "./memory"
+import { getAdminTelegramId } from "@/lib/env"
+import { readSession, removeSession, saveSession } from "./store"
 import type { Principal, TelegramUser } from "./types"
+export { loginTransactions } from "./store"
 
 export const USER_COOKIE = "tt_stats_user"
 export const USER_SESSION_SECONDS = 7 * 24 * 60 * 60
@@ -15,27 +16,30 @@ export interface LoginTransaction {
   verifier: string
   redirectUri: string
 }
-export const userSessions = new MemoryStore<TelegramUser>(10_000)
-export const loginTransactions = new MemoryStore<LoginTransaction>(1_000)
-const key = (token: string) => createHash("sha256").update(token).digest("hex")
 export const randomToken = () => randomBytes(32).toString("base64url")
-export function createUserSession(user: TelegramUser) {
+export async function createUserSession(user: TelegramUser, previous?: string) {
   const token = randomToken()
-  userSessions.set(key(token), user, USER_SESSION_SECONDS * 1000)
+  await saveSession(token, user, USER_SESSION_SECONDS, previous)
   return token
 }
-export function getUserSession(token?: string) {
+export async function getUserSession(token?: string) {
   if (!token || !/^[\w-]{43}$/u.test(token)) return null
-  return userSessions.get(key(token)) ?? null
+  return readSession(token)
 }
-export function deleteUserSession(token?: string) {
-  if (token && token.length <= 256) userSessions.delete(key(token))
+export async function deleteUserSession(token?: string) {
+  if (token && token.length <= 256) await removeSession(token)
 }
-export function getPrincipal(cookies: AstroCookies): Principal {
-  return {
-    admin: verifyAdminSession(cookies.get(ADMIN_COOKIE)?.value),
-    user: getUserSession(cookies.get(USER_COOKIE)?.value),
+const principals = new WeakMap<AstroCookies, Promise<Principal>>()
+export function getPrincipal(cookies: AstroCookies): Promise<Principal> {
+  let pending = principals.get(cookies)
+  if (!pending) {
+    pending = getUserSession(cookies.get(USER_COOKIE)?.value).then((user) => ({
+      user,
+      admin: Boolean(user && user.id === getAdminTelegramId()),
+    }))
+    principals.set(cookies, pending)
   }
+  return pending
 }
 export const sessionCookieOptions = (secure: boolean, maxAge: number) => ({
   path: "/",

@@ -21,15 +21,15 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+} from "@/components/controls"
+import { ToggleGroup, ToggleGroupItem } from "@/components/controls"
 import { useBrowserTime } from "@/lib/browser-time"
 import type { StatsRange, TimeSeriesPoint } from "@/lib/stats/types"
 

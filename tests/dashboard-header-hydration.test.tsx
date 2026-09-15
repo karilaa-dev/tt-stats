@@ -16,10 +16,6 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined }),
   useQueryClient: () => ({ refetchQueries: vi.fn() }),
 }))
-vi.mock("next-themes", () => ({ useTheme: () => ({ setTheme: vi.fn() }) }))
-vi.mock("@/components/ui/sidebar", () => ({
-  SidebarTrigger: () => <button>Sidebar</button>,
-}))
 vi.mock("@/lib/stats/query-options", () => ({
   snapshotMetadataQueryOptions: () => ({}),
   statsQueryKey: ["stats"],

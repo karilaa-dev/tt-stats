@@ -14,7 +14,7 @@ export const GET: APIRoute = async ({ params, cookies }) => {
       { status: 400, headers }
     )
   try {
-    if (!(await canReadMedia(getPrincipal(cookies), id)))
+    if (!(await canReadMedia(await getPrincipal(cookies), id)))
       return Response.json(
         { message: "Saved media is unavailable." },
         { status: 404, headers }

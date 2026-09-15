@@ -11,14 +11,14 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@/components/ui/empty"
+} from "@/components/controls"
 import { referralStatsQueryOptions } from "@/lib/stats/query-options"
 
 export function ReferralsPage() {

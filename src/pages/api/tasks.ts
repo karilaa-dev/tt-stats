@@ -2,14 +2,18 @@ import type { APIRoute } from "astro"
 import { getPrincipal } from "@/lib/auth/session"
 import { databaseTasks, taskOwner, validTaskId } from "@/lib/tasks/server"
 
-const handle: APIRoute = (context) => {
+const handle: APIRoute = async (context) => {
   let ip = "unknown"
   try {
     ip = context.clientAddress
   } catch {
     /* Shared anonymous identity. */
   }
-  const owner = taskOwner(getPrincipal(context.cookies), context.cookies, ip)
+  const owner = taskOwner(
+    await getPrincipal(context.cookies),
+    context.cookies,
+    ip
+  )
   const ids = (context.url.searchParams.get("ids") ?? "").split(",")
   if (!ids.length || ids.length > 8 || ids.some((id) => !validTaskId(id)))
     return Response.json({ message: "Invalid task request." }, { status: 400 })

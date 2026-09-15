@@ -1,3 +1,10 @@
+import {
+  getCachedUserStats,
+  getCachedUserActivity,
+  getCachedUserDownloads,
+  getCachedDownloaders,
+} from "@/lib/stats/cached"
+import { initializeWebsiteSchema } from "@/lib/db/website"
 import { canReadMedia } from "@/lib/media/access"
 import { getUserActivityRaw } from "@/lib/stats/user-activity"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
@@ -413,6 +420,8 @@ integration("PostgreSQL statistics queries", () => {
       )
     process.env.DB_URL = connectionString
     pool = new Pool({ connectionString })
+    await initializeWebsiteSchema(pool)
+    await pool.query("TRUNCATE tt_stats_web.query_cache")
     await pool.query("DROP SCHEMA IF EXISTS tt_stats_cache CASCADE")
     await pool.query("DROP TABLE IF EXISTS music, videos, users CASCADE")
     await pool.query("DROP TABLE IF EXISTS video_details CASCADE")
@@ -491,6 +500,45 @@ integration("PostgreSQL statistics queries", () => {
   afterAll(async () => {
     if (pool) await pool.end()
     await getPool().end()
+  })
+
+  it("serves repeated interactive requests without reading locked bot source tables", async () => {
+    const reads = () =>
+      Promise.all([
+        getCachedUserStats("1"),
+        getCachedUserActivity("1", "90d"),
+        getCachedUserDownloads("1", 1, 20, undefined, {
+          sort: "newest",
+          mediaKind: "all",
+          discovery: "all",
+          savedMediaOnly: false,
+        }),
+        getCachedDownloaders("1", 1),
+      ])
+    const first = await reads()
+    const locker = await pool.connect()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await locker.query("BEGIN")
+      await locker.query(
+        "LOCK TABLE public.users, public.videos, public.music, public.video_details IN ACCESS EXCLUSIVE MODE"
+      )
+      const cached = await Promise.race([
+        reads(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(
+            () =>
+              reject(new Error("Cached requests read locked source tables")),
+            1500
+          )
+        }),
+      ])
+      expect(cached).toEqual(first)
+    } finally {
+      clearTimeout(timeout)
+      await locker.query("ROLLBACK")
+      locker.release()
+    }
   })
 
   it("returns overview and exact scoped breakdown counts as strings", async () => {

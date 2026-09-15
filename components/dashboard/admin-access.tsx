@@ -1,5 +1,4 @@
 import type { ReactNode } from "react"
-import { Button } from "@/components/ui/button"
 import { SessionProvider, useSession } from "./session-access"
 export const AdminProvider = SessionProvider
 export function useAdminAccess() {
@@ -12,16 +11,7 @@ export function useAdminAccess() {
       window.location.assign("/admin")
       return false
     },
-    lockAdmin: () => session.logout(true),
   }
-}
-export function AdminLockButton() {
-  const { authenticated, lockAdmin } = useAdminAccess()
-  return authenticated ? (
-    <Button variant="ghost" size="sm" onClick={() => void lockAdmin()}>
-      Lock admin access
-    </Button>
-  ) : null
 }
 export function AdminGate({ children }: { children: ReactNode }) {
   const { authenticated } = useAdminAccess()

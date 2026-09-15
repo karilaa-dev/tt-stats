@@ -43,7 +43,7 @@ describe("dashboard infrastructure failures", () => {
     render(<DashboardError error={safeError} reset={vi.fn()} />)
 
     expect(
-      screen.getByText("TT Stats database objects need repair")
+      screen.getByText("@ttgrab Stats database objects need repair")
     ).toBeTruthy()
     expect(
       screen

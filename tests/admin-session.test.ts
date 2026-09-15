@@ -1,44 +1,50 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import type { AstroCookies } from "astro"
+import { getAdminTelegramId } from "@/lib/env"
+vi.mock("@/lib/auth/store", () => import("./auth-store-fixture"))
 import {
-  ADMIN_SESSION_SECONDS,
-  createAdminSession,
-  getAdminToken,
-  verifyAdminSession,
-  verifyAdminToken,
-} from "@/lib/admin/session"
-
-const secret = "test-admin-secret-with-at-least-32-characters"
-describe("shared admin sessions", () => {
-  it("fails closed when the secret is missing or short", () => {
-    expect(getAdminToken({})).toBeNull()
-    expect(getAdminToken({ ADMIN_TOKEN: "short" })).toBeNull()
-    expect(verifyAdminToken(secret, null)).toBe(false)
-    expect(verifyAdminSession(createAdminSession(secret), null)).toBe(false)
+  createUserSession,
+  deleteUserSession,
+  getPrincipal,
+  USER_COOKIE,
+} from "@/lib/auth/session"
+const cookies = (token?: string, retired?: string) =>
+  ({
+    get: (name: string) =>
+      name === USER_COOKIE && token
+        ? { value: token }
+        : name === "tt_stats_admin" && retired
+          ? { value: retired }
+          : undefined,
+  }) as AstroCookies
+afterEach(() => vi.unstubAllEnvs())
+describe("Telegram administrator", () => {
+  it("requires a valid server-configured Telegram ID", () => {
+    expect(getAdminTelegramId({})).toBeNull()
+    expect(getAdminTelegramId({ ADMIN_TELEGRAM_ID: "123" })).toBe("123")
+    for (const id of ["0", "-123", "admin", "0123", "9007199254740992"])
+      expect(() => getAdminTelegramId({ ADMIN_TELEGRAM_ID: id })).toThrow()
   })
-  it("accepts only the configured token", () => {
-    expect(verifyAdminToken(secret, secret)).toBe(true)
-    expect(verifyAdminToken("wrong", secret)).toBe(false)
-  })
-  it("rejects tampering, expiry and secret rotation", () => {
-    const now = 1_800_000_000_000
-    const session = createAdminSession(secret, now)
-    expect(session).not.toContain(secret)
-    expect(verifyAdminSession(session, secret, now)).toBe(true)
-    expect(verifyAdminSession(session + "x", secret, now)).toBe(false)
-    expect(
-      verifyAdminSession(session.replace(/^\d+/u, "9999999999"), secret, now)
-    ).toBe(false)
-    expect(
-      verifyAdminSession(session, secret, now + ADMIN_SESSION_SECONDS * 1000)
-    ).toBe(false)
-    expect(
-      verifyAdminSession(
-        session,
-        "a-different-admin-secret-of-sufficient-length",
-        now
-      )
-    ).toBe(false)
-    for (const bad of [undefined, "", "x.y.z", "123", secret])
-      expect(verifyAdminSession(bad, secret, now)).toBe(false)
+  it("grants access only to a verified matching account and ignores retired cookies", async () => {
+    vi.stubEnv("ADMIN_TELEGRAM_ID", "123")
+    const admin = await createUserSession({
+      id: "123",
+      name: "Owner",
+      username: null,
+    })
+    const other = await createUserSession({
+      id: "456",
+      name: "Other",
+      username: null,
+    })
+    expect((await getPrincipal(cookies(admin))).admin).toBe(true)
+    expect((await getPrincipal(cookies(other, "old-token"))).admin).toBe(false)
+    expect((await getPrincipal(cookies(undefined, "old-token"))).admin).toBe(
+      false
+    )
+    vi.stubEnv("ADMIN_TELEGRAM_ID", "456")
+    expect((await getPrincipal(cookies(admin))).admin).toBe(false)
+    await deleteUserSession(other)
+    expect((await getPrincipal(cookies(other))).admin).toBe(false)
   })
 })

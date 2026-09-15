@@ -1,3 +1,4 @@
+import { ExactCounter } from "./exact-counter"
 import {
   DatabaseXIcon,
   DatabaseZapIcon,
@@ -14,7 +15,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import type { StatsBreakdown } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
 
@@ -132,7 +133,11 @@ export function StatsCards({
                   metric.key === "downloads" && "text-primary"
                 )}
               >
-                {metric.value}
+                {metric.value.endsWith("%") ? (
+                  metric.value
+                ) : (
+                  <ExactCounter value={metric.value.replaceAll(",", "")} />
+                )}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {metric.detail}
@@ -194,7 +199,7 @@ function CacheMetric({
         {label}
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">
-        {count(value)}
+        <ExactCounter value={value} />
       </p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">
         {rate} of downloads

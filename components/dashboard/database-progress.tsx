@@ -1,12 +1,12 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/controls"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
+} from "@/components/controls"
 import {
   cancelBrowserTask,
   clearBrowserTasks,

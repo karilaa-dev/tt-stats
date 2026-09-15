@@ -10,7 +10,7 @@ import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/controls"
 import { statsBreakdownQueryOptions } from "@/lib/stats/query-options"
 
 export function DetailedPage() {

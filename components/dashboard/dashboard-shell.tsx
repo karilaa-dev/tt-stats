@@ -1,13 +1,11 @@
 import { useState, type ReactNode } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { ThemeProvider } from "@/components/theme-provider"
-import { TooltipProvider } from "@/components/ui/tooltip"
-import { Toaster } from "@/components/ui/sonner"
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { TooltipProvider } from "@/components/controls"
+import { Toaster } from "@/components/controls/toast"
 import { AppSidebar } from "./app-sidebar"
 import { DashboardHeader } from "./dashboard-header"
 import { DashboardContext } from "@/lib/dashboard-context"
-import { AdminLockButton, AdminProvider } from "./admin-access"
+import { AdminProvider } from "./admin-access"
 import { DatabaseProgress } from "./database-progress"
 
 export interface DashboardShellProps {
@@ -32,35 +30,31 @@ export function DashboardShell({ children, ...context }: DashboardShellProps) {
   return (
     <QueryClientProvider client={queryClient}>
       <DashboardContext.Provider value={context}>
-        <ThemeProvider>
-          <TooltipProvider>
-            <AdminProvider>
-              <SidebarProvider>
-                <a className="skip-link" href="#main-content">
-                  Skip to content
-                </a>
-                <AppSidebar />
-                <SidebarInset>
-                  <DashboardHeader fakeMode={context.fakeMode} />
-                  <main
-                    id="main-content"
-                    className="dashboard-main"
-                    tabIndex={-1}
-                  >
-                    {children}
-                  </main>
-                  <footer className="dashboard-footer">
-                    <span>tt stats /</span>
-                    <span>Made for the people behind the bot.</span>
-                    <AdminLockButton />
-                  </footer>
-                </SidebarInset>
-              </SidebarProvider>
-              <Toaster richColors closeButton />
-              <DatabaseProgress />
-            </AdminProvider>
-          </TooltipProvider>
-        </ThemeProvider>
+        <TooltipProvider>
+          <AdminProvider>
+            <div className="workspace-layout">
+              <a className="skip-link" href="#main-content">
+                Skip to content
+              </a>
+              <AppSidebar />
+              <div className="workspace-content">
+                <DashboardHeader fakeMode={context.fakeMode} />
+                <main
+                  id="main-content"
+                  className="dashboard-main"
+                  tabIndex={-1}
+                >
+                  {children}
+                </main>
+                <footer className="dashboard-footer">
+                  <span>@ttgrab Stats</span>
+                </footer>
+              </div>
+            </div>
+            <Toaster />
+            <DatabaseProgress />
+          </AdminProvider>
+        </TooltipProvider>
       </DashboardContext.Provider>
     </QueryClientProvider>
   )

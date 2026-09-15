@@ -1,3 +1,4 @@
+vi.mock("@/lib/auth/store", () => import("./auth-store-fixture"))
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { generateKeyPairSync, sign } from "node:crypto"
 import {
@@ -335,17 +336,17 @@ describe("RAM sessions and transactions", () => {
     store.set("third", "value", 100)
     expect(new MemoryStore<string>(1).get("third")).toBeUndefined()
   })
-  it("uses opaque, independent sessions and invalidates a logged-out session", () => {
+  it("uses opaque, independent sessions and invalidates a logged-out session", async () => {
     const user = { id: "123", name: "Test user", username: null }
-    const token = createUserSession(user)
-    const second = createUserSession(user)
+    const token = await createUserSession(user)
+    const second = await createUserSession(user)
     expect(token).not.toBe(second)
     expect(token).not.toContain("Test user")
-    expect(getUserSession(token)).toEqual(user)
-    expect(getUserSession(`${token}x`)).toBeNull()
-    deleteUserSession(token)
-    expect(getUserSession(token)).toBeNull()
-    expect(getUserSession(second)).toEqual(user)
-    deleteUserSession(second)
+    expect(await getUserSession(token)).toEqual(user)
+    expect(await getUserSession(`${token}x`)).toBeNull()
+    await deleteUserSession(token)
+    expect(await getUserSession(token)).toBeNull()
+    expect(await getUserSession(second)).toEqual(user)
+    await deleteUserSession(second)
   })
 })

@@ -1,3 +1,4 @@
+import { ExactCounter } from "./exact-counter"
 import { useId } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
@@ -10,21 +11,21 @@ import {
   UsersIcon,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "@/components/controls"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@/components/controls"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-} from "@/components/ui/empty"
-import { Skeleton } from "@/components/ui/skeleton"
+} from "@/components/controls"
+import { Skeleton } from "@/components/controls"
 import { TelegramMauCard } from "./telegram-mau-card"
 import { formatEpoch, useBrowserTime } from "@/lib/browser-time"
 import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
@@ -77,7 +78,7 @@ export function OverviewActivity({
               <div>
                 <p className="overview-metric-label">Video downloads</p>
                 <p className="overview-big-number">
-                  {count(recent.downloads.total)}
+                  <ExactCounter value={recent.downloads.total} />
                 </p>
                 <p className="overview-metric-note">
                   Downloaded by {count(recent.downloads.uniqueUsers)} unique

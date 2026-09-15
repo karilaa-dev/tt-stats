@@ -1,3 +1,4 @@
+import { seedTestSession } from "./session-fixture"
 import { expect, test } from "@playwright/test"
 test.use({ timezoneId: "America/New_York" })
 
@@ -9,10 +10,10 @@ test("personal statistics, filters, mobile access, and logout", async ({
 }, testInfo) => {
   // Browser presentation uses a simulated Telegram session. Real session identity,
   // ownership, and JWT verification are tested at the server boundary separately.
-  const backend = await playwright.request.newContext({ baseURL })
-  await backend.post("/api/admin-session", {
-    data: { token: "test-admin-secret-with-at-least-32-characters" },
-    headers: { origin: baseURL! },
+  const token = await seedTestSession()
+  const backend = await playwright.request.newContext({
+    baseURL,
+    extraHTTPHeaders: { Cookie: `tt_stats_user=${token}` },
   })
   let signedIn = true
   const historyRequests: Record<string, unknown>[] = []
@@ -57,7 +58,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
       page.getByRole("heading", { name: "My Profile", exact: true })
     ).toBeVisible()
     await expect(page.locator(".telegram-login")).toHaveText("My Profile")
-    await expect(page).toHaveTitle("My Profile · TT Stats")
+    await expect(page).toHaveTitle("My Profile · @ttgrab Stats")
     const history = page.getByRole("list", { name: "Download history" })
     await expect(
       page.getByRole("group", { name: "History period", exact: true })

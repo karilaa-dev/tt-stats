@@ -9,15 +9,15 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import type { BrowserSession } from "@/lib/auth/types"
 import { sessionRequest, clearCooldowns } from "@/lib/http-client"
-import { buttonVariants } from "@/components/ui/button"
+import { buttonVariants } from "@/components/controls"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
+import { toast } from "@/components/controls/toast"
 import { UserRoundIcon } from "lucide-react"
 
 const SessionContext = createContext<
   BrowserSession & {
     ready: boolean
-    logout: (admin?: boolean) => Promise<void>
+    logout: () => Promise<void>
   }
 >({
   user: null,
@@ -72,13 +72,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("pageshow", refresh)
     }
   }, [client])
-  async function logout(admin = false) {
+  async function logout() {
     try {
       await clearBrowserTasks()
-      const response = await fetch(
-        admin ? "/api/admin-session" : "/api/session",
-        { method: "DELETE" }
-      )
+      const response = await fetch("/api/session", { method: "DELETE" })
       if (!response.ok) throw new Error()
       await client.cancelQueries()
       client.clear()
@@ -90,7 +87,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           : null
       channel?.postMessage("changed")
       channel?.close()
-      window.location.assign(admin ? "/admin" : "/dashboard/me")
+      window.location.assign("/dashboard/me")
     } catch {
       toast.error("Could not log out. Try again.")
     }

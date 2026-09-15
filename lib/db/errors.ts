@@ -10,14 +10,14 @@ export const DATABASE_ERROR_COPY = {
       "The database connection setting is missing or malformed. Check the server environment and restart the web process.",
   },
   snapshotSchema: {
-    title: "TT Stats database objects need repair",
+    title: "@ttgrab Stats database objects need repair",
     description:
       "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Database jobs to install or repair it.",
   },
   snapshotsMissing: {
     title: "Statistics snapshots are not ready",
     description:
-      "The TT Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
+      "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
   },
   snapshotData: {
     title: "Statistics snapshot needs repair",
@@ -27,7 +27,7 @@ export const DATABASE_ERROR_COPY = {
   permission: {
     title: "Database permissions are incomplete",
     description:
-      "PostgreSQL is reachable, but the application role cannot read TT Stats snapshots or execute the approved job functions.",
+      "PostgreSQL is reachable, but the application role cannot read @ttgrab Stats snapshots or execute the approved job functions.",
   },
   timeout: {
     title: "The database query timed out",

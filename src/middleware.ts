@@ -34,7 +34,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   const { action, serializeActionResult } = getActionContext(context)
   const name = action?.name.replace(/\/$/u, "")
   const path = context.url.pathname.replace(/\/$/u, "")
-  const principal = getPrincipal(context.cookies)
+  let principal: Awaited<ReturnType<typeof getPrincipal>> = {
+    user: null,
+    admin: false,
+  }
   const fail = (status: number, message: string, retryAfter?: number) => {
     const headers = new Headers({
       "Content-Type": "application/json",
@@ -88,6 +91,11 @@ export const onRequest = defineMiddleware(async (context, next) => {
       return fail(403, "Request origin is not allowed.")
     if (Number(context.request.headers.get("content-length")) > 16_384)
       return fail(413, "Request is too large.")
+    try {
+      principal = await getPrincipal(context.cookies)
+    } catch {
+      return fail(503, "Login storage is temporarily unavailable.")
+    }
     const adminAction =
       name && !publicActions.has(name) && !userActions.has(name)
     if (!principal.admin && (adminAction || path.startsWith("/api/users/")))
@@ -117,9 +125,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       } catch {
         /* A missing address shares a conservative bucket. */
       }
-      const login =
-        path.startsWith("/api/auth/telegram/") ||
-        (path === "/api/admin-session" && context.request.method === "POST")
+      const login = path.startsWith("/api/auth/telegram/")
       const kind: RateClass = login
         ? "login"
         : /^\/api\/media\/[^/]+$/u.test(path)

@@ -104,3 +104,32 @@ export async function connect(): Promise<PoolClient> {
     throw new DataAccessError(error)
   }
 }
+
+// Reserve capacity for session checks so a saturated query pool cannot prevent
+// authentication of a cancellation or logout request. Both pools use DB_URL.
+const authDatabase = globalThis as typeof globalThis & {
+  ttStatsAuthPool?: Pool
+}
+export function getAuthPool(): Pool {
+  if (!authDatabase.ttStatsAuthPool) {
+    const env = getDbEnv()
+    const pool = new Pool({
+      connectionString: env.DB_URL,
+      max: 2,
+      connectionTimeoutMillis: 5000,
+      statement_timeout: 10000,
+      query_timeout: 12000,
+      idleTimeoutMillis: 10000,
+      allowExitOnIdle: true,
+      application_name: "tt-stats-auth",
+    })
+    pool.on("error", (error) =>
+      console.error(
+        "[database] session connection failed",
+        safeDatabaseError(error)
+      )
+    )
+    authDatabase.ttStatsAuthPool = pool
+  }
+  return authDatabase.ttStatsAuthPool
+}

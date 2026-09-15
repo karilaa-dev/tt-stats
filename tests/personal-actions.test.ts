@@ -1,3 +1,4 @@
+vi.mock("@/lib/auth/store", () => import("./auth-store-fixture"))
 import { afterEach, describe, expect, it, vi } from "vitest"
 import {
   createUserSession,
@@ -9,8 +10,10 @@ const queries = vi.hoisted(() => ({
   downloads: vi.fn(),
   activity: vi.fn(),
 }))
-vi.mock("@/lib/stats/user-activity", () => ({
-  getUserActivityRaw: queries.activity,
+vi.mock("@/lib/stats/cached", () => ({
+  getCachedUserActivity: queries.activity,
+  getCachedUserStats: queries.stats,
+  getCachedUserDownloads: queries.downloads,
 }))
 vi.mock("astro:actions", () => ({
   defineAction: (definition: unknown) => definition,
@@ -78,7 +81,7 @@ describe("personal action authorization", () => {
     }
   })
   it("derives identity from the verified session and rejects a supplied user ID", async () => {
-    const token = createUserSession({
+    const token = await createUserSession({
       id: "123",
       name: "Owner",
       username: null,
@@ -122,8 +125,10 @@ describe("personal action authorization", () => {
       undefined,
       input
     )
-    deleteUserSession(token)
-    await expect(stats.handler(undefined, context)).rejects.toMatchObject({
+    await deleteUserSession(token)
+    await expect(
+      stats.handler(undefined, { cookies: { ...context.cookies } })
+    ).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     })
   })

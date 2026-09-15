@@ -1,10 +1,10 @@
 import type { APIRoute } from "astro"
 import { getHistoryCsvResponse } from "@/lib/csv/history"
-import { ADMIN_COOKIE, verifyAdminSession } from "@/lib/admin/session"
-export const GET: APIRoute = ({ params, cookies }) => {
-  if (!verifyAdminSession(cookies.get(ADMIN_COOKIE)?.value)) {
+import { getPrincipal } from "@/lib/auth/session"
+export const GET: APIRoute = async ({ params, cookies }) => {
+  if (!(await getPrincipal(cookies)).admin) {
     return Response.json(
-      { message: "Enter the admin token to continue." },
+      { message: "Admin access required." },
       {
         status: 401,
         headers: { "Cache-Control": "no-store" },

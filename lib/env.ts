@@ -108,4 +108,18 @@ export function validateRuntimeConfiguration(
   source: NodeJS.ProcessEnv = process.env
 ): void {
   getDbEnv(source)
+  getAdminTelegramId(source)
+}
+
+export function getAdminTelegramId(
+  source: NodeJS.ProcessEnv = process.env
+): string | null {
+  const id = source.ADMIN_TELEGRAM_ID?.trim()
+  if (!id) return null
+  if (!/^[1-9]\d{0,15}$/u.test(id) || !Number.isSafeInteger(Number(id))) {
+    throw new Error(
+      "ADMIN_TELEGRAM_ID must be a positive numeric Telegram user ID"
+    )
+  }
+  return id
 }

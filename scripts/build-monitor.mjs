@@ -1,11 +1,22 @@
-import { build, write } from "bun"
+import { build, write, file } from "bun"
 
 export async function buildMonitor(outfile) {
   const result = await build({
-    entrypoints: ["server/plugins/video-inactivity-listener.ts"],
+    entrypoints: ["server/runtime.ts"],
     target: "bun",
     format: "esm",
     packages: "external",
+    plugins: [
+      {
+        name: "sql-text",
+        setup(builder) {
+          builder.onLoad({ filter: /\.sql\?raw$/ }, async ({ path }) => ({
+            contents: await file(path.replace(/\?raw$/, "")).text(),
+            loader: "text",
+          }))
+        },
+      },
+    ],
   })
   if (!result.success) {
     throw new AggregateError(
