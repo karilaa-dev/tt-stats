@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import type { ReactNode } from "react"
 import { SessionProvider, useSession } from "./session-access"
 export const AdminProvider = SessionProvider
@@ -19,9 +20,9 @@ export function AdminGate({ children }: { children: ReactNode }) {
     children
   ) : (
     <p>
-      Admin access required.{" "}
+      <T>{"Admin access required."}</T>{" "}
       <a href="/admin" className="underline">
-        Open admin login
+        <T>{"Open admin login"}</T>
       </a>
     </p>
   )

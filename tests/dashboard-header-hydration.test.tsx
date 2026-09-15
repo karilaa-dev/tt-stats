@@ -10,6 +10,7 @@ import { expect, it, vi } from "vitest"
 ).IS_REACT_ACT_ENVIRONMENT = true
 
 const state = vi.hoisted(() => ({ fetching: 1 }))
+vi.mock("@/components/dashboard/stats-refresh", () => ({ StatsRefresh: () => null }))
 vi.mock("@tanstack/react-query", () => ({
   useIsFetching: () => state.fetching,
   useMutation: () => ({ isPending: false, mutate: vi.fn() }),

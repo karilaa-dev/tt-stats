@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import { useEffect, useRef, useState } from "react"
 import { DownloadIcon } from "lucide-react"
 import { toast } from "@/components/controls/toast"
@@ -70,7 +71,7 @@ export function HistoryExport({
       }}
     >
       <DownloadIcon data-icon="inline-start" />
-      {loading ? "Exporting…" : "Export full history"}
+      <T>{loading ? "Exporting…" : "Export full history"}</T>
     </a>
   )
 }

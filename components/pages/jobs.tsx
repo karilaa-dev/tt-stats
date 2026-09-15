@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useDashboardContext } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
 import { DatabaseZapIcon } from "lucide-react"
@@ -17,6 +18,8 @@ import { getVideoNotificationStatus } from "@/lib/notifications/functions"
 import { getVideoMonitorDatabaseStatus } from "@/lib/notifications/status"
 
 export function DatabaseJobsPage() {
+  const { t } = useTranslation()
+
   const { fakeMode } = useDashboardContext()
   const notificationQuery = useQuery({
     queryKey: ["video-notification-status"],
@@ -44,19 +47,28 @@ export function DatabaseJobsPage() {
   return (
     <>
       <PageHeading
-        title="Database jobs"
-        description="Check database health and manage automatic statistics updates."
+        title={t("Database jobs")}
+        description={t(
+          "Check database health and manage automatic statistics updates."
+        )}
       />
-      {fakeMode ? (
-        <Alert className="mb-6">
-          <DatabaseZapIcon />
-          <AlertTitle>Controls disabled in fake-data mode</AlertTitle>
-          <AlertDescription>
-            The cards below are representative. Connect PostgreSQL and pg_cron
-            to manage real schedules.
-          </AlertDescription>
-        </Alert>
-      ) : null}
+      <T>
+        {fakeMode ? (
+          <Alert className="mb-6">
+            <DatabaseZapIcon />
+            <AlertTitle>
+              <T>{"Controls disabled in fake-data mode"}</T>
+            </AlertTitle>
+            <AlertDescription>
+              <T>
+                {
+                  "The cards below are representative. Connect PostgreSQL and pg_cron to manage real schedules."
+                }
+              </T>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+      </T>
       <div className="flex flex-col gap-8">
         <section
           aria-labelledby="database-health-heading"
@@ -67,10 +79,14 @@ export function DatabaseJobsPage() {
               id="database-health-heading"
               className="font-heading text-lg font-semibold tracking-tight"
             >
-              Database health
+              <T>{"Database health"}</T>
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Check the connection and required setup before changing schedules.
+              <T>
+                {
+                  "Check the connection and required setup before changing schedules."
+                }
+              </T>
             </p>
           </div>
           <div className="min-w-0 [&>[data-slot=card]]:mb-0">
@@ -79,12 +95,14 @@ export function DatabaseJobsPage() {
               checking={setupQuery.isPending || setupQuery.isFetching}
               controlsDisabled={fakeMode}
             />
-            {setupQuery.isError && !setupQuery.data ? (
-              <DashboardError
-                error={setupQuery.error}
-                reset={() => void setupQuery.refetch()}
-              />
-            ) : null}
+            <T>
+              {setupQuery.isError && !setupQuery.data ? (
+                <DashboardError
+                  error={setupQuery.error}
+                  reset={() => void setupQuery.refetch()}
+                />
+              ) : null}
+            </T>
           </div>
         </section>
         <section
@@ -96,37 +114,47 @@ export function DatabaseJobsPage() {
               id="refresh-schedules-heading"
               className="font-heading text-lg font-semibold tracking-tight"
             >
-              Refresh schedules
+              <T>{"Refresh schedules"}</T>
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Review the latest runs, change a schedule, or request a fresh
-              snapshot.
+              <T>
+                {
+                  "Review the latest runs, change a schedule, or request a fresh snapshot."
+                }
+              </T>
             </p>
           </div>
           <div className="min-w-0">
-            {jobsQuery.isError && !jobsQuery.data ? (
-              <DashboardError
-                error={jobsQuery.error}
-                reset={() => void jobsQuery.refetch()}
-              />
-            ) : jobsQuery.data ? (
-              <div className="grid min-w-0 gap-6">
-                {jobsQuery.data.map((job) => (
-                  <StatsJobCard
-                    key={job.dataset}
-                    job={job}
-                    controlsDisabled={fakeMode}
-                  />
-                ))}
-              </div>
-            ) : canLoadJobs || fakeMode ? (
-              <DashboardLoading />
-            ) : (
-              <p className="rounded-2xl border border-dashed p-6 text-sm leading-relaxed text-muted-foreground">
-                Schedules will appear after the database connection, statistics
-                setup, and scheduler checks pass above.
-              </p>
-            )}
+            <T>
+              {jobsQuery.isError && !jobsQuery.data ? (
+                <DashboardError
+                  error={jobsQuery.error}
+                  reset={() => void jobsQuery.refetch()}
+                />
+              ) : jobsQuery.data ? (
+                <div className="grid min-w-0 gap-6">
+                  <T>
+                    {jobsQuery.data.map((job) => (
+                      <StatsJobCard
+                        key={job.dataset}
+                        job={job}
+                        controlsDisabled={fakeMode}
+                      />
+                    ))}
+                  </T>
+                </div>
+              ) : canLoadJobs || fakeMode ? (
+                <DashboardLoading />
+              ) : (
+                <p className="rounded-2xl border border-dashed p-6 text-sm leading-relaxed text-muted-foreground">
+                  <T>
+                    {
+                      "Schedules will appear after the database connection, statistics setup, and scheduler checks pass above."
+                    }
+                  </T>
+                </p>
+              )}
+            </T>
           </div>
         </section>
         <section
@@ -138,20 +166,25 @@ export function DatabaseJobsPage() {
               id="delivery-monitor-heading"
               className="font-heading text-lg font-semibold tracking-tight"
             >
-              Delivery alerts
+              <T>{"Delivery alerts"}</T>
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Monitor interruptions in video deliveries and check notification
-              settings.
+              <T>
+                {
+                  "Monitor interruptions in video deliveries and check notification settings."
+                }
+              </T>
             </p>
           </div>
           <div className="min-w-0 [&>[data-slot=card]]:mb-0">
-            {notificationQuery.isError && !notificationQuery.data ? (
-              <DashboardError
-                error={notificationQuery.error}
-                reset={() => void notificationQuery.refetch()}
-              />
-            ) : null}
+            <T>
+              {notificationQuery.isError && !notificationQuery.data ? (
+                <DashboardError
+                  error={notificationQuery.error}
+                  reset={() => void notificationQuery.refetch()}
+                />
+              ) : null}
+            </T>
             <VideoInactivityCard
               status={notificationStatus}
               monitorDatabaseStatus={getVideoMonitorDatabaseStatus({

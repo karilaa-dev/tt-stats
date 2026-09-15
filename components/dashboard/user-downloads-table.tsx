@@ -1,4 +1,8 @@
+import { otherDownloaders } from "@/lib/i18n/format"
+import { T, useTranslation } from "@/lib/i18n/provider"
 import {
+  EyeIcon,
+  HeartIcon,
   ImagesIcon,
   VideoIcon,
   ChevronLeftIcon,
@@ -23,6 +27,7 @@ import {
 import { Skeleton } from "@/components/controls"
 import { Spinner } from "@/components/controls"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
+import { fullPostUrl, isSharingUrl } from "@/lib/media/post-links"
 import { safeExternalUrl } from "@/lib/security/links"
 import type { PaginatedUserDownloads } from "@/lib/stats/types"
 import type { SelectedDownload } from "./download-dialog"
@@ -36,6 +41,7 @@ export function UserDownloadsTable({
   own = false,
   admin = false,
   sort = "newest",
+  category = "history",
 }: {
   data?: PaginatedUserDownloads
   loading: boolean
@@ -44,33 +50,68 @@ export function UserDownloadsTable({
   onView?: (selection: SelectedDownload) => void
   own?: boolean
   admin?: boolean
-  sort?: "newest" | "popular"
+  sort?: "newest" | "oldest"
+  category?: "history" | "popular"
 }) {
+  const { locale } = useTranslation()
+
+  const { t } = useTranslation()
+
   const time = useBrowserTime()
   const first = data?.items.length ? (data.page - 1) * data.pageSize + 1 : 0
   return (
     <Card className="profile-history-card" aria-busy={loading || refreshing}>
       <CardHeader>
-        <CardTitle>Download history</CardTitle>
+        <CardTitle>
+          <T>
+            {category === "popular" ? "Popular downloads" : "Download history"}
+          </T>
+        </CardTitle>
         <CardDescription>
-          {sort === "popular"
-            ? "Most downloaded by others first."
-            : "Newest first."}{" "}
-          Times shown in {time.timeZone}.{" "}
-          {refreshing ? <Spinner aria-label="Updating downloads" /> : null}
+          <T>
+            {category === "popular"
+              ? sort === "oldest"
+                ? "Most downloaded by others, oldest first for ties."
+                : "Most downloaded by others, newest first for ties."
+              : sort === "oldest"
+                ? "Oldest first."
+                : "Newest first."}
+          </T>{" "}
+          <T>{"Times shown in "}</T>
+          <T>{time.timeZone}</T>.{" "}
+          <T>
+            {refreshing ? (
+              <Spinner aria-label={t("Updating downloads")} />
+            ) : null}
+          </T>
         </CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="flex flex-col gap-3" aria-label="Loading downloads">
-            {Array.from({ length: 5 }, (_, i) => (
-              <Skeleton key={i} className="h-16 w-full" />
-            ))}
+          <div
+            className="flex flex-col gap-3"
+            aria-label={t("Loading downloads")}
+          >
+            <T>
+              {Array.from({ length: 5 }, (_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </T>
           </div>
         ) : data?.items.length ? (
-          <ul className="download-history" aria-label="Download history">
+          <ul
+            className="download-history"
+            aria-label={t(
+              category === "popular" ? "Popular downloads" : "Download history"
+            )}
+          >
             {data.items.map((download) => {
-              const url = safeExternalUrl(download.sharedLink)
+              const original = safeExternalUrl(download.sharedLink)
+              const post = fullPostUrl(download.canonicalUrl)
+              const url =
+                original && (!post || isSharingUrl(original))
+                  ? original
+                  : undefined
               const label = url
                 ? new URL(url).hostname.replace(/^www\./u, "") +
                   new URL(url).pathname
@@ -82,39 +123,93 @@ export function UserDownloadsTable({
               return (
                 <li key={download.id} className="download-entry">
                   <span className="download-kind" aria-hidden="true">
-                    {download.mediaKind === "images" ? (
-                      <ImagesIcon />
-                    ) : (
-                      <VideoIcon />
-                    )}
+                    <T>
+                      {download.mediaKind === "images" ? (
+                        <ImagesIcon />
+                      ) : (
+                        <VideoIcon />
+                      )}
+                    </T>
                   </span>
                   <div className="download-description">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">
-                        {download.mediaKind === "images"
-                          ? "Image album"
-                          : "Video"}
+                        <T>
+                          {download.mediaKind === "images"
+                            ? "Image album"
+                            : "Video"}
+                        </T>
                       </span>
-                      {download.isFirstDownloader === true ? (
-                        <Badge variant="secondary">
-                          {own ? "You were first" : "First downloader"}
-                        </Badge>
-                      ) : null}
+                      <T>
+                        {download.isFirstDownloader === true ? (
+                          <Badge variant="secondary">
+                            <T>{own ? "You were first" : "First downloader"}</T>
+                          </Badge>
+                        ) : null}
+                      </T>
                     </div>
+                    {download.videoId ? (
+                      post ? (
+                        <a
+                          className="download-link"
+                          href={post}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {download.videoId}
+                          <span className="sr-only">
+                            <T>{" opens in a new tab"}</T>
+                          </span>
+                        </a>
+                      ) : (
+                        <p className="download-link">{download.videoId}</p>
+                      )
+                    ) : null}
                     {url ? (
                       <a
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="download-link"
-                        title={label}
+                        className={
+                          download.videoId
+                            ? "download-share-link"
+                            : "download-link"
+                        }
+                        title={t(label)}
                       >
-                        {label}
-                        <span className="sr-only"> opens in a new tab</span>
+                        <T>{label}</T>
+                        <span className="sr-only">
+                          <T>{" opens in a new tab"}</T>
+                        </span>
                       </a>
-                    ) : (
-                      <p>{label}</p>
-                    )}
+                    ) : !download.videoId ? (
+                      <p>
+                        <T>{label}</T>
+                      </p>
+                    ) : null}
+                    {download.viewsDisplay?.trim() ||
+                    download.likesDisplay?.trim() ? (
+                      <div className="download-engagement">
+                        {download.viewsDisplay?.trim() ? (
+                          <span>
+                            <EyeIcon aria-hidden="true" />
+                            <span>
+                              <T>{"Views"}</T>
+                            </span>{" "}
+                            <strong>{download.viewsDisplay}</strong>
+                          </span>
+                        ) : null}
+                        {download.likesDisplay?.trim() ? (
+                          <span>
+                            <HeartIcon aria-hidden="true" />
+                            <span>
+                              <T>{"Likes"}</T>
+                            </span>{" "}
+                            <strong>{download.likesDisplay}</strong>
+                          </span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <div className="download-context">
                       <time
                         className="text-xs text-muted-foreground"
@@ -126,15 +221,19 @@ export function UserDownloadsTable({
                               ).toISOString()
                         }
                       >
-                        {download.downloadedAt === null
-                          ? "Unknown time"
-                          : formatTimestamp(download.downloadedAt, time)}
+                        <T>
+                          {download.downloadedAt === null
+                            ? "Unknown time"
+                            : formatTimestamp(download.downloadedAt, time)}
+                        </T>
                       </time>
-                      {others !== null && others > 0n ? (
-                        <span className="download-popularity">
-                          {`${others.toLocaleString("en-US")} other ${others === 1n ? "person" : "people"} downloaded this`}
-                        </span>
-                      ) : null}
+                      <T>
+                        {others !== null && others > 0n ? (
+                          <span className="download-popularity">
+                            {otherDownloaders(others, locale)}
+                          </span>
+                        ) : null}
+                      </T>
                     </div>
                   </div>
                   {onView &&
@@ -153,7 +252,7 @@ export function UserDownloadsTable({
                             })
                           }
                         >
-                          View media
+                          <T>{"View media"}</T>
                         </Button>
                       ) : null}
                       {admin && download.videoDetailsId ? (
@@ -168,7 +267,7 @@ export function UserDownloadsTable({
                             })
                           }
                         >
-                          Other downloaders
+                          <T>{"Other downloaders"}</T>
                         </Button>
                       ) : null}
                     </div>
@@ -180,46 +279,54 @@ export function UserDownloadsTable({
         ) : (
           <Empty>
             <EmptyHeader>
-              <EmptyTitle>No downloads found</EmptyTitle>
+              <EmptyTitle>
+                <T>{"No downloads found"}</T>
+              </EmptyTitle>
               <EmptyDescription>
-                Downloads will appear here after you use the bot. If you applied
-                filters, try clearing the dates or selecting all downloads.
+                <T>
+                  {
+                    "Downloads will appear here after you use the bot. If you applied filters, try clearing the dates or selecting all downloads."
+                  }
+                </T>
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
         )}
       </CardContent>
-      {data?.items.length ? (
-        <CardFooter className="flex-col justify-between gap-3 sm:flex-row">
-          <p className="text-xs text-muted-foreground" aria-live="polite">
-            Showing {first}–{first + data.items.length - 1} of{" "}
-            {BigInt(data.total).toLocaleString("en-US")}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              disabled={refreshing || data.page <= 1}
-              aria-label="Go to previous page"
-              onClick={() => onPageChange(data.page - 1)}
-            >
-              <ChevronLeftIcon data-icon="inline-start" />
-              Previous
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              {data.page} / {data.totalPages}
-            </span>
-            <Button
-              variant="outline"
-              disabled={refreshing || data.page >= data.totalPages}
-              aria-label="Go to next page"
-              onClick={() => onPageChange(data.page + 1)}
-            >
-              Next
-              <ChevronRightIcon data-icon="inline-end" />
-            </Button>
-          </div>
-        </CardFooter>
-      ) : null}
+      <T>
+        {data?.items.length ? (
+          <CardFooter className="flex-col justify-between gap-3 sm:flex-row">
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              <T>{"Showing "}</T>
+              <T>{first}</T>–<T>{first + data.items.length - 1}</T>
+              <T>{" of"}</T> <T>{BigInt(data.total).toLocaleString(locale)}</T>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                disabled={refreshing || data.page <= 1}
+                aria-label={t("Go to previous page")}
+                onClick={() => onPageChange(data.page - 1)}
+              >
+                <ChevronLeftIcon data-icon="inline-start" />
+                <T>{"Previous"}</T>
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                <T>{data.page}</T> / <T>{data.totalPages}</T>
+              </span>
+              <Button
+                variant="outline"
+                disabled={refreshing || data.page >= data.totalPages}
+                aria-label={t("Go to next page")}
+                onClick={() => onPageChange(data.page + 1)}
+              >
+                <T>{"Next"}</T>
+                <ChevronRightIcon data-icon="inline-end" />
+              </Button>
+            </div>
+          </CardFooter>
+        ) : null}
+      </T>
     </Card>
   )
 }

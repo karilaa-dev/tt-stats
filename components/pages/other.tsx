@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useAdminAccess } from "@/components/dashboard/admin-access"
 import {
   useDashboardSearch,
@@ -24,6 +25,10 @@ import { otherStatsQueryOptions } from "@/lib/stats/query-options"
 const PAGE_SIZE = 20
 
 export function OtherPage() {
+  const { locale } = useTranslation()
+
+  const { t } = useTranslation()
+
   const { authenticated } = useAdminAccess()
   const statsQuery = useQuery(otherStatsQueryOptions())
   const stats = statsQuery.data
@@ -38,8 +43,10 @@ export function OtherPage() {
   return (
     <>
       <PageHeading
-        title="Audience insights"
-        description="Audience languages, download leaders, and file preferences."
+        title={t("Audience insights")}
+        description={t(
+          "Audience languages, download leaders, and file preferences."
+        )}
       />
       {statsQuery.isError && !stats ? (
         <DashboardError
@@ -54,21 +61,23 @@ export function OtherPage() {
             <div>
               <dt className="flex items-center gap-2 text-sm text-muted-foreground">
                 <FilesIcon className="size-4" aria-hidden="true" />
-                Users with file mode enabled
+                <T>{"Users with file mode enabled"}</T>
               </dt>
               <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                {BigInt(stats.fileModeUsers).toLocaleString("en-US")}
+                <T>{BigInt(stats.fileModeUsers).toLocaleString(locale)}</T>
               </dd>
             </div>
             <div>
-              <dt className="text-sm text-muted-foreground">Language values</dt>
+              <dt className="text-sm text-muted-foreground">
+                <T>{"Language values"}</T>
+              </dt>
               <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                {stats.languages.length.toLocaleString("en-US")}
+                <T>{stats.languages.length.toLocaleString(locale)}</T>
               </dd>
             </div>
             <div className="min-w-0">
               <dt className="text-sm text-muted-foreground">
-                Most common language
+                <T>{"Most common language"}</T>
               </dt>
               <dd className="mt-2 text-xl font-semibold tracking-tight">
                 {stats.languages[0] ? (
@@ -82,9 +91,13 @@ export function OtherPage() {
           <div className="grid items-start gap-6 xl:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Languages</CardTitle>
+                <CardTitle>
+                  <T>{"Languages"}</T>
+                </CardTitle>
                 <CardDescription>
-                  How your audience is distributed by stored language.
+                  <T>
+                    {"Bot audience by language."}
+                  </T>
                 </CardDescription>
                 <CardAction>
                   <LanguagesIcon
@@ -107,31 +120,37 @@ export function OtherPage() {
                 />
               </CardContent>
             </Card>
-            {authenticated ? (
-              <div className="flex min-w-0 flex-col gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top downloaders</CardTitle>
-                    <CardDescription>
-                      Private users and groups by video history count.
-                    </CardDescription>
-                    <CardAction>
-                      <TrophyIcon
-                        className="size-5 text-muted-foreground"
-                        aria-hidden="true"
+            <T>
+              {authenticated ? (
+                <div className="flex min-w-0 flex-col gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>
+                        <T>{"Top downloaders"}</T>
+                      </CardTitle>
+                      <CardDescription>
+                        <T>
+                          {"Private users and groups by video history count."}
+                        </T>
+                      </CardDescription>
+                      <CardAction>
+                        <TrophyIcon
+                          className="size-5 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      </CardAction>
+                    </CardHeader>
+                    <CardContent>
+                      <RankedTable
+                        rows={stats.topDownloaders}
+                        valueLabel="Telegram ID"
+                        countLabel="Downloads"
                       />
-                    </CardAction>
-                  </CardHeader>
-                  <CardContent>
-                    <RankedTable
-                      rows={stats.topDownloaders}
-                      valueLabel="Telegram ID"
-                      countLabel="Downloads"
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            ) : null}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : null}
+            </T>
           </div>
         </div>
       )}

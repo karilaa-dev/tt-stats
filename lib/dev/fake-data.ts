@@ -85,6 +85,20 @@ const fakeHistory: HistoryCsvRow[] = [
 const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
   const images = index % 5 === 2
   return {
+    videoId:
+      index % 4 === 3
+        ? null
+        : images
+          ? `DEMO_ALBUM_${String(index + 1).padStart(2, "0")}`
+          : String(7539876543210000001n + BigInt(index)),
+    canonicalUrl:
+      index % 4 === 3
+        ? null
+        : images
+          ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
+          : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
+    viewsDisplay: index % 4 === 3 ? null : "1.2M",
+    likesDisplay: index % 4 === 3 ? null : "0",
     id: String(10_000 - index),
     downloadedAt: FAKE_NOW_EPOCH - index * 14_417,
     sharedLink: images
@@ -335,15 +349,26 @@ export function getFakeUserDownloads(
           (filters.discovery !== "first" || item.isFirstDownloader === true)))
     )
   })
-  if (filters.sort === "popular")
+  {
+    const direction = filters.sort === "oldest" ? 1 : -1
     downloads.sort(
       (a, b) =>
-        Number(
-          BigInt(b.otherUniqueChats ?? "0") - BigInt(a.otherUniqueChats ?? "0")
-        ) ||
-        (b.downloadedAt ?? 0) - (a.downloadedAt ?? 0) ||
-        Number(BigInt(b.id) - BigInt(a.id))
+        (filters.category === "popular" || filters.sort === "popular"
+          ? Number(
+              BigInt(b.otherUniqueChats ?? "0") -
+                BigInt(a.otherUniqueChats ?? "0")
+            )
+          : 0) ||
+        (a.downloadedAt === null
+          ? b.downloadedAt === null
+            ? 0
+            : 1
+          : b.downloadedAt === null
+            ? -1
+            : direction * (a.downloadedAt - b.downloadedAt)) ||
+        direction * Number(BigInt(a.id) - BigInt(b.id))
     )
+  }
   const totalPages = Math.ceil(downloads.length / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
   const offset = (page - 1) * pageSize

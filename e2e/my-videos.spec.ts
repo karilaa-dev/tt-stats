@@ -76,7 +76,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
         .nth(4)
         .getByRole("button", { name: "View media" })
     ).toHaveCount(0)
-    const savedOnly = page.getByRole("switch", { name: "Only saved media" })
+    const savedOnly = page.getByRole("switch", { name: "Show only records with media preview" })
     await savedOnly.click()
     await expect(savedOnly).toBeChecked()
     await expect(page).toHaveURL(/savedMediaOnly=true/)
@@ -116,7 +116,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
         () => document.documentElement.scrollWidth <= innerWidth
       )
     ).toBe(true)
-    await expect(page.getByText("English", { exact: true })).toBeVisible()
+    await expect(page.locator(".profile-summary").getByText(/English/)).toBeVisible()
     const summary = await page.locator(".profile-summary").boundingBox()
     const chart = await page.locator(".profile-activity-card").boundingBox()
     if (isMobile) {
@@ -247,12 +247,12 @@ test("personal statistics, filters, mobile access, and logout", async ({
       .selectOption("others")
     await expect(
       page.getByRole("combobox", { name: "Sort", exact: true })
-    ).toHaveValue("popular")
+    ).toHaveValue("newest")
     await expect(
       page.getByText("Showing 1–20 of 23", { exact: true })
     ).toBeVisible()
     await expect(history.getByRole("listitem").first()).toContainText(
-      "6 other people downloaded this"
+      "1 other person downloaded this"
     )
     await page.getByRole("button", { name: "Go to next page" }).click()
     await expect(history.getByRole("listitem")).toHaveCount(3)

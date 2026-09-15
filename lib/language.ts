@@ -44,15 +44,16 @@ const languageCountries: Record<string, string> = {
   zh: "CN",
 }
 
-const languageNames = new Intl.DisplayNames(["en"], { type: "language" })
-
 function countryFlag(country: string): string {
   return [...country.toUpperCase()]
     .map((letter) => String.fromCodePoint(letter.charCodeAt(0) + 127_397))
     .join("")
 }
 
-export function getLanguagePresentation(value: string): {
+export function getLanguagePresentation(
+  value: string,
+  locale = "en"
+): {
   code: string
   flag: string
   name: string
@@ -67,7 +68,8 @@ export function getLanguagePresentation(value: string): {
 
   let name = value || "Unknown"
   try {
-    name = languageNames.of(code) ?? name
+    name =
+      new Intl.DisplayNames([locale], { type: "language" }).of(code) ?? name
   } catch {
     // Preserve unusual values from the database instead of failing the table.
   }

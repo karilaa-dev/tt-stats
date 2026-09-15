@@ -21,7 +21,7 @@ test("history opens media and links cache-hit downloads to other chats", async (
   await expect(
     rows.nth(4).getByRole("button", { name: "View media" })
   ).toHaveCount(0)
-  await page.getByRole("switch", { name: "Only saved media" }).click()
+  await page.getByRole("switch", { name: "Show only records with media preview" }).click()
   await expect(history.getByRole("listitem")).toHaveCount(17)
   await expect(history.getByRole("button", { name: "View media" })).toHaveCount(
     17

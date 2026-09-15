@@ -216,7 +216,7 @@
   background: var(--primary);
 }
 .overview-cache-legend > div:last-child i {
-  background: var(--border);
+  background: var(--chart-2);
 }
 .overview-cache-legend dd {
   font-size: 0.8rem;

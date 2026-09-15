@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import { clearBrowserTasks } from "@/lib/tasks/client"
 import {
   createContext,
@@ -102,11 +103,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         logout,
       }}
     >
-      {cacheIdentity === null || cacheIdentity === identity ? (
-        children
-      ) : (
-        <p role="status">Updating your session…</p>
-      )}
+      <T>
+        {cacheIdentity === null || cacheIdentity === identity ? (
+          children
+        ) : (
+          <p role="status">
+            <T>{"Updating your session…"}</T>
+          </p>
+        )}
+      </T>
     </SessionContext.Provider>
   )
 }
@@ -126,7 +131,7 @@ export function TelegramLoginButton({
       )}
     >
       <UserRoundIcon aria-hidden="true" data-icon="inline-start" />
-      {user ? "My Profile" : "Log in with Telegram"}
+      <T>{user ? "My Profile" : "Log in with Telegram"}</T>
     </a>
   )
 }

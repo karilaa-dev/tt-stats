@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import { cn } from "@/lib/utils"
 
 export function PageHeading({
@@ -11,8 +12,12 @@ export function PageHeading({
 }) {
   return (
     <div className={cn("page-heading", className)}>
-      <h1>{title}</h1>
-      <p>{description}</p>
+      <h1>
+        <T>{title}</T>
+      </h1>
+      <p>
+        <T>{description}</T>
+      </p>
     </div>
   )
 }

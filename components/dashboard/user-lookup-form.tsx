@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useEffect, useRef } from "react"
 import { useForm, useSelector } from "@tanstack/react-form"
 import {
@@ -35,6 +36,8 @@ export function UserLookupForm({
   initialId: string
   searching: boolean
 }) {
+  const { t } = useTranslation()
+
   const navigate = useDashboardNavigate()
   const { authenticated, requireAdmin } = useAdminAccess()
   const hydrated = useHydrated()
@@ -79,13 +82,17 @@ export function UserLookupForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Find a chat</CardTitle>
-        <CardDescription>Start with a Telegram ID.</CardDescription>
+        <CardTitle>
+          <T>{"Find a chat"}</T>
+        </CardTitle>
+        <CardDescription>
+          <T>{"Start with a Telegram ID."}</T>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
           role="search"
-          aria-label="Chat lookup"
+          aria-label={t("Chat lookup")}
           onSubmit={(event) => {
             event.preventDefault()
             event.stopPropagation()
@@ -112,7 +119,7 @@ export function UserLookupForm({
                   data-disabled={!hydrated}
                 >
                   <FieldLabel htmlFor={field.name}>
-                    Telegram user or group ID
+                    <T>{"Telegram user or group ID"}</T>
                   </FieldLabel>
                   <div className="flex items-center gap-2">
                     <Input
@@ -124,7 +131,7 @@ export function UserLookupForm({
                       onChange={(event) =>
                         field.handleChange(event.target.value)
                       }
-                      placeholder="Enter a chat ID"
+                      placeholder={t("Enter a chat ID")}
                       autoComplete="off"
                       autoCapitalize="none"
                       spellCheck={false}
@@ -150,20 +157,26 @@ export function UserLookupForm({
                         }}
                       >
                         <XIcon />
-                        <span className="sr-only">Clear lookup</span>
+                        <span className="sr-only">
+                          <T>{"Clear lookup"}</T>
+                        </span>
                       </Button>
                     ) : null}
                   </div>
                   {!field.state.meta.isValid ? (
                     <FieldError id={`${field.name}-error`}>
-                      {String(field.state.meta.errors[0] ?? "Invalid ID")}
+                      <T>
+                        {String(field.state.meta.errors[0] ?? "Invalid ID")}
+                      </T>
                     </FieldError>
                   ) : null}
                   <FieldDescription id={`${field.name}-hint`}>
-                    Group IDs include a minus sign.{" "}
-                    {authenticated
-                      ? "Results update as you type."
-                      : "Searching requires the admin token."}
+                    <T>{"Group IDs include a minus sign."}</T>{" "}
+                    <T>
+                      {authenticated
+                        ? "Results update as you type."
+                        : "Searching requires the admin token."}
+                    </T>
                   </FieldDescription>
                   <Button
                     type="submit"
@@ -175,12 +188,14 @@ export function UserLookupForm({
                       !parseTelegramId(field.state.value.trim())
                     }
                   >
-                    {searching ? (
-                      <Spinner data-icon="inline-start" />
-                    ) : (
-                      <SearchIcon data-icon="inline-start" />
-                    )}
-                    {searching ? "Finding chat…" : "Search"}
+                    <T>
+                      {searching ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : (
+                        <SearchIcon data-icon="inline-start" />
+                      )}
+                    </T>
+                    <T>{searching ? "Finding chat…" : "Search"}</T>
                   </Button>
                 </Field>
               )}
@@ -188,27 +203,33 @@ export function UserLookupForm({
           </FieldGroup>
         </form>
       </CardContent>
-      {fakeMode ? (
-        <CardFooter className="flex-col items-start gap-2">
-          <p className="text-xs text-muted-foreground">Try a demo chat</p>
-          <div className="flex w-full flex-wrap gap-2">
-            <Button
-              variant="outline"
-              disabled={!hydrated}
-              onClick={() => form.setFieldValue("id", "123456789")}
-            >
-              Private user <ArrowUpRightIcon data-icon="inline-end" />
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!hydrated}
-              onClick={() => form.setFieldValue("id", "-1001234567890")}
-            >
-              Group <ArrowUpRightIcon data-icon="inline-end" />
-            </Button>
-          </div>
-        </CardFooter>
-      ) : null}
+      <T>
+        {fakeMode ? (
+          <CardFooter className="flex-col items-start gap-2">
+            <p className="text-xs text-muted-foreground">
+              <T>{"Try a demo chat"}</T>
+            </p>
+            <div className="flex w-full flex-wrap gap-2">
+              <Button
+                variant="outline"
+                disabled={!hydrated}
+                onClick={() => form.setFieldValue("id", "123456789")}
+              >
+                <T>{"Private user "}</T>
+                <ArrowUpRightIcon data-icon="inline-end" />
+              </Button>
+              <Button
+                variant="outline"
+                disabled={!hydrated}
+                onClick={() => form.setFieldValue("id", "-1001234567890")}
+              >
+                <T>{"Group "}</T>
+                <ArrowUpRightIcon data-icon="inline-end" />
+              </Button>
+            </div>
+          </CardFooter>
+        ) : null}
+      </T>
     </Card>
   )
 }

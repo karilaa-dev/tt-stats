@@ -43,7 +43,7 @@
     background: color-mix(in srgb, var(--primary), white 18%);
   }
   .button-outline {
-    border-color: var(--border);
+    border-color: var(--input);
     background: transparent;
     color: var(--foreground);
   }
@@ -448,7 +448,7 @@
     width: fit-content;
     align-items: center;
     padding: 0.25rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--input);
     border-radius: 0.5rem;
     background: var(--background);
   }

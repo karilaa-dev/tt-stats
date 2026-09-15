@@ -104,10 +104,16 @@ export interface HistoryFilters {
   until?: number
   mediaKind: "all" | "video" | "images"
   discovery: "all" | "others" | "first"
-  sort: "newest" | "popular"
+  category?: "history" | "popular"
+  /** popular is accepted for links and clients predating categories. */
+  sort: "newest" | "oldest" | "popular"
 }
 
 export interface UserDownload {
+  videoId: string | null
+  canonicalUrl: string | null
+  viewsDisplay: string | null
+  likesDisplay: string | null
   id: string
   downloadedAt: number | null
   sharedLink: string

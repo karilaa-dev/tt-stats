@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { ExactCounter } from "./exact-counter"
 import {
   DatabaseXIcon,
@@ -19,16 +20,19 @@ import {
 import type { StatsBreakdown } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
 
-function count(value: string) {
-  return BigInt(value).toLocaleString("en-US")
-}
-
-function percentage(part: string, total: string): string {
+function percentage(part: string, total: string, locale: string): string {
   const denominator = BigInt(total)
-  if (denominator === 0n) return "0.0%"
+  if (denominator === 0n)
+    return new Intl.NumberFormat(locale, {
+      style: "percent",
+      minimumFractionDigits: 1,
+    }).format(0)
   const numerator = BigInt(part)
   const tenths = (numerator * 1000n + denominator / 2n) / denominator
-  return `${tenths / 10n}.${tenths % 10n}%`
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: 1,
+  }).format(Number(tenths) / 1000)
 }
 
 export function StatsCards({
@@ -38,6 +42,8 @@ export function StatsCards({
   stats: StatsBreakdown
   cacheDisplay?: "counts" | "percentage"
 }) {
+  const { locale } = useTranslation()
+  const count = (value: string) => BigInt(value).toLocaleString(locale)
   const cacheMisses = (
     BigInt(stats.downloads.total) - BigInt(stats.downloads.cacheHits)
   ).toString()
@@ -75,7 +81,11 @@ export function StatsCards({
           {
             key: "cacheRate",
             label: "Cache hit rate",
-            value: percentage(stats.downloads.cacheHits, stats.downloads.total),
+            value: percentage(
+              stats.downloads.cacheHits,
+              stats.downloads.total,
+              locale
+            ),
             detail: "Downloads served from cache",
             icon: DatabaseZapIcon,
           },
@@ -85,14 +95,14 @@ export function StatsCards({
             key: "cacheHits",
             label: "Cache hits",
             value: count(stats.downloads.cacheHits),
-            detail: `${percentage(stats.downloads.cacheHits, stats.downloads.total)} hit rate`,
+            detail: `${percentage(stats.downloads.cacheHits, stats.downloads.total, locale)} hit rate`,
             icon: DatabaseZapIcon,
           },
           {
             key: "cacheMisses",
             label: "Cache misses",
             value: count(cacheMisses),
-            detail: `${percentage(cacheMisses, stats.downloads.total)} miss rate`,
+            detail: `${percentage(cacheMisses, stats.downloads.total, locale)} miss rate`,
             icon: DatabaseXIcon,
           },
         ]),
@@ -118,7 +128,9 @@ export function StatsCards({
             )}
           >
             <CardHeader>
-              <CardDescription>{metric.label}</CardDescription>
+              <CardDescription>
+                <T>{metric.label}</T>
+              </CardDescription>
               <CardAction>
                 <Icon
                   className="size-4 text-muted-foreground"
@@ -136,11 +148,11 @@ export function StatsCards({
                 {metric.value.endsWith("%") ? (
                   metric.value
                 ) : (
-                  <ExactCounter value={metric.value.replaceAll(",", "")} />
+                  <ExactCounter value={metric.value.replace(/[^0-9-]/gu, "")} />
                 )}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
-                {metric.detail}
+                <T>{metric.detail}</T>
               </p>
             </CardContent>
           </Card>
@@ -151,6 +163,7 @@ export function StatsCards({
 }
 
 export function CachePerformanceCard({ stats }: { stats: StatsBreakdown }) {
+  const { locale } = useTranslation()
   const misses = (
     BigInt(stats.downloads.total) - BigInt(stats.downloads.cacheHits)
   ).toString()
@@ -158,9 +171,11 @@ export function CachePerformanceCard({ stats }: { stats: StatsBreakdown }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cache performance</CardTitle>
+        <CardTitle>
+          <T>{"Cache performance"}</T>
+        </CardTitle>
         <CardDescription>
-          Download delivery in the selected period
+          <T>{"Download delivery in the selected period"}</T>
         </CardDescription>
         <CardAction>
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -172,12 +187,16 @@ export function CachePerformanceCard({ stats }: { stats: StatsBreakdown }) {
         <CacheMetric
           label="Cache hits"
           value={stats.downloads.cacheHits}
-          rate={percentage(stats.downloads.cacheHits, stats.downloads.total)}
+          rate={percentage(
+            stats.downloads.cacheHits,
+            stats.downloads.total,
+            locale
+          )}
         />
         <CacheMetric
           label="Cache misses"
           value={misses}
-          rate={percentage(misses, stats.downloads.total)}
+          rate={percentage(misses, stats.downloads.total, locale)}
         />
       </CardContent>
     </Card>
@@ -196,13 +215,14 @@ function CacheMetric({
   return (
     <div className="flex flex-col justify-center rounded-lg bg-muted/50 p-4">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-        {label}
+        <T>{label}</T>
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">
         <ExactCounter value={value} />
       </p>
       <p className="mt-1 text-xs font-medium text-muted-foreground">
-        {rate} of downloads
+        <T>{rate}</T>
+        <T>{" of downloads"}</T>
       </p>
     </div>
   )

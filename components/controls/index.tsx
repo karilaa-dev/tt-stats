@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import * as React from "react"
 import { Button as BaseButton } from "@base-ui/react/button"
 import { Dialog as BaseDialog } from "@base-ui/react/dialog"
@@ -146,9 +147,11 @@ export function Spinner({
   className,
   ...props
 }: React.ComponentProps<typeof LoaderCircleIcon>) {
+  const { t } = useTranslation()
+
   return (
     <LoaderCircleIcon
-      aria-label="Loading"
+      aria-label={t("Loading")}
       role="status"
       {...props}
       className={cn("control-spinner", className)}
@@ -192,10 +195,12 @@ export function FieldError({
       {...props}
       className={cn("control-field-error", props.className)}
     >
-      {children ??
-        [
-          ...new Set(errors?.map((error) => error?.message).filter(Boolean)),
-        ].join(". ")}
+      <T>
+        {children ??
+          [
+            ...new Set(errors?.map((error) => error?.message).filter(Boolean)),
+          ].join(". ")}
+      </T>
     </div>
   )
 }
@@ -229,12 +234,14 @@ export function DialogFooter({
 }: React.ComponentPropsWithRef<"div"> & { showCloseButton?: boolean }) {
   return (
     <div {...props} className={cn("control-dialog-footer", props.className)}>
-      {children}
-      {showCloseButton && (
-        <BaseDialog.Close render={<Button variant="outline" />}>
-          Close
-        </BaseDialog.Close>
-      )}
+      <T>{children}</T>
+      <T>
+        {showCloseButton && (
+          <BaseDialog.Close render={<Button variant="outline" />}>
+            <T>{"Close"}</T>
+          </BaseDialog.Close>
+        )}
+      </T>
     </div>
   )
 }
@@ -244,6 +251,8 @@ export function DialogContent({
   showCloseButton = true,
   ...props
 }: BaseDialog.Popup.Props & { showCloseButton?: boolean }) {
+  const { t } = useTranslation()
+
   return (
     <BaseDialog.Portal>
       <BaseDialog.Backdrop className="control-backdrop" />
@@ -252,16 +261,18 @@ export function DialogContent({
         data-slot="dialog-content"
         className={cn("control-dialog", className)}
       >
-        {children}
-        {showCloseButton && (
-          <BaseDialog.Close
-            aria-label="Close"
-            className="control-dialog-close"
-            render={<Button size="icon-sm" variant="ghost" />}
-          >
-            <XIcon />
-          </BaseDialog.Close>
-        )}
+        <T>{children}</T>
+        <T>
+          {showCloseButton && (
+            <BaseDialog.Close
+              aria-label={t("Close")}
+              className="control-dialog-close"
+              render={<Button size="icon-sm" variant="ghost" />}
+            >
+              <XIcon />
+            </BaseDialog.Close>
+          )}
+        </T>
       </BaseDialog.Popup>
     </BaseDialog.Portal>
   )
@@ -276,6 +287,8 @@ export function SheetContent({
   children,
   ...props
 }: BaseDialog.Popup.Props & { side?: "bottom" | "left" | "right" | "top" }) {
+  const { t } = useTranslation()
+
   return (
     <BaseDialog.Portal>
       <BaseDialog.Backdrop className="control-backdrop" />
@@ -283,9 +296,9 @@ export function SheetContent({
         {...props}
         className={cn("control-sheet", `sheet-${side}`, className)}
       >
-        {children}
+        <T>{children}</T>
         <BaseDialog.Close
-          aria-label="Close navigation"
+          aria-label={t("Close navigation")}
           className="control-dialog-close"
           render={<Button size="icon" variant="ghost" />}
         >
@@ -407,9 +420,11 @@ export function TabsTrigger({ className, ...props }: BaseTabs.Tab.Props) {
 }
 export const TabsContent = BaseTabs.Panel
 export function Pagination(props: React.ComponentPropsWithRef<"nav">) {
+  const { t } = useTranslation()
+
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("Pagination")}
       {...props}
       className={cn("control-pagination", props.className)}
     />
@@ -438,19 +453,27 @@ export function PaginationLink({
 export function PaginationPrevious(
   props: React.ComponentProps<typeof PaginationLink>
 ) {
+  const { t } = useTranslation()
+
   return (
-    <PaginationLink size="default" aria-label="Go to previous page" {...props}>
+    <PaginationLink
+      size="default"
+      aria-label={t("Go to previous page")}
+      {...props}
+    >
       <ChevronLeftIcon />
-      Previous
+      <T>{"Previous"}</T>
     </PaginationLink>
   )
 }
 export function PaginationNext(
   props: React.ComponentProps<typeof PaginationLink>
 ) {
+  const { t } = useTranslation()
+
   return (
-    <PaginationLink size="default" aria-label="Go to next page" {...props}>
-      Next
+    <PaginationLink size="default" aria-label={t("Go to next page")} {...props}>
+      <T>{"Next"}</T>
       <ChevronRightIcon />
     </PaginationLink>
   )

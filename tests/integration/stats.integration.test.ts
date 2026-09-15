@@ -45,6 +45,118 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
+  it("joins platform metadata and stored engagement once, orders categories, and separates cached filters", async () => {
+    await pool.query("INSERT INTO users(user_id) VALUES (998080), (998081)")
+    await pool.query(`INSERT INTO video_details(pk_id,platform,platform_video_id,creator_username,canonical_link,views_display,likes_display) VALUES
+      (998080,'tiktok','7539876543210000080','alice','https://www.tiktok.com/@alice/video/7539876543210000080?tracking=1',' 1.2M ',' 0 '),
+      (998081,'tiktok','7539876543210000081','bob',null,' ','25'),
+      (998082,'tiktok','7539876543210000082',null,null,'0',null)`)
+    await pool.query(`INSERT INTO videos(pk_id,user_id,video_details_id,downloaded_at,shared_link,media_kind,delivery_surface) VALUES
+      (998080,998080,998080,1700000000,'https://vm.tiktok.com/ABC','video','chat'),
+      (998081,998080,998081,1700000000,'https://vm.tiktok.com/DEF','video','chat'),
+      (998082,998080,998082,null,'https://vm.tiktok.com/GHI','video','chat'),
+      (998083,998081,998080,1700000001,'https://vm.tiktok.com/ABC','video','chat'),
+      (998084,998080,null,1699999999,'https://example.test/legacy','video','chat')`)
+    const base = {
+      mediaKind: "all",
+      discovery: "all",
+      category: "history",
+      sort: "newest",
+    } as const
+    try {
+      const newest = await getCachedUserDownloads(
+        "998080",
+        1,
+        20,
+        undefined,
+        base
+      )
+      expect(newest.items.map((row) => row.id)).toEqual([
+        "998081",
+        "998080",
+        "998084",
+        "998082",
+      ])
+      expect(newest.items[1]).toMatchObject({
+        videoId: "7539876543210000080",
+        canonicalUrl: "https://www.tiktok.com/@alice/video/7539876543210000080",
+        viewsDisplay: "1.2M",
+        likesDisplay: "0",
+      })
+      expect(newest.items[0]).toMatchObject({
+        viewsDisplay: null,
+        likesDisplay: "25",
+      })
+      expect(newest.items[3]).toMatchObject({
+        viewsDisplay: "0",
+        likesDisplay: null,
+      })
+      expect(newest.items[2]).toMatchObject({
+        videoId: null,
+        canonicalUrl: null,
+        viewsDisplay: null,
+        likesDisplay: null,
+      })
+      const oldest = await getCachedUserDownloads("998080", 1, 20, undefined, {
+        ...base,
+        sort: "oldest",
+      })
+      expect(oldest.items.map((row) => row.id)).toEqual([
+        "998084",
+        "998080",
+        "998081",
+        "998082",
+      ])
+      const popular = await getCachedUserDownloads("998080", 1, 20, undefined, {
+        ...base,
+        category: "popular",
+        sort: "oldest",
+      })
+      expect(popular.items.map((row) => row.id)).toEqual([
+        "998080",
+        "998084",
+        "998081",
+        "998082",
+      ])
+      expect(popular.items[0]).toMatchObject({
+        viewsDisplay: "1.2M",
+        likesDisplay: "0",
+      })
+      const page1 = await getUserDownloadsRaw("998080", 1, 2, pool, {
+        ...base,
+        sort: "oldest",
+      })
+      const page2 = await getUserDownloadsRaw("998080", 2, 2, pool, {
+        ...base,
+        sort: "oldest",
+      })
+      expect([...page1.items, ...page2.items]).toEqual(oldest.items)
+      const locker = await pool.connect()
+      try {
+        await locker.query("BEGIN")
+        await locker.query(
+          "LOCK TABLE public.videos,public.video_details IN ACCESS EXCLUSIVE MODE"
+        )
+        const cached = await getCachedUserDownloads(
+          "998080",
+          1,
+          20,
+          undefined,
+          { ...base, category: "popular", sort: "oldest" }
+        )
+        expect(cached).toEqual(popular)
+      } finally {
+        await locker.query("ROLLBACK")
+        locker.release()
+      }
+    } finally {
+      await pool.query("DELETE FROM videos WHERE user_id IN (998080,998081)")
+      await pool.query(
+        "DELETE FROM video_details WHERE pk_id BETWEEN 998080 AND 998082"
+      )
+      await pool.query("DELETE FROM users WHERE user_id IN (998080,998081)")
+    }
+  })
   it("filters saved media before pagination and discovery without exposing file IDs", async () => {
     const client = await pool.connect()
     try {

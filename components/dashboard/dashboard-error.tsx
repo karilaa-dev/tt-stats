@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import { useAdminAccess } from "./admin-access"
 import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
 
@@ -38,18 +39,24 @@ export function DashboardError({
     <div className="flex flex-col gap-4">
       <Alert variant="destructive">
         <TriangleAlertIcon />
-        <AlertTitle>{presentation.title}</AlertTitle>
-        <AlertDescription>{presentation.description}</AlertDescription>
+        <AlertTitle>
+          <T>{presentation.title}</T>
+        </AlertTitle>
+        <AlertDescription>
+          <T>{presentation.description}</T>
+        </AlertDescription>
       </Alert>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={reset}>Try again</Button>
+        <Button onClick={reset}>
+          <T>{"Try again"}</T>
+        </Button>
         {showJobs && authenticated ? (
           <a
             href="/dashboard/jobs"
             className={buttonVariants({ variant: "outline" })}
           >
             <DatabaseZapIcon data-icon="inline-start" />
-            Open Database jobs
+            <T>{"Open Database jobs"}</T>
           </a>
         ) : null}
       </div>

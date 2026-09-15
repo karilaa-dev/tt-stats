@@ -1,4 +1,5 @@
 import "@/lib/server-only"
+import { canonicalPostUrl } from "@/lib/media/post-links"
 import type { Pool } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import { withDatabaseStage } from "@/lib/db/diagnostics"
@@ -29,9 +30,17 @@ function comparisons(source: string) {
 
 const fields = `page.pk_id::text AS id, page.downloaded_at, page.shared_link, page.media_kind,
   page.cache_hit, page.video_details_id::text,
+  details.platform, details.platform_video_id, details.creator_username, details.canonical_link,
+  details.views_display, details.likes_display,
   ${savedMediaSql("page.video_details_id")} AS has_saved_media`
 interface HistoryRow {
   id: string | null
+  platform: string | null
+  platform_video_id: string | null
+  creator_username: string | null
+  canonical_link: string | null
+  views_display: string | null
+  likes_display: string | null
   downloaded_at: string | null
   shared_link: string
   media_kind: "video" | "images"
@@ -66,12 +75,14 @@ export async function getUserDownloadsRaw(
     AND ($3::bigint IS NULL OR downloaded_at < $3::bigint)
     AND ($4::text IS NULL OR media_kind = $4)
     ${filters.savedMediaOnly ? `AND ${savedMediaSql("videos.video_details_id")}` : ""}`
-  const newest = "page.downloaded_at DESC NULLS LAST, page.pk_id DESC"
+  const direction = filters.sort === "oldest" ? "ASC" : "DESC"
+  const popular = filters.category === "popular" || filters.sort === "popular"
+  const chronological = `page.downloaded_at ${direction} NULLS LAST, page.pk_id ${direction}`
   let rows: HistoryRow[]
   let total: string
   let page: number
   try {
-    if (filters.discovery === "all" && filters.sort === "newest") {
+    if (filters.discovery === "all" && !popular) {
       // Ordinary browsing compares only the requested page.
       const count = await withDatabaseStage("history.count", () =>
         pool.query<{ count: string }>(
@@ -88,10 +99,10 @@ export async function getUserDownloadsRaw(
         pool.query<HistoryRow>(
           `WITH page AS (
           SELECT * FROM public.videos WHERE ${predicate}
-          ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC LIMIT $5 OFFSET $6
+          ORDER BY downloaded_at ${direction} NULLS LAST, pk_id ${direction} LIMIT $5 OFFSET $6
         ) SELECT ${fields}, comparison.other_chats::text, comparison.uncertain,
           first_download.user_id::text AS first_user
-        FROM page ${comparisons("page")} ORDER BY ${newest}`,
+        FROM page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ${comparisons("page")} ORDER BY ${chronological}`,
           [...values, pageSize, (page - 1) * pageSize]
         )
       )
@@ -105,8 +116,9 @@ export async function getUserDownloadsRaw(
           : filters.discovery === "others"
             ? "other_chats > 0"
             : "other_chats > 0 AND NOT uncertain AND first_user = $1::bigint"
-      const order =
-        filters.sort === "popular" ? `page.other_chats DESC, ${newest}` : newest
+      const order = popular
+        ? `page.other_chats DESC, ${chronological}`
+        : chronological
       const cached = await getHistoryComparisons(
         pool,
         userId,
@@ -151,11 +163,11 @@ export async function getUserDownloadsRaw(
         SELECT totals.total::text, selected.* FROM totals
         LEFT JOIN LATERAL (
           SELECT ${fields}, page.other_chats::text, page.uncertain, page.first_user::text
-          FROM qualified page ORDER BY ${order}
+          FROM qualified page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ORDER BY ${order}
           LIMIT $5 OFFSET (least($6::bigint, greatest(1, ceil(totals.total::numeric / $5)::bigint)) - 1) * $5
         ) selected ON true
-        ORDER BY ${filters.sort === "popular" ? "selected.other_chats::bigint DESC," : ""}
-          selected.downloaded_at DESC NULLS LAST, selected.id::bigint DESC`,
+        ORDER BY ${popular ? "selected.other_chats::bigint DESC," : ""}
+          selected.downloaded_at ${direction} NULLS LAST, selected.id::bigint ${direction}`,
           [
             ...values,
             pageSize,
@@ -174,6 +186,16 @@ export async function getUserDownloadsRaw(
     return {
       items: rows.map((row) => ({
         id: row.id!,
+        videoId: row.platform_video_id?.trim() || null,
+        canonicalUrl: canonicalPostUrl({
+          platform: row.platform,
+          videoId: row.platform_video_id,
+          creator: row.creator_username,
+          canonicalLink: row.canonical_link,
+          mediaKind: row.media_kind,
+        }),
+        viewsDisplay: row.views_display?.trim() || null,
+        likesDisplay: row.likes_display?.trim() || null,
         downloadedAt:
           row.downloaded_at === null ? null : Number(row.downloaded_at),
         sharedLink: row.shared_link,

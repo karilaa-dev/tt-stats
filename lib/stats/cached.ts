@@ -24,8 +24,19 @@ export const getCachedUserDownloads = (
   filters: HistoryFilters
 ) =>
   cachedQuery(
-    "account-history",
-    { userId, page, pageSize, ...filters, visibility: "account" },
+    "account-history:v2",
+    {
+      userId,
+      page,
+      pageSize,
+      ...filters,
+      category:
+        filters.sort === "popular"
+          ? "popular"
+          : (filters.category ?? "history"),
+      sort: filters.sort === "popular" ? "newest" : filters.sort,
+      visibility: "account",
+    },
     () => getUserDownloadsRaw(userId, page, pageSize, undefined, filters)
   )
 export const getCachedDownloaders = (downloadId: string, page: number) =>

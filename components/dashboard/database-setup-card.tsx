@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
@@ -115,6 +116,8 @@ export function DatabaseSetupCard({
   checking?: boolean
   controlsDisabled?: boolean
 }) {
+  const { t } = useTranslation()
+
   const queryClient = useQueryClient()
   const [rollingSchedule, setRollingSchedule] = useState<string>(
     RECOMMENDED_STATS_SCHEDULE.rolling_24h
@@ -199,49 +202,63 @@ export function DatabaseSetupCard({
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Setup & diagnostics</CardTitle>
+            <CardTitle>
+              <T>{"Setup & diagnostics"}</T>
+            </CardTitle>
             <CardDescription className="mt-1">
-              Verify the app connection, snapshot schema, permissions, pg_cron,
-              and fixed schedules independently.
+              <T>
+                {
+                  "Verify the app connection, snapshot schema, permissions, pg_cron, and fixed schedules independently."
+                }
+              </T>
             </CardDescription>
           </div>
           <Badge variant={status?.ready ? "default" : "secondary"}>
-            {checking && !status
-              ? "Checking"
-              : status?.ready
-                ? "Ready"
-                : "Action needed"}
+            <T>
+              {checking && !status
+                ? "Checking"
+                : status?.ready
+                  ? "Ready"
+                  : "Action needed"}
+            </T>
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {checking && !status ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Spinner /> Checking PostgreSQL without running aggregations…
+            <Spinner />
+            <T>{" Checking PostgreSQL without running aggregations…"}</T>
           </div>
         ) : status ? (
           <>
-            {status.appConnection.ok && !status.snapshot.schemaInstalled ? (
-              <Alert>
-                <DatabaseIcon />
-                <AlertTitle>Database connection verified</AlertTitle>
-                <AlertDescription>
-                  DB_URL works. The dashboard is unavailable because the TT
-                  Stats snapshot objects have not been installed in this
-                  database yet.
-                </AlertDescription>
-              </Alert>
-            ) : null}
+            <T>
+              {status.appConnection.ok && !status.snapshot.schemaInstalled ? (
+                <Alert>
+                  <DatabaseIcon />
+                  <AlertTitle>
+                    <T>{"Database connection verified"}</T>
+                  </AlertTitle>
+                  <AlertDescription>
+                    <T>
+                      {
+                        "DB_URL works. The dashboard is unavailable because the TT Stats snapshot objects have not been installed in this database yet."
+                      }
+                    </T>
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+            </T>
 
             <div className="grid gap-3 lg:grid-cols-2">
               <DiagnosticRow
                 state={status.appConnection.ok ? "good" : "bad"}
-                title="Application connection"
-                description={
+                title={t("Application connection")}
+                description={t(
                   status.appConnection.ok
                     ? "DB_URL connected successfully."
                     : errorDescription(status.appConnection.errorKind)
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -251,23 +268,23 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="Database definitions"
-                description={
+                title={t("Database definitions")}
+                description={t(
                   !status.snapshot.jobsApiInstalled
                     ? "Not checked until the snapshot API is installed."
                     : status.snapshot.definitionsCurrent
                       ? "The installed refresh procedures match this web app version."
                       : "An update is available. Existing schedules will be preserved."
-                }
+                )}
               />
               <DiagnosticRow
                 state={status.website?.ready ? "good" : "bad"}
-                title="Website storage"
-                description={
+                title={t("Website storage")}
+                description={t(
                   status.website?.ready
                     ? "User, session and query-cache tables are ready."
                     : "Website tables are missing or incompatible. Check startup logs."
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -277,8 +294,8 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="DB_URL privileges"
-                description={
+                title={t("DB_URL privileges")}
+                description={t(
                   !status.appConnection.ok
                     ? "Not checked until DB_URL connects successfully."
                     : missingRolePrivileges.length === 0
@@ -286,7 +303,7 @@ export function DatabaseSetupCard({
                         ? "All runtime grants exist. Database CREATE is revoked and is needed only to reinstall a missing schema."
                         : "All required database privileges are available."
                       : `Missing: ${missingRolePrivileges.join(", ")}.`
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -298,8 +315,8 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="Snapshot schema & API"
-                description={
+                title={t("Snapshot schema & API")}
+                description={t(
                   !status.appConnection.ok
                     ? "Not checked until the application connection succeeds."
                     : status.snapshot.schemaInstalled &&
@@ -307,7 +324,7 @@ export function DatabaseSetupCard({
                         status.snapshot.jobsApiInstalled
                       ? "All @ttgrab Stats snapshot tables and approved functions exist."
                       : "One or more @ttgrab Stats database objects are missing."
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -319,8 +336,8 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="Application permissions"
-                description={
+                title={t("Application permissions")}
+                description={t(
                   !status.snapshot.schemaInstalled
                     ? "Not checked until the snapshot schema is installed."
                     : status.snapshot.appCanRead &&
@@ -328,7 +345,7 @@ export function DatabaseSetupCard({
                         status.snapshot.appCanMonitorDownloads
                       ? "The app can read snapshots and video downloads, call only the fixed management API, and update the video-monitor state."
                       : "Snapshot reads, approved job-management grants, or video-monitor state grants are incomplete."
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -338,14 +355,14 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="PostgreSQL scheduler"
-                description={
+                title={t("PostgreSQL scheduler")}
+                description={t(
                   !status.appConnection.ok
                     ? "Not checked until a server-side connection succeeds."
                     : status.scheduler.pgCronInstalled
                       ? `pg_cron ${status.scheduler.pgCronVersion ?? "(version unavailable)"} is enabled.`
                       : "The pg_cron extension is not enabled in this database."
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -356,15 +373,15 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "bad"
                 }
-                title="Fixed schedules"
-                description={
+                title={t("Fixed schedules")}
+                description={t(
                   !status.scheduler.pgCronInstalled
                     ? "Not checked until pg_cron is enabled."
                     : status.scheduler.rollingJobInstalled &&
                         status.scheduler.dailyJobInstalled
                       ? "Both @ttgrab Stats jobs are installed."
                       : "The rolling or daily fixed job is missing."
-                }
+                )}
               />
               <DiagnosticRow
                 state={
@@ -376,36 +393,42 @@ export function DatabaseSetupCard({
                       ? "good"
                       : "waiting"
                 }
-                title="Initial snapshots"
-                description={
+                title={t("Initial snapshots")}
+                description={t(
                   !status.scheduler.rollingJobInstalled ||
-                  !status.scheduler.dailyJobInstalled
+                    !status.scheduler.dailyJobInstalled
                     ? "Not checked until both fixed schedules are installed."
                     : status.snapshot.rollingSeeded &&
                         status.snapshot.dailySeeded
                       ? "Rolling and daily datasets have completed at least once."
                       : "Waiting for one or both initial refresh requests to complete."
-                }
+                )}
               />
             </div>
 
             {installed ? (
               <>
                 <Alert>
-                  {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
+                  <T>
+                    {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
+                  </T>
                   <AlertTitle>
-                    {status.ready
-                      ? "Database jobs are ready"
-                      : status.snapshot.definitionsCurrent
-                        ? "Configuration is ready; snapshots are pending"
-                        : "Database definition update available"}
+                    <T>
+                      {status.ready
+                        ? "Database jobs are ready"
+                        : status.snapshot.definitionsCurrent
+                          ? "Configuration is ready; snapshots are pending"
+                          : "Database definition update available"}
+                    </T>
                   </AlertTitle>
                   <AlertDescription>
-                    {status.ready
-                      ? "Use the job cards below to edit schedules, pause or resume a job, inspect runs, or queue a refresh."
-                      : status.snapshot.definitionsCurrent
-                        ? "PostgreSQL will populate the dashboard asynchronously. This page checks progress every minute."
-                        : "Update the procedures below to repair all-time charts and use completed half-hour buckets. Your cron schedules are not changed."}
+                    <T>
+                      {status.ready
+                        ? "Use the job cards below to edit schedules, pause or resume a job, inspect runs, or queue a refresh."
+                        : status.snapshot.definitionsCurrent
+                          ? "PostgreSQL will populate the dashboard asynchronously. This page checks progress every minute."
+                          : "Update the procedures below to repair all-time charts and use completed half-hour buckets. Your cron schedules are not changed."}
+                    </T>
                   </AlertDescription>
                 </Alert>
                 <Field
@@ -418,11 +441,16 @@ export function DatabaseSetupCard({
                 >
                   <FieldContent>
                     <FieldLabel htmlFor="update-database-definitions">
-                      DB_URL can update the installed statistics schema
+                      <T>
+                        {"DB_URL can update the installed statistics schema"}
+                      </T>
                     </FieldLabel>
                     <FieldDescription>
-                      Confirm this to replace only @ttgrab Stats function and
-                      procedure definitions, then queue both snapshot rebuilds.
+                      <T>
+                        {
+                          "Confirm this to replace only @ttgrab Stats function and procedure definitions, then queue both snapshot rebuilds."
+                        }
+                      </T>
                     </FieldDescription>
                   </FieldContent>
                   <Switch
@@ -436,12 +464,17 @@ export function DatabaseSetupCard({
                     onCheckedChange={setSetupPrivilegesConfirmed}
                   />
                 </Field>
-                {!status.snapshot.definitionsCurrent ? (
-                  <p className="text-sm text-destructive">
-                    Update the database definitions before relying on the next
-                    scheduled snapshots.
-                  </p>
-                ) : null}
+                <T>
+                  {!status.snapshot.definitionsCurrent ? (
+                    <p className="text-sm text-destructive">
+                      <T>
+                        {
+                          "Update the database definitions before relying on the next scheduled snapshots."
+                        }
+                      </T>
+                    </p>
+                  ) : null}
+                </T>
                 <div>
                   <Button
                     type="button"
@@ -451,27 +484,36 @@ export function DatabaseSetupCard({
                     disabled={controlsDisabled || !canUpdate || actionPending}
                     onClick={() => setConfirming("update")}
                   >
-                    {updateMutation.isPending ? (
-                      <Spinner data-icon="inline-start" />
-                    ) : (
-                      <WrenchIcon data-icon="inline-start" />
-                    )}
-                    Update database definitions
+                    <T>
+                      {updateMutation.isPending ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : (
+                        <WrenchIcon data-icon="inline-start" />
+                      )}
+                    </T>
+                    <T>{"Update database definitions"}</T>
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                {!hasLimitedSetupPrivileges(status) ? (
-                  <Alert>
-                    <TriangleAlertIcon />
-                    <AlertTitle>DB_URL needs additional privileges</AlertTitle>
-                    <AlertDescription>
-                      Grant only the missing database privileges listed above.
-                      Use the administrative connection configured in DB_URL.
-                    </AlertDescription>
-                  </Alert>
-                ) : null}
+                <T>
+                  {!hasLimitedSetupPrivileges(status) ? (
+                    <Alert>
+                      <TriangleAlertIcon />
+                      <AlertTitle>
+                        <T>{"DB_URL needs additional privileges"}</T>
+                      </AlertTitle>
+                      <AlertDescription>
+                        <T>
+                          {
+                            "Grant only the missing database privileges listed above. Use the administrative connection configured in DB_URL."
+                          }
+                        </T>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                </T>
 
                 <FieldGroup>
                   <Field
@@ -486,12 +528,16 @@ export function DatabaseSetupCard({
                   >
                     <FieldContent>
                       <FieldLabel htmlFor="setup-limited-privileges">
-                        DB_URL has the listed administrative privileges
+                        <T>
+                          {"DB_URL has the listed administrative privileges"}
+                        </T>
                       </FieldLabel>
                       <FieldDescription>
-                        Confirm that this connection may install the additive TT
-                        Stats schema and own the two fixed jobs. It never
-                        installs pg_cron or changes PostgreSQL configuration.
+                        <T>
+                          {
+                            "Confirm that this connection may install the additive TT Stats schema and own the two fixed jobs. It never installs pg_cron or changes PostgreSQL configuration."
+                          }
+                        </T>
                       </FieldDescription>
                     </FieldContent>
                     <Switch
@@ -510,7 +556,7 @@ export function DatabaseSetupCard({
                   <div className="grid gap-5 md:grid-cols-2">
                     <Field data-invalid={Boolean(rollingError)}>
                       <FieldLabel htmlFor="setup-rolling-schedule">
-                        Rolling 24-hour schedule
+                        <T>{"Rolling 24-hour schedule"}</T>
                       </FieldLabel>
                       <Input
                         id="setup-rolling-schedule"
@@ -524,15 +570,19 @@ export function DatabaseSetupCard({
                         }
                       />
                       <FieldDescription>
-                        Recommended: every five minutes.
+                        <T>{"Recommended: every five minutes."}</T>
                       </FieldDescription>
-                      {rollingError ? (
-                        <FieldError>{rollingError}</FieldError>
-                      ) : null}
+                      <T>
+                        {rollingError ? (
+                          <FieldError>
+                            <T>{rollingError}</T>
+                          </FieldError>
+                        ) : null}
+                      </T>
                     </Field>
                     <Field data-invalid={Boolean(dailyError)}>
                       <FieldLabel htmlFor="setup-daily-schedule">
-                        Daily snapshot schedule
+                        <T>{"Daily snapshot schedule"}</T>
                       </FieldLabel>
                       <Input
                         id="setup-daily-schedule"
@@ -546,35 +596,52 @@ export function DatabaseSetupCard({
                         }
                       />
                       <FieldDescription>
-                        Recommended: 00:07 UTC each day.
+                        <T>{"Recommended: 00:07 UTC each day."}</T>
                       </FieldDescription>
-                      {dailyError ? (
-                        <FieldError>{dailyError}</FieldError>
-                      ) : null}
+                      <T>
+                        {dailyError ? (
+                          <FieldError>
+                            <T>{dailyError}</T>
+                          </FieldError>
+                        ) : null}
+                      </T>
                     </Field>
                   </div>
                 </FieldGroup>
 
-                {!status.appConnection.ok ? (
-                  <p className="text-sm text-destructive">
-                    Setup is disabled until DB_URL connects successfully. Review
-                    the diagnostics above.
-                  </p>
-                ) : !status.scheduler.pgCronInstalled ? (
-                  <p className="text-sm text-destructive">
-                    Setup is disabled until a PostgreSQL administrator enables
-                    pg_cron.
-                  </p>
-                ) : !hasLimitedSetupPrivileges(status) ? (
-                  <p className="text-sm text-destructive">
-                    Setup is disabled until the missing required privileges are
-                    applied.
-                  </p>
-                ) : !setupPrivilegesConfirmed ? (
-                  <p className="text-sm text-muted-foreground">
-                    Confirm the limited DB_URL grants to enable setup.
-                  </p>
-                ) : null}
+                <T>
+                  {!status.appConnection.ok ? (
+                    <p className="text-sm text-destructive">
+                      <T>
+                        {
+                          "Setup is disabled until DB_URL connects successfully. Review the diagnostics above."
+                        }
+                      </T>
+                    </p>
+                  ) : !status.scheduler.pgCronInstalled ? (
+                    <p className="text-sm text-destructive">
+                      <T>
+                        {
+                          "Setup is disabled until a PostgreSQL administrator enables pg_cron."
+                        }
+                      </T>
+                    </p>
+                  ) : !hasLimitedSetupPrivileges(status) ? (
+                    <p className="text-sm text-destructive">
+                      <T>
+                        {
+                          "Setup is disabled until the missing required privileges are applied."
+                        }
+                      </T>
+                    </p>
+                  ) : !setupPrivilegesConfirmed ? (
+                    <p className="text-sm text-muted-foreground">
+                      <T>
+                        {"Confirm the limited DB_URL grants to enable setup."}
+                      </T>
+                    </p>
+                  ) : null}
+                </T>
                 <div>
                   <Button
                     type="button"
@@ -586,12 +653,14 @@ export function DatabaseSetupCard({
                     }
                     onClick={() => setConfirming("configure")}
                   >
-                    {configureMutation.isPending ? (
-                      <Spinner data-icon="inline-start" />
-                    ) : (
-                      <WrenchIcon data-icon="inline-start" />
-                    )}
-                    Install or repair database jobs
+                    <T>
+                      {configureMutation.isPending ? (
+                        <Spinner data-icon="inline-start" />
+                      ) : (
+                        <WrenchIcon data-icon="inline-start" />
+                      )}
+                    </T>
+                    <T>{"Install or repair database jobs"}</T>
                   </Button>
                 </div>
               </>
@@ -600,17 +669,21 @@ export function DatabaseSetupCard({
         ) : (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Diagnostics could not be loaded</AlertTitle>
+            <AlertTitle>
+              <T>{"Diagnostics could not be loaded"}</T>
+            </AlertTitle>
             <AlertDescription>
-              Retry this page. No database configuration was changed.
+              <T>{"Retry this page. No database configuration was changed."}</T>
             </AlertDescription>
           </Alert>
         )}
       </CardContent>
 
-      {status?.appConnection.ok && !status.scheduler.pgCronInstalled ? (
-        <PgCronInstallationDialog />
-      ) : null}
+      <T>
+        {status?.appConnection.ok && !status.scheduler.pgCronInstalled ? (
+          <PgCronInstallationDialog />
+        ) : null}
+      </T>
 
       <AlertDialog
         open={confirming !== null}
@@ -622,19 +695,23 @@ export function DatabaseSetupCard({
               <DatabaseIcon />
             </AlertDialogMedia>
             <AlertDialogTitle>
-              {confirming === "update"
-                ? "Update @ttgrab Stats database definitions?"
-                : "Configure @ttgrab Stats in PostgreSQL?"}
+              <T>
+                {confirming === "update"
+                  ? "Update @ttgrab Stats database definitions?"
+                  : "Configure @ttgrab Stats in PostgreSQL?"}
+              </T>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirming === "update"
-                ? "This replaces only @ttgrab Stats database definitions and queues rolling and daily rebuilds. Existing snapshots remain readable until each rebuild succeeds. Cron expressions, job states, extensions, and unrelated jobs are unchanged."
-                : "This uses the administrative DB_URL connection to apply the fixed additive snapshot schema, install only the two @ttgrab Stats schedules, grant the approved access, and queue both initial refreshes. It does not install extensions, change server configuration, delete existing snapshots, or touch unrelated cron jobs."}
+              <T>
+                {confirming === "update"
+                  ? "This replaces only @ttgrab Stats database definitions and queues rolling and daily rebuilds. Existing snapshots remain readable until each rebuild succeeds. Cron expressions, job states, extensions, and unrelated jobs are unchanged."
+                  : "This uses the administrative DB_URL connection to apply the fixed additive snapshot schema, install only the two @ttgrab Stats schedules, grant the approved access, and queue both initial refreshes. It does not install extensions, change server configuration, delete existing snapshots, or touch unrelated cron jobs."}
+              </T>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={actionPending}>
-              Cancel
+              <T>{"Cancel"}</T>
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
@@ -645,14 +722,18 @@ export function DatabaseSetupCard({
                   : configureMutation.mutate()
               }
             >
-              {actionPending ? <Spinner data-icon="inline-start" /> : null}
-              {actionPending
-                ? confirming === "update"
-                  ? "Updating…"
-                  : "Configuring…"
-                : confirming === "update"
-                  ? "Update and rebuild"
-                  : "Configure"}
+              <T>
+                {actionPending ? <Spinner data-icon="inline-start" /> : null}
+              </T>
+              <T>
+                {actionPending
+                  ? confirming === "update"
+                    ? "Updating…"
+                    : "Configuring…"
+                  : confirming === "update"
+                    ? "Update and rebuild"
+                    : "Configure"}
+              </T>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -662,6 +743,8 @@ export function DatabaseSetupCard({
 }
 
 function PgCronInstallationDialog() {
+  const { t } = useTranslation()
+
   const [open, setOpen] = useState(true)
 
   return (
@@ -671,25 +754,33 @@ function PgCronInstallationDialog() {
           <AlertDialogMedia>
             <ShieldAlertIcon />
           </AlertDialogMedia>
-          <AlertDialogTitle>pg_cron installation required</AlertDialogTitle>
+          <AlertDialogTitle>
+            <T>{"pg_cron installation required"}</T>
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            pg_cron is not installed or enabled in this database. A PostgreSQL
-            administrator must install and enable it before database jobs can be
-            configured.{" "}
+            <T>
+              {
+                "pg_cron is not installed or enabled in this database. A PostgreSQL administrator must install and enable it before database jobs can be configured."
+              }
+            </T>{" "}
             <a
               href="https://github.com/citusdata/pg_cron#setting-up-pg_cron"
               target="_blank"
               rel="noreferrer"
-              aria-label="Open installation guide (opens in a new tab)"
+              aria-label={t("Open installation guide (opens in a new tab)")}
               onClick={() => setOpen(false)}
             >
-              Open installation guide
-              <span className="sr-only"> (opens in a new tab)</span>
+              <T>{"Open installation guide"}</T>
+              <span className="sr-only">
+                <T>{" (opens in a new tab)"}</T>
+              </span>
             </a>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Close</AlertDialogCancel>
+          <AlertDialogCancel>
+            <T>{"Close"}</T>
+          </AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -725,8 +816,12 @@ function DiagnosticRow({
         aria-hidden="true"
       />
       <div className="min-w-0">
-        <p className="font-medium">{title}</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+        <p className="font-medium">
+          <T>{title}</T>
+        </p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          <T>{description}</T>
+        </p>
       </div>
     </div>
   )

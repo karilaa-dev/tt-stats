@@ -22,9 +22,10 @@ import type {
 } from "@/lib/stats/types"
 
 export const statsQueryKey = ["stats"] as const
-const AGGREGATE_STALE_TIME = 30 * 1000
-const ROLLING_REFRESH_INTERVAL = 60 * 1000
-const DAILY_REFRESH_INTERVAL = 15 * 60 * 1000
+const AGGREGATE_STALE_TIME = 5 * 60 * 1000
+const ROLLING_REFRESH_INTERVAL = 5 * 60 * 1000
+const DAILY_REFRESH_INTERVAL = 24 * 60 * 60 * 1000
+const OPERATIONS_REFRESH_INTERVAL = 60 * 1000
 const USER_STALE_TIME = 5 * 60 * 1000
 
 const rollingRefreshOptions = {
@@ -36,7 +37,7 @@ const rollingRefreshOptions = {
 const dailyRefreshOptions = {
   placeholderData: keepPreviousData,
   refetchInterval: databaseRefreshInterval(DAILY_REFRESH_INTERVAL),
-  staleTime: 5 * 60 * 1000,
+  staleTime: DAILY_REFRESH_INTERVAL,
 } as const
 
 export function overviewQueryOptions() {
@@ -99,8 +100,8 @@ export function statsJobsQueryOptions() {
     queryKey: [...statsQueryKey, "jobs"],
     queryFn: ({ signal }) => getStatsJobs(signal),
     placeholderData: keepPreviousData,
-    refetchInterval: databaseRefreshInterval(ROLLING_REFRESH_INTERVAL),
-    staleTime: AGGREGATE_STALE_TIME,
+    refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
+    staleTime: 30_000,
   })
 }
 
@@ -109,8 +110,8 @@ export function databaseSetupQueryOptions() {
     queryKey: [...statsQueryKey, "database-setup"],
     queryFn: ({ signal }) => getDatabaseSetupStatus(signal),
     placeholderData: keepPreviousData,
-    refetchInterval: databaseRefreshInterval(ROLLING_REFRESH_INTERVAL),
-    staleTime: AGGREGATE_STALE_TIME,
+    refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
+    staleTime: 30_000,
   })
 }
 
@@ -120,8 +121,8 @@ export function statsJobRunsQueryOptions(dataset: StatsDataset) {
     queryFn: ({ signal }) =>
       getStatsJobRuns({ signal, data: { dataset, limit: 10 } }),
     placeholderData: keepPreviousData,
-    refetchInterval: databaseRefreshInterval(ROLLING_REFRESH_INTERVAL),
-    staleTime: AGGREGATE_STALE_TIME,
+    refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
+    staleTime: 30_000,
   })
 }
 

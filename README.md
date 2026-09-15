@@ -96,8 +96,10 @@ after ten minutes and are consumed atomically once.
 
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
-tables every minute or every 15 minutes, depending on the dataset, while keeping
-the previous result visible. Personal and admin summaries, activity, history pages, and downloader lists use
+metadata every five minutes and reload daily-backed views when their snapshot
+version changes, including after manual rebuilds. Recent views refresh every five
+minutes; operational status keeps its separate polling interval. Previous results
+remain visible during refresh. Personal and admin summaries, activity, history pages, and downloader lists use
 five-minute database cache entries. Keys include account identity, visibility,
 filters, ordering, and pagination. Expiring leases deduplicate concurrent fills
 across app instances; history comparisons share the same cache, and derived
@@ -585,3 +587,34 @@ The attached @ttgrab logo is served unchanged. The chart favicon is Twemoji
 licensed under CC BY 4.0. A copy of the graphics license is served at
 `/twemoji-license.txt`. Barlow Condensed and IBM Plex fonts are distributed under
 their bundled open font licenses.
+
+## Languages and history presentation
+
+The website supports English, Russian, and Ukrainian. Server rendering reads
+`Accept-Language`; an explicit selection overrides it in the validated
+`tt_stats_locale` browser cookie for one year. Language is never saved in the
+database or included in database cache keys. Page titles, controls, notifications,
+dates, counts, and plural forms follow the selection. Stored IDs, URLs, engagement
+strings, logs, and CSV column names remain unchanged. Bot language preferences
+are independent and display a flag with the localized language name. Cyrillic
+IBM Plex fonts are served locally.
+
+History links use `video_details.platform_video_id`, `canonical_link`, and
+`creator_username`. Short/mobile share links appear beneath a canonical link;
+legacy entries retain their original URL. Stored `views_display` and
+`likes_display` are joined in the history query, trimmed, and returned independently
+as nullable strings. Zero and abbreviated values are preserved. The expanded
+history response uses a new cache version; no schema migration is needed.
+
+Download history and Popular downloads are separate categories. Both support
+Newest/Oldest ordering; Popular first ranks by other downloaders, then applies
+the chosen chronological order and event-ID tie-breaker. Unknown timestamps sort
+last. Legacy `sort=popular` URLs select Popular + Newest. Filters reset pagination.
+Albums support previous/next buttons, horizontal swipes, and keyboard arrows,
+without automatic advancement or wrapping.
+
+Administrators have an **Update now** menu for Recent statistics and Daily
+statistics. It queues the existing authorized PostgreSQL jobs, tracks their
+status, and reloads the affected views after success. Duplicate pending requests
+are disabled. Failed rebuilds retain existing snapshots. Operations retains its
+schedule and maintenance controls. Non-admin visitors have no update control.

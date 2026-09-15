@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useQuery } from "@tanstack/react-query"
 import { Badge } from "@/components/controls"
 import {
@@ -19,6 +20,8 @@ const chatTypes = {
 }
 
 export function TelegramChatCard({ chatId }: { chatId: string }) {
+  const { t } = useTranslation()
+
   const query = useQuery(telegramChatQueryOptions(chatId))
   const data: TelegramChatProfile | undefined = query.data
   const profile = data?.status === "available" ? data : null
@@ -30,9 +33,9 @@ export function TelegramChatCard({ chatId }: { chatId: string }) {
         : "Telegram details are temporarily unavailable."
 
   return (
-    <Card aria-label="Telegram chat details" aria-busy={query.isPending}>
+    <Card aria-label={t("Telegram chat details")} aria-busy={query.isPending}>
       <CardHeader>
-        <CardTitle>{profile?.name ?? "Telegram chat"}</CardTitle>
+        <CardTitle>{profile?.name ?? t("Telegram chat")}</CardTitle>
         <CardDescription>
           <span className="font-mono break-all">{chatId}</span>
         </CardDescription>
@@ -41,13 +44,21 @@ export function TelegramChatCard({ chatId }: { chatId: string }) {
         {query.isPending ? (
           <Skeleton
             className="h-6 w-48"
-            aria-label="Loading Telegram details"
+            aria-label={t("Loading Telegram details")}
           />
         ) : profile ? (
           <>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{chatTypes[profile.type]}</Badge>
-              {profile.demo ? <Badge variant="outline">Demo data</Badge> : null}
+              <Badge variant="secondary">
+                <T>{chatTypes[profile.type]}</T>
+              </Badge>
+              <T>
+                {profile.demo ? (
+                  <Badge variant="outline">
+                    <T>{"Demo data"}</T>
+                  </Badge>
+                ) : null}
+              </T>
             </div>
             {profile.username ? (
               profile.demo ? (
@@ -64,15 +75,19 @@ export function TelegramChatCard({ chatId }: { chatId: string }) {
               )
             ) : (
               <p className="text-sm text-muted-foreground">
-                No public username
+                <T>{"No public username"}</T>
               </p>
             )}
             {!profile.name ? (
-              <p className="text-sm text-muted-foreground">Name unavailable</p>
+              <p className="text-sm text-muted-foreground">
+                <T>{"Name unavailable"}</T>
+              </p>
             ) : null}
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">{message}</p>
+          <p className="text-sm text-muted-foreground">
+            <T>{message}</T>
+          </p>
         )}
       </CardContent>
     </Card>

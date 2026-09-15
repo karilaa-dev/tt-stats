@@ -28,8 +28,12 @@ function parseSearch(search: string) {
     discovery: (["others", "first"].includes(params.get("discovery") ?? "")
       ? params.get("discovery")
       : "all") as "all" | "others" | "first",
-    sort: (params.get("sort") === "popular" ? "popular" : "newest") as
-      "newest" | "popular",
+    category: (params.get("category") === "popular" ||
+    params.get("sort") === "popular"
+      ? "popular"
+      : "history") as "history" | "popular",
+    sort: (params.get("sort") === "oldest" ? "oldest" : "newest") as
+      "newest" | "oldest",
     mediaKind: (["video", "images"].includes(params.get("mediaKind") ?? "")
       ? params.get("mediaKind")
       : "all") as "all" | "video" | "images",

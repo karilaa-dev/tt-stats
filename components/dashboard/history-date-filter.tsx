@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useId, useState } from "react"
 import { Button } from "@/components/controls"
 import { Input } from "@/components/controls"
@@ -13,6 +14,8 @@ export function HistoryDateFilter({
   throughDate: string
   onApply: (value: { fromDate: string; throughDate: string }) => void
 }) {
+  const { t } = useTranslation()
+
   const [from, setFrom] = useState(fromDate)
   const [through, setThrough] = useState(throughDate)
   const [error, setError] = useState("")
@@ -21,7 +24,7 @@ export function HistoryDateFilter({
   return (
     <form
       className="history-date-filter"
-      aria-label="History date range"
+      aria-label={t("History date range")}
       onSubmit={(event) => {
         event.preventDefault()
         const result = historyDateRange(from, through)
@@ -31,7 +34,9 @@ export function HistoryDateFilter({
     >
       <div className="history-date-fields">
         <label>
-          <span>From date</span>
+          <span>
+            <T>{"From date"}</T>
+          </span>
           <Input
             type="date"
             min="2000-01-01"
@@ -42,7 +47,9 @@ export function HistoryDateFilter({
           />
         </label>
         <label>
-          <span>Through date</span>
+          <span>
+            <T>{"Through date"}</T>
+          </span>
           <Input
             type="date"
             min="2000-01-01"
@@ -55,32 +62,38 @@ export function HistoryDateFilter({
       </div>
       <div className="flex gap-2">
         <Button type="submit" variant="outline" size="sm">
-          Apply dates
+          <T>{"Apply dates"}</T>
         </Button>
-        {from || through ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setFrom("")
-              setThrough("")
-              setError("")
-              onApply({ fromDate: "", throughDate: "" })
-            }}
-          >
-            Clear dates
-          </Button>
-        ) : null}
+        <T>
+          {from || through ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFrom("")
+                setThrough("")
+                setError("")
+                onApply({ fromDate: "", throughDate: "" })
+              }}
+            >
+              <T>{"Clear dates"}</T>
+            </Button>
+          ) : null}
+        </T>
       </div>
       <p id={hintId} className="history-date-hint">
-        Dates in {time.timeZone}. Includes the full end date.
+        <T>{"Dates in "}</T>
+        <T>{time.timeZone}</T>
+        <T>{". Includes the full end date."}</T>
       </p>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+      <T>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            <T>{error}</T>
+          </p>
+        ) : null}
+      </T>
     </form>
   )
 }

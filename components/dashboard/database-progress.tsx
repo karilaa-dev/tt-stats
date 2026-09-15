@@ -1,3 +1,5 @@
+import { formatDuration } from "@/lib/i18n/format"
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useEffect, useState, useSyncExternalStore } from "react"
 import { Button } from "@/components/controls"
 import {
@@ -16,13 +18,9 @@ import {
   subscribeTasks,
 } from "@/lib/tasks/client"
 
-const duration = (ms: number) => {
-  const seconds = Math.max(1, Math.ceil(ms / 1000))
-  return seconds < 60
-    ? `${seconds}s`
-    : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-}
 export function DatabaseProgress() {
+  const { t, locale } = useTranslation()
+
   const tasks = useSyncExternalStore(subscribeTasks, getTasks, getServerTasks)
   const [now, setNow] = useState(0)
   const active = tasks.length > 0
@@ -62,9 +60,11 @@ export function DatabaseProgress() {
         className="max-h-[85dvh] overflow-y-auto sm:max-w-md"
       >
         <DialogHeader>
-          <DialogTitle>Loading your data</DialogTitle>
+          <DialogTitle>
+            <T>{"Loading your data"}</T>
+          </DialogTitle>
           <DialogDescription>
-            You can cancel a request at any time.
+            <T>{"You can cancel a request at any time."}</T>
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-6">
@@ -90,39 +90,52 @@ export function DatabaseProgress() {
             return (
               <section
                 key={task.id}
-                aria-label={task.label}
+                aria-label={t(task.label)}
                 className="flex flex-col gap-3"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <p className="font-medium">{task.label}</p>
+                  <p className="font-medium">
+                    <T>{task.label}</T>
+                  </p>
                   <span className="text-sm text-muted-foreground tabular-nums">
-                    {percent === null
-                      ? "Calculating…"
-                      : `${estimated ? "About " : ""}${percent}%`}
+                    <T>
+                      {percent === null
+                        ? "Calculating…"
+                        : `${estimated ? "About " : ""}${percent}%`}
+                    </T>
                   </span>
                 </div>
                 <progress
-                  aria-label={`${task.label} progress`}
+                  aria-label={t(`${task.label} progress`)}
                   max={100}
                   value={percent ?? undefined}
                   className="database-progress-bar h-2 w-full"
                 />
                 <p role="status" className="text-sm text-muted-foreground">
-                  {task.cancelling
-                    ? "Cancelling…"
-                    : (progress?.phase ?? "Waiting for the database")}
-                  {measured &&
-                    ` · ${progress.completed!.toLocaleString()} / ${progress.total!.toLocaleString()} videos`}
+                  <T>
+                    {task.cancelling
+                      ? "Cancelling…"
+                      : (progress?.phase ?? "Waiting for the database")}
+                  </T>
+                  <T>
+                    {measured &&
+                      ` · ${progress.completed!.toLocaleString(locale)} / ${progress.total!.toLocaleString(locale)} videos`}
+                  </T>
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                   <div className="text-muted-foreground tabular-nums">
-                    <p>Elapsed: {duration(elapsed)}</p>
                     <p>
-                      {remaining === null
-                        ? "Time left: estimating…"
-                        : remaining <= 0
-                          ? "Finishing…"
-                          : `About ${duration(remaining)} left`}
+                      <T>{"Elapsed: "}</T>
+                      <T>{formatDuration(elapsed, locale)}</T>
+                    </p>
+                    <p>
+                      <T>
+                        {remaining === null
+                          ? "Time left: estimating…"
+                          : remaining <= 0
+                            ? "Finishing…"
+                            : `About ${formatDuration(remaining, locale)} left`}
+                      </T>
                     </p>
                   </div>
                   <Button
@@ -130,14 +143,16 @@ export function DatabaseProgress() {
                     disabled={task.cancelling}
                     onClick={() => void cancelBrowserTask(task.id)}
                   >
-                    Cancel
+                    <T>{"Cancel"}</T>
                   </Button>
                 </div>
-                {task.cancelError && (
-                  <p role="alert" className="text-sm text-destructive">
-                    {task.cancelError}
-                  </p>
-                )}
+                <T>
+                  {task.cancelError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      <T>{task.cancelError}</T>
+                    </p>
+                  )}
+                </T>
               </section>
             )
           })}

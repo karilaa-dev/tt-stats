@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   useDashboardSearch,
   useDashboardNavigate,
@@ -17,6 +18,8 @@ import {
 } from "@/lib/stats/query-options"
 
 export function AnalyticsPage() {
+  const { t } = useTranslation()
+
   const time = useBrowserTime()
   const { range } = useDashboardSearch()
   const navigate = useDashboardNavigate()
@@ -31,8 +34,10 @@ export function AnalyticsPage() {
   return (
     <>
       <PageHeading
-        title="Trends"
-        description={`Registrations and downloads over time. Times shown in ${time.timeZone}.`}
+        title={t("Trends")}
+        description={t(
+          `Registrations and downloads over time. Times shown in ${time.timeZone}.`
+        )}
       />
       <StatsFilters
         range={range}
@@ -41,43 +46,45 @@ export function AnalyticsPage() {
           navigate({ search: { range: nextRange } })
         }
       />
-      {failed ? (
-        <DashboardError
-          error={queries.find((query) => query.isError)?.error}
-          reset={() => {
-            void Promise.all(queries.map((query) => query.refetch()))
-          }}
-        />
-      ) : loading ? (
-        <DashboardLoading variant="charts" />
-      ) : (
-        <div className="flex flex-col gap-6">
-          <TimeSeriesChart
-            title="Video downloads"
-            description="Video and image deliveries"
-            points={videosQuery.data ?? []}
-            range={range}
-            color="var(--chart-2)"
+      <T>
+        {failed ? (
+          <DashboardError
+            error={queries.find((query) => query.isError)?.error}
+            reset={() => {
+              void Promise.all(queries.map((query) => query.refetch()))
+            }}
           />
-          <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+        ) : loading ? (
+          <DashboardLoading variant="charts" />
+        ) : (
+          <div className="flex flex-col gap-6">
             <TimeSeriesChart
-              title="Registrations"
-              description="New private users and groups"
-              points={usersQuery.data ?? []}
+              title={t("Video downloads")}
+              description={t("Video and image deliveries")}
+              points={videosQuery.data ?? []}
               range={range}
-              color="var(--chart-1)"
+              color="var(--chart-2)"
             />
-            <TimeSeriesChart
-              title="Music downloads"
-              description="Music download history"
-              points={musicQuery.data ?? []}
-              range={range}
-              color="var(--chart-3)"
-            />
+            <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+              <TimeSeriesChart
+                title={t("Registrations")}
+                description={t("New private users and groups")}
+                points={usersQuery.data ?? []}
+                range={range}
+                color="var(--chart-1)"
+              />
+              <TimeSeriesChart
+                title={t("Music downloads")}
+                description={t("Music download history")}
+                points={musicQuery.data ?? []}
+                range={range}
+                color="var(--chart-3)"
+              />
+            </div>
+            <CachePerformanceCard stats={cacheQuery.data!} />
           </div>
-          <CachePerformanceCard stats={cacheQuery.data!} />
-        </div>
-      )}
+        )}
+      </T>
     </>
   )
 }

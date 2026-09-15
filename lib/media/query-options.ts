@@ -57,8 +57,8 @@ export const popularVideosQueryOptions = (page: number, range: StatsRange) =>
         databaseAction(actions.getPopularVideos, { page, range }, signal)
       ),
     retry: false,
-    refetchInterval: databaseRefreshInterval(60_000),
-    staleTime: 60_000,
+    refetchInterval: databaseRefreshInterval(range === "24h" ? 300_000 : 86_400_000),
+    staleTime: range === "24h" ? 300_000 : 86_400_000,
     placeholderData: (previous) =>
       previous?.range === range ? keepPreviousData(previous) : undefined,
   })

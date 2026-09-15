@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { databaseRefreshInterval } from "@/lib/http-client"
 import { HistoryExport } from "@/components/dashboard/history-export"
 import { databaseAction } from "@/lib/tasks/action"
@@ -47,7 +48,13 @@ import { Button } from "@/components/controls"
 import { Switch } from "@/components/controls"
 import { Field, FieldLabel } from "@/components/controls"
 import { Skeleton } from "@/components/controls"
-import { ToggleGroup, ToggleGroupItem } from "@/components/controls"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/controls"
 import { Badge } from "@/components/controls"
 import { parseTelegramId } from "@/lib/stats/validation"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
@@ -60,6 +67,8 @@ import type {
 } from "@/lib/stats/types"
 
 export function UsersPage({ own = false }: { own?: boolean }) {
+  const { t } = useTranslation()
+
   const session = useSession()
   const { authenticated } = useAdminAccess()
   const { id } = useDashboardSearch()
@@ -79,40 +88,54 @@ export function UsersPage({ own = false }: { own?: boolean }) {
     return (
       <>
         <PageHeading
-          title="My Profile"
-          description="Your downloads and activity. Results update every five minutes."
+          title={t("My Profile")}
+          description={t(
+            "Your downloads and activity. Results update every five minutes."
+          )}
         />
         <Empty className="mx-auto w-full max-w-xl border-solid bg-card">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <UserRoundIcon />
             </EmptyMedia>
-            <EmptyTitle>See your download history</EmptyTitle>
+            <EmptyTitle>
+              <T>{"See your download history"}</T>
+            </EmptyTitle>
             <EmptyDescription>
-              Log in with Telegram to see your videos, activity, and the posts
-              you downloaded first. Your history is private.
+              <T>
+                {
+                  "Log in with Telegram to see your videos, activity, and the posts you downloaded first. Your history is private."
+                }
+              </T>
             </EmptyDescription>
           </EmptyHeader>
-          {login && messages[login] ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              {messages[login]}
-            </p>
-          ) : null}
+          <T>
+            {login && messages[login] ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                <T>{messages[login]}</T>
+              </p>
+            ) : null}
+          </T>
           <TelegramLoginButton />
         </Empty>
       </>
     )
   }
-  if (!own && !authenticated) return <p>Admin access required.</p>
+  if (!own && !authenticated)
+    return (
+      <p>
+        <T>{"Admin access required."}</T>
+      </p>
+    )
   return (
     <>
       <PageHeading
-        title={own ? "My Profile" : "User lookup"}
-        description={
+        title={t(own ? "My Profile" : "User lookup")}
+        description={t(
           own
             ? "Your downloads and activity. Results update every five minutes; reloading uses the same saved results."
             : "Download history and statistics for a user or group."
-        }
+        )}
       />
       <div
         className={
@@ -121,11 +144,13 @@ export function UsersPage({ own = false }: { own?: boolean }) {
             : "grid items-start gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]"
         }
       >
-        {!own ? (
-          <aside aria-label="Lookup controls">
-            <UserLookupForm initialId={requested} searching={false} />
-          </aside>
-        ) : null}
+        <T>
+          {!own ? (
+            <aside aria-label={t("Lookup controls")}>
+              <UserLookupForm initialId={requested} searching={false} />
+            </aside>
+          ) : null}
+        </T>
         {userId ? (
           <UserWorkspace
             key={`${own}:${userId}:${session.admin}`}
@@ -136,10 +161,14 @@ export function UsersPage({ own = false }: { own?: boolean }) {
           <Empty className="border">
             <EmptyHeader>
               <EmptyTitle>
-                {requested ? "Invalid Telegram ID" : "Enter an ID to begin"}
+                <T>
+                  {requested ? "Invalid Telegram ID" : "Enter an ID to begin"}
+                </T>
               </EmptyTitle>
               <EmptyDescription>
-                Search for a user or group by their numeric Telegram ID.
+                <T>
+                  {"Search for a user or group by their numeric Telegram ID."}
+                </T>
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -149,6 +178,8 @@ export function UsersPage({ own = false }: { own?: boolean }) {
   )
 }
 function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
+  const { t } = useTranslation()
+
   const session = useSession()
   const {
     page,
@@ -157,6 +188,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     mediaKind,
     discovery,
     sort,
+    category,
     savedMediaOnly,
   } = useDashboardSearch()
   const hydrated = useHydrated()
@@ -169,6 +201,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     mediaKind,
     discovery,
     sort,
+    category,
     savedMediaOnly,
   }
   const historySearch = {
@@ -177,6 +210,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     mediaKind,
     discovery,
     sort,
+    category,
     savedMediaOnly,
   }
   const userQuery = useQuery({
@@ -240,7 +274,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   return (
     <section
       className="profile-workspace"
-      aria-label={own ? "Your statistics" : "Chat results"}
+      aria-label={t(own ? "Your statistics" : "Chat results")}
     >
       <DownloadDialog
         selection={selection}
@@ -266,36 +300,42 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             </div>
           </div>
           <Button variant="ghost" onClick={() => void session.logout()}>
-            Log out
+            <T>{"Log out"}</T>
           </Button>
         </div>
       )}
       <div className="profile-overview">
-        {userQuery.isPending ? (
-          <Skeleton
-            className="h-32 w-full"
-            aria-label="Loading user statistics"
-          />
-        ) : userQuery.isError ? (
-          <QueryError
-            title="Statistics unavailable"
-            error={userQuery.error}
-            retry={() => void userQuery.refetch()}
-          />
-        ) : user ? (
-          <UserSummary user={user} />
-        ) : (
-          <Alert>
-            <AlertTitle>
-              {own ? "Your first download starts here" : "User not found"}
-            </AlertTitle>
-            <AlertDescription>
-              {own
-                ? "Download a video using the bot, then refresh this page. Group downloads are recorded separately."
-                : "There are no saved bot records for this ID."}
-            </AlertDescription>
-          </Alert>
-        )}
+        <T>
+          {userQuery.isPending ? (
+            <Skeleton
+              className="h-32 w-full"
+              aria-label={t("Loading user statistics")}
+            />
+          ) : userQuery.isError ? (
+            <QueryError
+              title={t("Statistics unavailable")}
+              error={userQuery.error}
+              retry={() => void userQuery.refetch()}
+            />
+          ) : user ? (
+            <UserSummary user={user} />
+          ) : (
+            <Alert>
+              <AlertTitle>
+                <T>
+                  {own ? "Your first download starts here" : "User not found"}
+                </T>
+              </AlertTitle>
+              <AlertDescription>
+                <T>
+                  {own
+                    ? "Download a video using the bot, then refresh this page. Group downloads are recorded separately."
+                    : "There are no saved bot records for this ID."}
+                </T>
+              </AlertDescription>
+            </Alert>
+          )}
+        </T>
         {user ? (
           <UserActivityChart
             own={own}
@@ -304,11 +344,31 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
           />
         ) : null}
       </div>
-      <section className="profile-history" aria-label="Your download history">
+      <section
+        className="profile-history"
+        aria-label={t("Your download history")}
+      >
+        <Tabs
+          value={category}
+          onValueChange={(value) =>
+            changeFilters({ category: value as "history" | "popular" })
+          }
+        >
+          <TabsList aria-label={t("History category")}>
+            <TabsTrigger value="history">
+              <T>{"Download history"}</T>
+            </TabsTrigger>
+            <TabsTrigger value="popular">
+              <T>{"Popular downloads"}</T>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <div className="history-toolbar">
           <div className="history-discovery-filters">
             <label className="history-select-field">
-              <span>Show</span>
+              <span>
+                <T>{"Show"}</T>
+              </span>
               <select
                 className="history-select"
                 value={discovery}
@@ -316,34 +376,43 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                   const next = event.target.value as HistoryFilters["discovery"]
                   changeFilters({
                     discovery: next,
-                    sort: next === "all" ? "newest" : "popular",
                   })
                 }}
               >
-                <option value="all">All downloads</option>
-                <option value="others">Downloaded by others</option>
+                <option value="all">
+                  <T>{"All downloads"}</T>
+                </option>
+                <option value="others">
+                  <T>{"Downloaded by others"}</T>
+                </option>
                 <option value="first">
-                  {own ? "You were first" : "Account was first"}
+                  <T>{own ? "You were first" : "Account was first"}</T>
                 </option>
               </select>
             </label>
             <label className="history-select-field">
-              <span>Sort</span>
+              <span>
+                <T>{"Sort"}</T>
+              </span>
               <select
                 className="history-select"
                 value={sort}
                 onChange={(event) =>
                   changeFilters({
-                    sort: event.target.value as HistoryFilters["sort"],
+                    sort: event.target.value as "newest" | "oldest",
                   })
                 }
               >
-                <option value="newest">Newest first</option>
-                <option value="popular">Most downloaded by others</option>
+                <option value="newest">
+                  <T>{"Newest"}</T>
+                </option>
+                <option value="oldest">
+                  <T>{"Oldest"}</T>
+                </option>
               </select>
             </label>
             <ToggleGroup
-              aria-label="Media type"
+              aria-label={t("Media type")}
               value={[mediaKind]}
               onValueChange={(value) => {
                 if (value[0])
@@ -354,15 +423,17 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               variant="outline"
               size="sm"
             >
-              {[
-                ["all", "All media"],
-                ["video", "Videos"],
-                ["images", "Albums"],
-              ].map(([value, label]) => (
-                <ToggleGroupItem key={value} value={value}>
-                  {label}
-                </ToggleGroupItem>
-              ))}
+              <T>
+                {[
+                  ["all", "All media"],
+                  ["video", "Videos"],
+                  ["images", "Albums"],
+                ].map(([value, label]) => (
+                  <ToggleGroupItem key={value} value={value}>
+                    <T>{label}</T>
+                  </ToggleGroupItem>
+                ))}
+              </T>
             </ToggleGroup>
             <Field orientation="horizontal" className="w-auto">
               <Switch
@@ -373,7 +444,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                 }
               />
               <FieldLabel htmlFor="saved-media-only">
-                Only saved media
+                <T>{"Show only records with media preview"}</T>
               </FieldLabel>
             </Field>
           </div>
@@ -388,13 +459,17 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             />
           ) : null}
         </div>
-        {discovery === "first" ? (
-          <p className="text-xs text-muted-foreground">
-            {own
-              ? "Only posts you downloaded first that others also downloaded."
-              : "Only posts this account downloaded first that others also downloaded."}
-          </p>
-        ) : null}
+        <T>
+          {discovery === "first" ? (
+            <p className="text-xs text-muted-foreground">
+              <T>
+                {own
+                  ? "Only posts you downloaded first that others also downloaded."
+                  : "Only posts this account downloaded first that others also downloaded."}
+              </T>
+            </p>
+          ) : null}
+        </T>
         <HistoryDateFilter
           key={`${fromDate}:${throughDate}`}
           fromDate={fromDate}
@@ -403,12 +478,16 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
         />
         {dateRange.error ? (
           <Alert variant="destructive">
-            <AlertTitle>Invalid date range</AlertTitle>
-            <AlertDescription>{dateRange.error}</AlertDescription>
+            <AlertTitle>
+              <T>{"Invalid date range"}</T>
+            </AlertTitle>
+            <AlertDescription>
+              <T>{dateRange.error}</T>
+            </AlertDescription>
           </Alert>
         ) : history.isError ? (
           <QueryError
-            title="Download history unavailable"
+            title={t("Download history unavailable")}
             error={history.error}
             retry={() => void history.refetch()}
           />
@@ -420,6 +499,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             loading={history.isPending}
             refreshing={history.isFetching && !history.isPending}
             sort={sort}
+            category={category}
             onView={setSelection}
             onPageChange={(nextPage) => {
               setSelection(null)
@@ -438,51 +518,74 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
   )
 }
 function UserSummary({ user }: { user: UserStats }) {
+  const { locale } = useTranslation()
+
   const time = useBrowserTime()
   const timestamp = (value: number | null | undefined) =>
     value == null ? "Not recorded" : formatTimestamp(value, time)
   return (
     <Card className="profile-summary">
       <CardHeader>
-        <CardTitle>Download statistics</CardTitle>
-        <CardDescription>All your recorded downloads.</CardDescription>
+        <CardTitle>
+          <T>{"Download statistics"}</T>
+        </CardTitle>
+        <CardDescription>
+          <T>{"All your recorded downloads."}</T>
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         <dl className="personal-metrics">
-          {[
-            ["Downloads", user.downloads],
-            [
-              "Videos",
-              (BigInt(user.downloads) - BigInt(user.images)).toString(),
-            ],
-            ["Image albums", user.images],
-            ["Unique videos", user.uniqueVideos ?? "0"],
-          ].map(([label, count]) => (
-            <div key={label}>
-              <dt>{label}</dt>
-              <dd>{BigInt(count).toLocaleString("en-US")}</dd>
-            </div>
-          ))}
+          <T>
+            {[
+              ["Downloads", user.downloads],
+              [
+                "Videos",
+                (BigInt(user.downloads) - BigInt(user.images)).toString(),
+              ],
+              ["Image albums", user.images],
+              ["Unique videos", user.uniqueVideos ?? "0"],
+            ].map(([label, count]) => (
+              <div key={label}>
+                <dt>
+                  <T>{label}</T>
+                </dt>
+                <dd>
+                  <T>{BigInt(count).toLocaleString(locale)}</T>
+                </dd>
+              </div>
+            ))}
+          </T>
         </dl>
         <dl className="profile-details">
-          {[
-            ["First download", timestamp(user.firstDownloadAt)],
-            ["Latest download", timestamp(user.latestDownloadAt)],
-            ["Joined", timestamp(user.registeredAt)],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd className="mt-1 font-medium">{value}</dd>
-            </div>
-          ))}
+          <T>
+            {[
+              ["First download", timestamp(user.firstDownloadAt)],
+              ["Latest download", timestamp(user.latestDownloadAt)],
+              ["Joined", timestamp(user.registeredAt)],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-muted-foreground">
+                  <T>{label}</T>
+                </dt>
+                <dd className="mt-1 font-medium">
+                  <T>{value}</T>
+                </dd>
+              </div>
+            ))}
+          </T>
           <div>
-            <dt className="text-muted-foreground">Preferences</dt>
+            <dt className="text-muted-foreground">
+              <T>{"Preferences"}</T>
+            </dt>
             <dd className="mt-1 flex flex-wrap gap-2">
               <Badge variant="secondary">
-                {getLanguagePresentation(user.language).name}
+                <span aria-hidden="true">
+                  {getLanguagePresentation(user.language, locale).flag}
+                </span>{" "}
+                {getLanguagePresentation(user.language, locale).name}
               </Badge>
               <Badge variant="outline">
-                {user.fileMode ? "Send as file" : "Send as media"}
+                <T>{user.fileMode ? "Send as file" : "Send as media"}</T>
               </Badge>
             </dd>
           </div>
@@ -501,6 +604,8 @@ function UserActivityChart({
   userId: string
   initial: TimeSeriesPoint[]
 }) {
+  const { t } = useTranslation()
+
   const [range, setRange] = useState<UserActivityRange>("31d")
   const query = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId, "activity", range],
@@ -517,7 +622,7 @@ function UserActivityChart({
   })
   const controls = (
     <ToggleGroup
-      aria-label="Activity period"
+      aria-label={t("Activity period")}
       value={[range]}
       onValueChange={(values) =>
         values[0] && setRange(values[0] as UserActivityRange)
@@ -525,52 +630,41 @@ function UserActivityChart({
       variant="outline"
       size="sm"
     >
-      {[
-        ["31d", "31 days"],
-        ["90d", "90 days"],
-        ["1y", "1 year"],
-        ["all", "All time"],
-      ].map(([value, label]) => (
-        <ToggleGroupItem key={value} value={value}>
-          {label}
-        </ToggleGroupItem>
-      ))}
+      <T>
+        {[
+          ["31d", "31 days"],
+          ["90d", "90 days"],
+          ["1y", "1 year"],
+          ["all", "All time"],
+        ].map(([value, label]) => (
+          <ToggleGroupItem key={value} value={value}>
+            <T>{label}</T>
+          </ToggleGroupItem>
+        ))}
+      </T>
     </ToggleGroup>
   )
-  if (range !== "31d" && (query.isPending || query.isError))
-    return (
-      <Card className="profile-activity-card">
-        <CardHeader>
-          <CardTitle>Download activity</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {controls}
-          {query.isError ? (
-            <QueryError
-              title="Activity unavailable"
-              error={query.error}
-              retry={() => void query.refetch()}
-            />
-          ) : (
-            <Skeleton
-              className="h-64 w-full"
-              aria-label="Loading download activity"
-            />
-          )}
-        </CardContent>
-      </Card>
-    )
-  const interval = range === "31d" ? "day" : (query.data?.interval ?? "month")
+  const interval = range === "31d" ? "day" : range === "90d" ? "week" : "month"
   return (
     <TimeSeriesChart
-      title="Download activity"
-      description={
+      title={t("Download activity")}
+      loading={range !== "31d" && query.isPending}
+      error={
+        range !== "31d" && query.isError ? (
+          <QueryError
+            title={t("Activity unavailable")}
+            error={query.error}
+            retry={() => void query.refetch()}
+          />
+        ) : undefined
+      }
+      description={t(
         interval === "month"
           ? "Downloads per month"
           : interval === "week"
             ? "Downloads per week"
             : "Downloads per day"
-      }
+      )}
       intervalDescription="UTC, including the current period"
       points={range === "31d" ? initial : (query.data?.points ?? [])}
       range={interval === "month" ? "all" : "31d"}
@@ -592,21 +686,25 @@ function QueryError({
   return (
     <Alert variant="destructive">
       <AlertTitle>
-        {"code" in error && error.code === "REQUEST_CANCELLED"
-          ? "Loading cancelled"
-          : title}
+        <T>
+          {"code" in error && error.code === "REQUEST_CANCELLED"
+            ? "Loading cancelled"
+            : title}
+        </T>
       </AlertTitle>
       <AlertDescription>
         <p>
-          {"code" in error &&
-          ["TOO_MANY_REQUESTS", "REQUEST_CANCELLED"].includes(
-            String(error.code)
-          )
-            ? error.message
-            : "Please try again in a moment."}
+          <T>
+            {"code" in error &&
+            ["TOO_MANY_REQUESTS", "REQUEST_CANCELLED"].includes(
+              String(error.code)
+            )
+              ? error.message
+              : "Please try again in a moment."}
+          </T>
         </p>
         <Button variant="outline" onClick={retry}>
-          Try again
+          <T>{"Try again"}</T>
         </Button>
       </AlertDescription>
     </Alert>

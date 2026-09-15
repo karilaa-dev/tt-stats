@@ -1,3 +1,4 @@
+import { useTranslation } from "@/lib/i18n/provider"
 import { Toast } from "@base-ui/react/toast"
 const manager = Toast.createToastManager()
 export const toast = {
@@ -8,6 +9,8 @@ export const toast = {
   info: (title: string) => manager.add({ title, type: "info" }),
 }
 function Messages() {
+  const { t } = useTranslation()
+
   const { toasts } = Toast.useToastManager()
   return (
     <Toast.Portal>
@@ -20,10 +23,16 @@ function Messages() {
             data-type={item.type}
           >
             <Toast.Content>
-              <Toast.Title />
-              <Toast.Description />
+              <Toast.Title>
+                {typeof item.title === "string" ? t(item.title) : item.title}
+              </Toast.Title>
+              <Toast.Description>
+                {typeof item.description === "string"
+                  ? t(item.description)
+                  : item.description}
+              </Toast.Description>
             </Toast.Content>
-            <Toast.Close aria-label="Dismiss notification">×</Toast.Close>
+            <Toast.Close aria-label={t("Dismiss notification")}>×</Toast.Close>
           </Toast.Root>
         ))}
       </Toast.Viewport>

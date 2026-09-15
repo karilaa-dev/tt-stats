@@ -1,3 +1,4 @@
+import { T } from "@/lib/i18n/provider"
 import {
   DashboardShell,
   type DashboardShellProps,
@@ -28,32 +29,36 @@ function AdminAccess() {
   return (
     <Card className="mx-auto w-full max-w-lg">
       <CardHeader>
-        <CardTitle>Admin access</CardTitle>
+        <CardTitle>
+          <T>{"Admin access"}</T>
+        </CardTitle>
         <CardDescription>
-          Log in with the Telegram account assigned to this website.
+          <T>{"Log in with the Telegram account assigned to this website."}</T>
         </CardDescription>
       </CardHeader>
       <CardContent>
         {!ready ? (
-          <p role="status">Checking your session…</p>
+          <p role="status">
+            <T>{"Checking your session…"}</T>
+          </p>
         ) : admin ? (
           <div className="flex flex-wrap gap-3">
             <Button nativeButton={false} render={<a href="/dashboard/users" />}>
-              User lookup
+              <T>{"User lookup"}</T>
             </Button>
             <Button
               variant="outline"
               nativeButton={false}
               render={<a href="/dashboard/jobs" />}
             >
-              Operations
+              <T>{"Operations"}</T>
             </Button>
           </div>
         ) : user ? (
           <p>
-            Your Telegram account does not have admin access.{" "}
+            <T>{"Your Telegram account does not have admin access."}</T>{" "}
             <a href="/dashboard/me" className="underline">
-              View your profile
+              <T>{"View your profile"}</T>
             </a>
             .
           </p>

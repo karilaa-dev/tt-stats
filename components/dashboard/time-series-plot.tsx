@@ -1,3 +1,4 @@
+import { useTranslation } from "@/lib/i18n/provider"
 import { memo, useMemo } from "react"
 import { Chart } from "@tanstack/charts/react"
 import { scaleBand } from "@tanstack/charts/scales/band"
@@ -30,6 +31,8 @@ export default memo(function TimeSeriesPlot({
   height = 300,
   calendarUnit,
 }: TimeSeriesPlotProps) {
+  const { locale, t } = useTranslation()
+
   // Reuse formatters across every point and axis tick in this reporting period.
   const { labelFormatter, tickFormatter } = useMemo(() => {
     const options: Intl.DateTimeFormatOptions = {
@@ -122,8 +125,8 @@ export default memo(function TimeSeriesPlot({
         nice: true,
         grid: true,
         axis: {
-          label: "Count",
-          ticks: { format: (value) => value.toLocaleString("en-US") },
+          label: t("Count"),
+          ticks: { format: (value) => value.toLocaleString(locale) },
         },
       },
       focus: "nearest-x",
@@ -135,25 +138,38 @@ export default memo(function TimeSeriesPlot({
         items: [
           {
             field: "label",
-            label: calendarUnit ? "Period (UTC)" : "Local interval",
+            label: t(calendarUnit ? "Period (UTC)" : "Local interval"),
           },
           {
             channel: "y",
             label: title,
-            text: (point) => Number(point.yValue).toLocaleString("en-US"),
+            text: (point) => Number(point.yValue).toLocaleString(locale),
           },
         ],
       },
       svgAnimation: !reducedMotion && data.length <= 240,
     })
-  }, [color, data, reducedMotion, tickFormatter, title, view, calendarUnit])
-
+  }, [
+    color,
+    data,
+    reducedMotion,
+    tickFormatter,
+    title,
+    view,
+    calendarUnit,
+    locale,
+    t,
+  ])
   return (
     <Chart
       definition={definition}
       height={height}
-      ariaLabel={`${title}, ${calendarUnit ? "UTC" : time.timeZone} time series`}
-      ariaDescription="Use the pointer or arrow keys to inspect intervals. Click or press Enter to pin a value."
+      ariaLabel={t(
+        `${title}, ${calendarUnit ? "UTC" : time.timeZone} time series`
+      )}
+      ariaDescription={t(
+        "Use the pointer or arrow keys to inspect intervals. Click or press Enter to pin a value."
+      )}
     />
   )
 })

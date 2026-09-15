@@ -1,20 +1,14 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
+import { LanguageSelector } from "@/lib/i18n/provider"
 import { TelegramLoginButton } from "./session-access"
 import { useAdminAccess } from "./admin-access"
-import {
-  useIsFetching,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query"
+import { useEffect, useRef } from "react"
+import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useHydrated } from "@/lib/dashboard-context"
-import { RefreshCwIcon } from "lucide-react"
-import { toast } from "@/components/controls/toast"
-
-import { Badge } from "@/components/controls"
-import { Button } from "@/components/controls"
-
-import { Spinner } from "@/components/controls"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/controls"
+import { Badge, Spinner } from "@/components/controls"
+import { StatsRefresh } from "./stats-refresh"
+import { invalidateSnapshotViews } from "@/lib/stats/snapshot-refresh"
+import type { StatsDataset } from "@/lib/stats/types"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import {
   snapshotMetadataQueryOptions,
@@ -40,25 +34,25 @@ function isSnapshotQuery(query: { queryKey: readonly unknown[] }) {
 }
 
 export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
+  const { t } = useTranslation()
+
   const { authenticated } = useAdminAccess()
   const hydrated = useHydrated()
   const queryClient = useQueryClient()
   const time = useBrowserTime()
   const metadataQuery = useQuery(snapshotMetadataQueryOptions())
   const fetching = useIsFetching({ predicate: isSnapshotQuery }) > 0
-  const refreshMutation = useMutation({
-    mutationFn: () =>
-      queryClient.refetchQueries(
-        { predicate: isSnapshotQuery, type: "active" },
-        { throwOnError: true }
-      ),
-    onError: () => {
-      toast.error("The refresh failed. Existing statistics remain available.")
-    },
-    onSuccess: () => toast.success("Statistics updated."),
-  })
-  // Fetch state can change between SSR and hydration as queries settle.
-  const refreshing = hydrated && (fetching || refreshMutation.isPending)
+  const versions = useRef<Partial<Record<StatsDataset, number>>>({})
+  useEffect(() => {
+    for (const snapshot of metadataQuery.data ?? []) {
+      const previous = versions.current[snapshot.dataset]
+      versions.current[snapshot.dataset] = snapshot.refreshedAt
+      if (previous !== undefined && previous !== snapshot.refreshedAt) {
+        void invalidateSnapshotViews(queryClient, snapshot.dataset)
+      }
+    }
+  }, [metadataQuery.data, queryClient])
+  const refreshing = hydrated && fetching
   const latestSnapshot =
     hydrated && metadataQuery.data?.length
       ? metadataQuery.data.reduce((latest, snapshot) =>
@@ -76,7 +70,7 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
         <a
           href="/dashboard"
           className="brand-lockup"
-          aria-label="@ttgrab Stats overview"
+          aria-label={t("@ttgrab Stats overview")}
         >
           <img
             src="/ttgrab-logo.png"
@@ -86,59 +80,57 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
             height="44"
           />
           <strong>
-            @ttgrab <span>Stats</span>
+            <T>{"@ttgrab "}</T>
+            <span>Stats</span>
           </strong>
         </a>
         <span className="topbar-divider" aria-hidden="true" />
-        <span className="workspace-label">Download activity</span>
+        <span className="workspace-label">
+          <T>{"Download activity"}</T>
+        </span>
         <div className="topbar-actions">
-          {refreshing ? (
-            <Badge variant="outline" className="hidden sm:inline-flex">
-              <Spinner /> Refreshing in background
-            </Badge>
-          ) : latestSnapshot && !fakeMode ? (
-            <span className="hidden text-xs text-muted-foreground lg:inline">
-              Updated {formatTimestamp(latestSnapshot.refreshedAt, time)}
-            </span>
-          ) : null}
+          <T>
+            {refreshing ? (
+              <Badge variant="outline" className="hidden sm:inline-flex">
+                <Spinner />
+                <T>{" Refreshing in background"}</T>
+              </Badge>
+            ) : latestSnapshot && !fakeMode ? (
+              <span className="hidden text-xs text-muted-foreground lg:inline">
+                <T>{"Updated "}</T>
+                <T>{formatTimestamp(latestSnapshot.refreshedAt, time)}</T>
+              </span>
+            ) : null}
+          </T>
           {staleSnapshot ? (
             <Badge
               variant="destructive"
               render={authenticated ? <a href="/dashboard/jobs" /> : undefined}
-              title="Statistics are overdue for an update."
+              title={t("Statistics are overdue for an update.")}
             >
-              <span className="sm:hidden">Stale</span>
+              <span className="sm:hidden">
+                <T>{"Stale"}</T>
+              </span>
               <span className="hidden sm:inline">
-                {staleSnapshot.dataset === "rolling_24h" ? "Rolling" : "Daily"}{" "}
-                stale
+                <T>
+                  {staleSnapshot.dataset === "rolling_24h"
+                    ? "Rolling"
+                    : "Daily"}
+                </T>{" "}
+                <T>{"stale"}</T>
               </span>
             </Badge>
           ) : null}
-          {fakeMode ? (
-            <Badge variant="secondary" className="hidden sm:inline-flex">
-              Demo data
-            </Badge>
-          ) : null}
+          <T>
+            {fakeMode ? (
+              <Badge variant="secondary" className="hidden sm:inline-flex">
+                <T>{"Demo data"}</T>
+              </Badge>
+            ) : null}
+          </T>
+          <LanguageSelector />
           <TelegramLoginButton compact />
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={!hydrated || refreshing}
-                  onClick={() => refreshMutation.mutate()}
-                />
-              }
-            >
-              <RefreshCwIcon
-                className={refreshing ? "animate-spin" : undefined}
-              />
-              <span className="sr-only">Refresh statistics</span>
-            </TooltipTrigger>
-            <TooltipContent>Refresh statistics</TooltipContent>
-          </Tooltip>
+          {authenticated && <StatsRefresh fakeMode={fakeMode} />}
         </div>
       </div>
     </header>

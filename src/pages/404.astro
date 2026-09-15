@@ -1,4 +1,7 @@
 ---
+import { localeFromRequest } from "@/lib/i18n/locale"
+import { translate } from "@/lib/i18n/translate"
+const locale = localeFromRequest(Astro.cookies, Astro.request)
 import Layout from "../layouts/base.astro"
 ---
 
@@ -6,9 +9,11 @@ import Layout from "../layouts/base.astro"
   <main
     class="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center"
   >
-    <h1 class="text-2xl font-semibold">Page not found</h1>
+    <h1 class="text-2xl font-semibold">
+      {translate("Page not found", locale)}
+    </h1>
     <a href="/dashboard" class="text-primary underline underline-offset-4"
-      >Return to dashboard</a
+      >{translate("Return to dashboard", locale)}</a
     >
   </main>
 </Layout>

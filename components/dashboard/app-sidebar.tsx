@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   ActivityIcon,
   ArrowUpRightIcon,
@@ -38,7 +39,7 @@ const navigation = [
     label: "Overview",
     short: "Home",
     icon: LayoutDashboardIcon,
-    description: "Your bot at a glance",
+    description: "Bot at a glance",
   },
   {
     href: "/dashboard/analytics",
@@ -73,7 +74,7 @@ const navigation = [
     label: "Referrals",
     short: "Referrals",
     icon: Share2Icon,
-    description: "Where your audience comes from",
+    description: "Where the bot audience comes from",
   },
   {
     href: "/dashboard/other",
@@ -92,6 +93,8 @@ const navigation = [
 ]
 
 export function AppSidebar() {
+  const { t } = useTranslation()
+
   const { authenticated } = useAdminAccess()
   const visibleNavigation = navigation.filter(
     (item) =>
@@ -113,19 +116,22 @@ export function AppSidebar() {
         <a
           href="/dashboard"
           className="sidebar-brand"
-          aria-label="@ttgrab Stats overview"
+          aria-label={t("@ttgrab Stats overview")}
         >
           <img src="/ttgrab-logo.png" alt="" width="56" height="56" />
           <strong>
-            @ttgrab <span>Stats</span>
+            <T>{"@ttgrab "}</T>
+            <span>Stats</span>
           </strong>
         </a>
-        <p className="sidebar-caption">STATISTICS</p>
-        <nav aria-label="Main navigation">
+        <p className="sidebar-caption">
+          <T>{"STATISTICS"}</T>
+        </p>
+        <nav aria-label={t("Main navigation")}>
           <BounceSidebar
             items={visibleNavigation.map(({ href, label, icon }) => ({
               href,
-              label,
+              label: t(label),
               icon,
             }))}
             value={visibleNavigation.findIndex((item) => item.href === current)}
@@ -138,10 +144,11 @@ export function AppSidebar() {
           target="_blank"
           rel="noreferrer"
         >
-          Open bot <ArrowUpRightIcon aria-hidden="true" />
+          <T>{"Open bot "}</T>
+          <ArrowUpRightIcon aria-hidden="true" />
         </a>
       </aside>
-      <nav aria-label="Quick navigation" className="mobile-dock">
+      <nav aria-label={t("Quick navigation")} className="mobile-dock">
         {quickLinks.map(({ href, short, icon: Icon }) => (
           <a
             key={href}
@@ -149,7 +156,9 @@ export function AppSidebar() {
             aria-current={current === href ? "page" : undefined}
           >
             <Icon aria-hidden="true" />
-            <span>{short}</span>
+            <span>
+              <T>{short}</T>
+            </span>
           </a>
         ))}
         <Button
@@ -158,11 +167,13 @@ export function AppSidebar() {
           ref={moreButton}
           onClick={() => setOpenMobile(true)}
           data-active={!quickLinks.some((item) => item.href === current)}
-          aria-label="Open all sections"
+          aria-label={t("Open all sections")}
           aria-expanded={openMobile}
         >
           <MoreHorizontalIcon />
-          <span>More</span>
+          <span>
+            <T>{"More"}</T>
+          </span>
         </Button>
       </nav>
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
@@ -172,25 +183,31 @@ export function AppSidebar() {
           className="navigation-sheet"
         >
           <SheetHeader>
-            <SheetTitle>All sections</SheetTitle>
+            <SheetTitle>
+              <T>{"All sections"}</T>
+            </SheetTitle>
             <SheetDescription>
-              Statistics, downloads and your profile.
+              <T>{"Statistics, downloads and your profile."}</T>
             </SheetDescription>
           </SheetHeader>
-          <nav aria-label="Main navigation" className="sheet-navigation">
+          <nav aria-label={t("Main navigation")} className="sheet-navigation">
             {visibleNavigation.map(
               ({ href, label, description, icon: Icon }) => (
                 <a
                   key={href}
                   href={href}
                   aria-current={current === href ? "page" : undefined}
-                  aria-label={label}
+                  aria-label={t(label)}
                   onClick={() => setOpenMobile(false)}
                 >
                   <Icon aria-hidden="true" />
                   <span>
-                    <strong>{label}</strong>
-                    <small>{description}</small>
+                    <strong>
+                      <T>{label}</T>
+                    </strong>
+                    <small>
+                      <T>{description}</T>
+                    </small>
                   </span>
                   <ArrowUpRightIcon aria-hidden="true" />
                 </a>
@@ -199,7 +216,9 @@ export function AppSidebar() {
           </nav>
           <div className="sheet-workspace">
             <ActivityIcon aria-hidden="true" />
-            {fakeMode ? "Demo workspace · sample data" : "tt-bot workspace"}
+            <T>
+              {fakeMode ? "Demo workspace · sample data" : "tt-bot workspace"}
+            </T>
           </div>
         </SheetContent>
       </Sheet>

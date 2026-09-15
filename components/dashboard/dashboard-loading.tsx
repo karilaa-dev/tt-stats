@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import { Skeleton } from "@/components/controls"
 import { Spinner } from "@/components/controls"
@@ -8,20 +9,27 @@ export function DashboardLoading({
 }: {
   variant?: "cards" | "charts" | "table"
 }) {
+  const { t } = useTranslation()
+
   const count = variant === "charts" ? 4 : variant === "table" ? 1 : 6
 
   return (
     <div
       className="flex flex-col gap-4"
       aria-busy="true"
-      aria-label="Loading dashboard data"
+      aria-label={t("Loading dashboard data")}
     >
       <Alert>
         <Spinner />
-        <AlertTitle>Loading the latest statistics</AlertTitle>
+        <AlertTitle>
+          <T>{"Loading the latest statistics"}</T>
+        </AlertTitle>
         <AlertDescription>
-          Navigation and filters remain available while data refreshes in the
-          background.
+          <T>
+            {
+              "Navigation and filters remain available while data refreshes in the background."
+            }
+          </T>
         </AlertDescription>
       </Alert>
       <div
@@ -34,19 +42,21 @@ export function DashboardLoading({
               : undefined
         )}
       >
-        {Array.from({ length: count }, (_, index) => (
-          <Skeleton
-            key={index}
-            className={cn(
-              "w-full",
-              variant === "charts"
-                ? "h-[26rem]"
-                : variant === "table"
-                  ? "h-80"
-                  : "h-32"
-            )}
-          />
-        ))}
+        <T>
+          {Array.from({ length: count }, (_, index) => (
+            <Skeleton
+              key={index}
+              className={cn(
+                "w-full",
+                variant === "charts"
+                  ? "h-[26rem]"
+                  : variant === "table"
+                    ? "h-80"
+                    : "h-32"
+              )}
+            />
+          ))}
+        </T>
       </div>
     </div>
   )

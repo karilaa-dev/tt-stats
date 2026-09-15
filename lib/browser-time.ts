@@ -1,3 +1,4 @@
+import { useTranslation } from "@/lib/i18n/provider"
 import { useEffect, useState } from "react"
 
 export interface BrowserTimeSettings {
@@ -16,6 +17,7 @@ const formatters = new Map<string, Intl.DateTimeFormat>()
 const MAX_FORMATTERS = 32
 
 export function useBrowserTime(): BrowserTimeSettings {
+  const { locale } = useTranslation()
   const [settings, setSettings] = useState(serverFallback)
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export function useBrowserTime(): BrowserTimeSettings {
     })
   }, [])
 
-  return settings
+  return { ...settings, locale }
 }
 
 export function formatEpoch(

@@ -1,21 +1,27 @@
 ---
 import "../styles.css"
+import { localeFromRequest } from "@/lib/i18n/locale"
+import { translate } from "@/lib/i18n/translate"
 import bodyLatin from "@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2?url"
 interface Props {
   title: string
 }
 const { title } = Astro.props
+const locale = localeFromRequest(Astro.cookies, Astro.request)
 ---
 
 <!doctype html>
-<html lang="en" class="dark">
+<html lang={locale} data-page-title={title} class="dark">
   <head>
     <meta charset="utf-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <meta name="description" content="Download analytics for @ttgrab." />
+    <meta
+      name="description"
+      content={translate("Download analytics for @ttgrab.", locale)}
+    />
     <meta name="theme-color" content="#08090b" />
     <link
       rel="preload"
@@ -26,7 +32,7 @@ const { title } = Astro.props
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" type="image/png" href="/favicon.png" />
-    <title>{title}</title>
+    <title>{translate(title, locale)}</title>
   </head>
   <body><slot /></body>
 </html>

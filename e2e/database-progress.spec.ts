@@ -14,7 +14,7 @@ test("slow ranking shows measured progress and cancellation permits a retry", as
   let cancelledId: string | null = null
   let requestId: string | undefined
   await page.route("**/_actions/getUserDownloads/**", async (route) => {
-    if (route.request().postDataJSON().sort !== "popular" || !delayed)
+    if (route.request().postDataJSON().category !== "popular" || !delayed)
       return route.continue()
     requestId = route.request().headers()["x-database-task"]
     await new Promise<void>((resolve) => {
@@ -53,8 +53,8 @@ test("slow ranking shows measured progress and cancellation permits a retry", as
     page.getByRole("list", { name: "Download history" })
   ).toBeVisible()
   await page
-    .getByRole("combobox", { name: "Sort", exact: true })
-    .selectOption("popular")
+    .getByRole("tab", { name: "Popular downloads", exact: true })
+    .click()
   const dialog = page.getByRole("dialog", { name: "Loading your data" })
   await expect(dialog).toBeVisible()
   await expect(dialog.getByRole("progressbar")).toHaveAttribute("value", "25")
@@ -79,7 +79,7 @@ test("slow ranking shows measured progress and cancellation permits a retry", as
   expect(cancelledId).toBe(requestId)
   await page.getByRole("button", { name: "Try again", exact: true }).click()
   await expect(
-    page.getByRole("list", { name: "Download history" })
+    page.getByRole("list", { name: "Popular downloads" })
   ).toBeVisible()
   await expect(dialog).toBeHidden()
 })

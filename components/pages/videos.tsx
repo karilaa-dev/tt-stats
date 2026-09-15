@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
@@ -42,6 +43,10 @@ import {
 } from "@/lib/dashboard-context"
 
 export function VideosPage() {
+  const { locale } = useTranslation()
+
+  const { t } = useTranslation()
+
   const { page: requestedPage, range } = useDashboardSearch()
   const page = Math.min(requestedPage, 1_000_000)
   const time = useBrowserTime()
@@ -52,8 +57,10 @@ export function VideosPage() {
   return (
     <>
       <PageHeading
-        title="Most downloaded videos"
-        description="Ranked by people who downloaded each video. Each user or group counts once in the selected period."
+        title={t("Most downloaded videos")}
+        description={t(
+          "Ranked by people who downloaded each video. Each user or group counts once in the selected period."
+        )}
       />
       <StatsFilters
         range={range}
@@ -70,72 +77,98 @@ export function VideosPage() {
       />
       <Card aria-busy={query.isFetching}>
         <CardHeader>
-          <CardTitle>Top 1,000 videos</CardTitle>
+          <CardTitle>
+            <T>{"Top 1,000 videos"}</T>
+          </CardTitle>
           <CardDescription>
-            Each user or group counts once. Image albums and legacy downloads
-            without a video ID are excluded.{" "}
-            {range === "24h"
-              ? "24 hours through the last completed half-hour. Rankings update every five minutes."
-              : range === "all"
-                ? "All recorded downloads. Rankings update daily."
-                : `${range === "7d" ? "7" : "31"} complete days in UTC. Rankings update daily.`}
-            {query.data
-              ? ` Last updated ${formatTimestamp(query.data.refreshedAt, time)}.`
-              : ""}
+            <T>
+              {
+                "Each user or group counts once. Image albums and legacy downloads without a video ID are excluded."
+              }
+            </T>{" "}
+            <T>
+              {range === "24h"
+                ? "24 hours through the last completed half-hour. Rankings update every five minutes."
+                : range === "all"
+                  ? "All recorded downloads. Rankings update daily."
+                  : `${range === "7d" ? "7" : "31"} complete days in UTC. Rankings update daily.`}
+            </T>
+            <T>
+              {query.data
+                ? ` Last updated ${formatTimestamp(query.data.refreshedAt, time)}.`
+                : ""}
+            </T>
           </CardDescription>
         </CardHeader>
         <CardContent>
           {query.isPending ? (
-            <Spinner aria-label="Loading top videos" />
+            <Spinner aria-label={t("Loading top videos")} />
           ) : query.isError ? (
             <Alert variant="destructive">
               <AlertTitle>
-                {isRequestCancelled(query.error)
-                  ? "Loading cancelled"
-                  : authenticated
-                    ? getSafeDatabaseError(query.error).title
-                    : "Rankings are unavailable"}
+                <T>
+                  {isRequestCancelled(query.error)
+                    ? "Loading cancelled"
+                    : authenticated
+                      ? getSafeDatabaseError(query.error).title
+                      : "Rankings are unavailable"}
+                </T>
               </AlertTitle>
               <AlertDescription className="flex flex-col items-start gap-2">
                 {isRequestCancelled(query.error) ? (
-                  <p>You can try again when you are ready.</p>
+                  <p>
+                    <T>{"You can try again when you are ready."}</T>
+                  </p>
                 ) : authenticated ? (
                   <>
-                    <p>{getSafeDatabaseError(query.error).description}</p>
                     <p>
-                      If the ranking has not been installed, open Operations,
-                      update database definitions, then wait for the selected
-                      period to refresh.
+                      <T>{getSafeDatabaseError(query.error).description}</T>
+                    </p>
+                    <p>
+                      <T>
+                        {
+                          "If the ranking has not been installed, open Operations, update database definitions, then wait for the selected period to refresh."
+                        }
+                      </T>
                     </p>
                     <a href="/dashboard/jobs" className="underline">
-                      Open Operations
+                      <T>{"Open Operations"}</T>
                     </a>
                   </>
                 ) : (
                   <p>
-                    The ranking for this period is not available yet. Please try
-                    again later.
+                    <T>
+                      {
+                        "The ranking for this period is not available yet. Please try again later."
+                      }
+                    </T>
                   </p>
                 )}
                 <Button variant="outline" onClick={() => void query.refetch()}>
-                  Try again
+                  <T>{"Try again"}</T>
                 </Button>
               </AlertDescription>
             </Alert>
           ) : query.data.items.length ? (
-            <Table aria-label="Most downloaded videos">
+            <Table aria-label={t("Most downloaded videos")}>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Video ID</TableHead>
-                  <TableHead>People downloaded</TableHead>
+                  <TableHead>
+                    <T>{"Rank"}</T>
+                  </TableHead>
+                  <TableHead>
+                    <T>{"Video ID"}</T>
+                  </TableHead>
+                  <TableHead>
+                    <T>{"People downloaded"}</T>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {query.data.items.map((item, index) => (
                   <TableRow key={item.downloadId}>
                     <TableCell>
-                      {(query.data.page - 1) * 20 + index + 1}
+                      <T>{(query.data.page - 1) * 20 + index + 1}</T>
                     </TableCell>
                     <TableCell className="max-w-48 sm:max-w-96">
                       <div className="flex flex-col items-start gap-2">
@@ -154,13 +187,13 @@ export function VideosPage() {
                               })
                             }}
                           >
-                            View media
+                            <T>{"View media"}</T>
                           </Button>
                         ) : null}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {BigInt(item.uniqueChats).toLocaleString("en-US")}
+                      <T>{BigInt(item.uniqueChats).toLocaleString(locale)}</T>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -169,11 +202,15 @@ export function VideosPage() {
           ) : (
             <Empty>
               <EmptyHeader>
-                <EmptyTitle>No videos found</EmptyTitle>
+                <EmptyTitle>
+                  <T>{"No videos found"}</T>
+                </EmptyTitle>
                 <EmptyDescription>
-                  {page > 1
-                    ? "There are no more videos on this page. Return to the previous page."
-                    : "Downloaded videos will appear here."}
+                  <T>
+                    {page > 1
+                      ? "There are no more videos on this page. Return to the previous page."
+                      : "Downloaded videos will appear here."}
+                  </T>
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -185,10 +222,11 @@ export function VideosPage() {
             disabled={page <= 1 || query.isFetching}
             onClick={() => void navigate({ search: { range, page: page - 1 } })}
           >
-            Previous
+            <T>{"Previous"}</T>
           </Button>
           <span className="text-sm text-muted-foreground" aria-live="polite">
-            Page {query.data?.page ?? page}
+            <T>{"Page "}</T>
+            <T>{query.data?.page ?? page}</T>
           </span>
           <Button
             variant="outline"
@@ -200,7 +238,7 @@ export function VideosPage() {
             }
             onClick={() => void navigate({ search: { range, page: page + 1 } })}
           >
-            Next
+            <T>{"Next"}</T>
           </Button>
         </CardFooter>
       </Card>

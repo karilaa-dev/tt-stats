@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   useDashboardSearch,
   useDashboardNavigate,
@@ -14,6 +15,8 @@ import { Button } from "@/components/controls"
 import { statsBreakdownQueryOptions } from "@/lib/stats/query-options"
 
 export function DetailedPage() {
+  const { t } = useTranslation()
+
   const { scope, range } = useDashboardSearch()
   const navigate = useDashboardNavigate()
   const statsQuery = useQuery(statsBreakdownQueryOptions(scope, range))
@@ -31,8 +34,10 @@ export function DetailedPage() {
   return (
     <>
       <PageHeading
-        title="Breakdown"
-        description="Compare download activity by audience and reporting period."
+        title={t("Breakdown")}
+        description={t(
+          "Compare download activity by audience and reporting period."
+        )}
       />
       <StatsFilters
         scope={scope}
@@ -51,10 +56,11 @@ export function DetailedPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 px-1">
         <div>
           <h2 className="font-heading text-xl font-semibold tracking-tight">
-            {audience}
+            <T>{audience}</T>
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {period} · Downloads, formats, and cache usage
+            <T>{period}</T>
+            <T>{" · Downloads, formats, and cache usage"}</T>
           </p>
         </div>
         <Button
@@ -65,19 +71,22 @@ export function DetailedPage() {
             <a href={`/dashboard/analytics?scope=${scope}&range=${range}`} />
           }
         >
-          View activity over time <ArrowUpRightIcon data-icon="inline-end" />
+          <T>{"View activity over time "}</T>
+          <ArrowUpRightIcon data-icon="inline-end" />
         </Button>
       </div>
-      {statsQuery.isError && !statsQuery.data ? (
-        <DashboardError
-          error={statsQuery.error}
-          reset={() => void statsQuery.refetch()}
-        />
-      ) : statsQuery.data ? (
-        <StatsCards stats={statsQuery.data} />
-      ) : (
-        <DashboardLoading />
-      )}
+      <T>
+        {statsQuery.isError && !statsQuery.data ? (
+          <DashboardError
+            error={statsQuery.error}
+            reset={() => void statsQuery.refetch()}
+          />
+        ) : statsQuery.data ? (
+          <StatsCards stats={statsQuery.data} />
+        ) : (
+          <DashboardLoading />
+        )}
+      </T>
     </>
   )
 }

@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   lazy,
   memo,
@@ -45,6 +46,8 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   controls,
   compact = false,
   calendarUnit,
+  loading = false,
+  error,
 }: {
   title: string
   description: string
@@ -55,7 +58,11 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
   controls?: ReactNode
   compact?: boolean
   calendarUnit?: "day" | "week" | "month"
+  loading?: boolean
+  error?: ReactNode
 }) {
+  const { t } = useTranslation()
+
   const [view, setView] = useState<"line" | "bars">("line")
   const time = useBrowserTime()
   const summary = useMemo(() => {
@@ -115,14 +122,19 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
     )
     observer.observe(plot)
     return () => observer.disconnect()
-  }, [points.length])
+  }, [points.length, loading, error])
 
   return (
-    <Card className={compact ? "profile-activity-card" : undefined}>
+    <Card
+      className={compact ? "profile-activity-card" : undefined}
+      aria-busy={loading}
+    >
       <CardHeader>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle>
+          <T>{title}</T>
+        </CardTitle>
         <CardDescription>
-          {description} · {resolution}
+          <T>{description}</T> · <T>{resolution}</T>
         </CardDescription>
         <CardAction>
           <ToggleGroup
@@ -133,76 +145,112 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
             variant="outline"
             size="sm"
             spacing={0}
-            aria-label={`${title} chart style`}
+            aria-label={t(`${title} chart style`)}
           >
-            <ToggleGroupItem value="line" aria-label="Line and area chart">
+            <ToggleGroupItem value="line" aria-label={t("Line and area chart")}>
               <ChartSplineIcon data-icon="inline-start" />
-              <span className="hidden sm:inline">Line</span>
+              <span className="hidden sm:inline">
+                <T>{"Line"}</T>
+              </span>
             </ToggleGroupItem>
-            <ToggleGroupItem value="bars" aria-label="Bar chart">
+            <ToggleGroupItem value="bars" aria-label={t("Bar chart")}>
               <ChartNoAxesColumnIcon data-icon="inline-start" />
-              <span className="hidden sm:inline">Bars</span>
+              <span className="hidden sm:inline">
+                <T>{"Bars"}</T>
+              </span>
             </ToggleGroupItem>
           </ToggleGroup>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {controls}
-        <div className="grid grid-cols-3 gap-2" aria-label={`${title} summary`}>
-          <ChartSummary label="Total" value={summary.total} />
-          <ChartSummary label="Average" value={summary.average} />
-          <ChartSummary label="Peak" value={summary.peak?.count ?? 0} />
+        <T>{controls}</T>
+        <div
+          className="grid grid-cols-3 gap-2"
+          aria-label={t(`${title} summary`)}
+        >
+          <ChartSummary
+            label="Total"
+            value={summary.total}
+            loading={loading || Boolean(error)}
+          />
+          <ChartSummary
+            label="Average"
+            value={summary.average}
+            loading={loading || Boolean(error)}
+          />
+          <ChartSummary
+            label="Peak"
+            value={summary.peak?.count ?? 0}
+            loading={loading || Boolean(error)}
+          />
         </div>
-        {points.length ? (
-          <div
-            ref={plotRef}
-            className="min-w-0"
-            style={{ height: compact ? 200 : 300 }}
-          >
-            <Suspense fallback={<ChartPlaceholder title={title} />}>
-              {visible ? (
-                <TimeSeriesPlot
-                  title={title}
-                  points={points}
-                  range={range}
-                  color={color}
-                  view={view}
-                  time={time}
-                  reducedMotion={reducedMotion}
-                  height={compact ? 200 : 300}
-                  calendarUnit={calendarUnit}
-                />
-              ) : (
-                <ChartPlaceholder title={title} />
-              )}
-            </Suspense>
-          </div>
-        ) : (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <BarChart3Icon />
-              </EmptyMedia>
-              <EmptyTitle>No activity in this period</EmptyTitle>
-              <EmptyDescription>
-                Choose a longer reporting period to look for activity.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        )}
+        <T>
+          {loading || error ? (
+            <div
+              style={{ height: compact ? 200 : 300, overflow: "auto" }}
+              aria-label={t("Loading download activity")}
+            >
+              <T>{error || <ChartPlaceholder title={t(title)} />}</T>
+            </div>
+          ) : points.length ? (
+            <div
+              ref={plotRef}
+              className="min-w-0"
+              style={{ height: compact ? 200 : 300 }}
+            >
+              <Suspense fallback={<ChartPlaceholder title={t(title)} />}>
+                <T>
+                  {visible ? (
+                    <TimeSeriesPlot
+                      title={t(title)}
+                      points={points}
+                      range={range}
+                      color={color}
+                      view={view}
+                      time={time}
+                      reducedMotion={reducedMotion}
+                      height={compact ? 200 : 300}
+                      calendarUnit={calendarUnit}
+                    />
+                  ) : (
+                    <ChartPlaceholder title={t(title)} />
+                  )}
+                </T>
+              </Suspense>
+            </div>
+          ) : (
+            <Empty style={{ height: compact ? 200 : 300 }}>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <BarChart3Icon />
+                </EmptyMedia>
+                <EmptyTitle>
+                  <T>{"No activity in this period"}</T>
+                </EmptyTitle>
+                <EmptyDescription>
+                  <T>
+                    {"Choose a longer reporting period to look for activity."}
+                  </T>
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
+        </T>
       </CardContent>
     </Card>
   )
 })
 
 function ChartPlaceholder({ title }: { title: string }) {
+  const { t } = useTranslation()
+
   return (
     <div
       className="flex h-full items-center justify-center rounded-lg bg-muted/20 text-sm text-muted-foreground"
       role="status"
-      aria-label={`Loading ${title.toLowerCase()} chart`}
+      aria-label={t(`Loading ${title.toLowerCase()} chart`)}
     >
-      Loading chart…
+      <T>{"Loading chart…"}</T>
     </div>
   )
 }
@@ -210,17 +258,21 @@ function ChartPlaceholder({ title }: { title: string }) {
 function ChartSummary({
   label: name,
   value,
+  loading = false,
 }: {
   label: string
+  loading?: boolean
   value: number
 }) {
+  const { locale } = useTranslation()
+
   return (
     <div className="rounded-lg bg-muted/50 px-3 py-2">
       <p className="text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
-        {name}
+        <T>{name}</T>
       </p>
       <p className="mt-0.5 text-base font-semibold tabular-nums">
-        {value.toLocaleString("en-US")}
+        <T>{loading ? "—" : value.toLocaleString(locale)}</T>
       </p>
     </div>
   )

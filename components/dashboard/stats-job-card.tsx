@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react"
+import { invalidateSnapshotViews } from "@/lib/stats/snapshot-refresh"
+import { T, useTranslation } from "@/lib/i18n/provider"
+import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   CirclePauseIcon,
@@ -97,6 +99,19 @@ export function StatsJobCard({
       return status === "succeeded" || status === "failed" ? false : 5_000
     },
   })
+  const completedRequest = useRef<string | null>(null)
+  useEffect(() => {
+    if (
+      manualQuery.data?.status !== "succeeded" ||
+      completedRequest.current === manualQuery.data.id
+    )
+      return
+    completedRequest.current = manualQuery.data.id
+    void invalidateSnapshotViews(queryClient, job.dataset)
+    void queryClient.invalidateQueries({
+      queryKey: [...statsQueryKey, "metadata"],
+    })
+  }, [manualQuery.data, queryClient, job.dataset])
   const validationError = validateCronSchedule(schedule)
   const changed = schedule.trim() !== job.schedule
   const isRecommended = job.schedule === RECOMMENDED_STATS_SCHEDULE[job.dataset]
@@ -162,13 +177,15 @@ export function StatsJobCard({
       <CardHeader>
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <CardTitle>{title}</CardTitle>
+            <CardTitle>
+              <T>{title}</T>
+            </CardTitle>
             <CardDescription className="mt-1 font-mono text-xs break-all">
               {job.jobName}
             </CardDescription>
           </div>
           <Badge variant={job.active ? "default" : "secondary"}>
-            {job.active ? "Active" : "Paused"}
+            <T>{job.active ? "Active" : "Paused"}</T>
           </Badge>
         </div>
       </CardHeader>
@@ -176,20 +193,32 @@ export function StatsJobCard({
         {!job.schedule ? (
           <Alert variant="destructive">
             <TriangleAlertIcon />
-            <AlertTitle>Job is not installed</AlertTitle>
+            <AlertTitle>
+              <T>{"Job is not installed"}</T>
+            </AlertTitle>
             <AlertDescription>
-              Apply the pg_cron installation SQL before using these controls.
+              <T>
+                {
+                  "Apply the pg_cron installation SQL before using these controls."
+                }
+              </T>
             </AlertDescription>
           </Alert>
         ) : null}
         {!isRecommended && job.schedule ? (
           <Alert>
             <TriangleAlertIcon />
-            <AlertTitle>Custom cadence</AlertTitle>
+            <AlertTitle>
+              <T>{"Custom cadence"}</T>
+            </AlertTitle>
             <AlertDescription>
-              Recommended:{" "}
-              <code>{RECOMMENDED_STATS_SCHEDULE[job.dataset]}</code>. The
-              current schedule can make snapshots refresh less predictably.
+              <T>{"Recommended:"}</T>{" "}
+              <code>{RECOMMENDED_STATS_SCHEDULE[job.dataset]}</code>
+              <T>
+                {
+                  ". The current schedule can make snapshots refresh less predictably."
+                }
+              </T>
             </AlertDescription>
           </Alert>
         ) : null}
@@ -217,42 +246,64 @@ export function StatsJobCard({
             value={
               job.lastDurationMs === null
                 ? "—"
-                : `${(job.lastDurationMs / 1000).toFixed(1)} s`
+                : new Intl.NumberFormat(time.locale, {
+                    style: "unit",
+                    unit: "second",
+                    unitDisplay: "short",
+                    maximumFractionDigits: 1,
+                  }).format(job.lastDurationMs / 1000)
             }
           />
         </div>
 
-        {manual ? (
-          <Alert>
-            {manual.status === "queued" || manual.status === "running" ? (
-              <Spinner />
-            ) : (
-              <Clock3Icon />
-            )}
-            <AlertTitle>Manual refresh {manual.status}</AlertTitle>
-            <AlertDescription>
-              Requested {formatTimestamp(manual.requestedAt, time)}
-              {manual.finishedAt
-                ? ` · Finished ${formatTimestamp(manual.finishedAt, time)}`
-                : ""}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-        {manualQuery.isError ? (
-          <Alert variant="destructive">
-            <TriangleAlertIcon />
-            <AlertTitle>Refresh status could not be checked</AlertTitle>
-            <AlertDescription>
-              The PostgreSQL request may still be running. Reload this page or
-              check the recent job runs before queuing another refresh.
-            </AlertDescription>
-          </Alert>
-        ) : null}
+        <T>
+          {manual ? (
+            <Alert>
+              <T>
+                {manual.status === "queued" || manual.status === "running" ? (
+                  <Spinner />
+                ) : (
+                  <Clock3Icon />
+                )}
+              </T>
+              <AlertTitle>
+                <T>{"Manual refresh "}</T>
+                <T>{manual.status}</T>
+              </AlertTitle>
+              <AlertDescription>
+                <T>{"Requested "}</T>
+                <T>{formatTimestamp(manual.requestedAt, time)}</T>
+                <T>
+                  {manual.finishedAt
+                    ? ` · Finished ${formatTimestamp(manual.finishedAt, time)}`
+                    : ""}
+                </T>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </T>
+        <T>
+          {manualQuery.isError ? (
+            <Alert variant="destructive">
+              <TriangleAlertIcon />
+              <AlertTitle>
+                <T>{"Refresh status could not be checked"}</T>
+              </AlertTitle>
+              <AlertDescription>
+                <T>
+                  {
+                    "The PostgreSQL request may still be running. Reload this page or check the recent job runs before queuing another refresh."
+                  }
+                </T>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+        </T>
 
         <FieldGroup>
           <Field data-invalid={Boolean(changed && validationError)}>
             <FieldLabel htmlFor={`schedule-${job.dataset}`}>
-              Cron schedule
+              <T>{"Cron schedule"}</T>
             </FieldLabel>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -276,21 +327,30 @@ export function StatsJobCard({
                 }
                 onClick={() => setConfirmation("schedule")}
               >
-                {scheduleMutation.isPending ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <SaveIcon data-icon="inline-start" />
-                )}
-                Save
+                <T>
+                  {scheduleMutation.isPending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <SaveIcon data-icon="inline-start" />
+                  )}
+                </T>
+                <T>{"Save"}</T>
               </Button>
             </div>
             <FieldDescription>
-              PostgreSQL validates the expression; the SQL command and job name
-              remain fixed.
+              <T>
+                {
+                  "PostgreSQL validates the expression; the SQL command and job name remain fixed."
+                }
+              </T>
             </FieldDescription>
-            {changed && validationError ? (
-              <FieldError>{validationError}</FieldError>
-            ) : null}
+            <T>
+              {changed && validationError ? (
+                <FieldError>
+                  <T>{validationError}</T>
+                </FieldError>
+              ) : null}
+            </T>
           </Field>
         </FieldGroup>
 
@@ -298,7 +358,11 @@ export function StatsJobCard({
           <Button
             type="button"
             disabled={
-              controlsDisabled || !job.schedule || runMutation.isPending
+              controlsDisabled ||
+              !job.schedule ||
+              runMutation.isPending ||
+              manual?.status === "queued" ||
+              manual?.status === "running"
             }
             onClick={() =>
               job.dataset === "daily"
@@ -306,12 +370,14 @@ export function StatsJobCard({
                 : runMutation.mutate()
             }
           >
-            {runMutation.isPending ? (
-              <Spinner data-icon="inline-start" />
-            ) : (
-              <PlayIcon data-icon="inline-start" />
-            )}
-            Run now
+            <T>
+              {runMutation.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <PlayIcon data-icon="inline-start" />
+              )}
+            </T>
+            <T>{"Run now"}</T>
           </Button>
           <Button
             type="button"
@@ -325,25 +391,35 @@ export function StatsJobCard({
                 : activeMutation.mutate(true)
             }
           >
-            {activeMutation.isPending ? (
-              <Spinner data-icon="inline-start" />
-            ) : job.active ? (
-              <CirclePauseIcon data-icon="inline-start" />
-            ) : (
-              <CirclePlayIcon data-icon="inline-start" />
-            )}
-            {job.active ? "Pause" : "Resume"}
+            <T>
+              {activeMutation.isPending ? (
+                <Spinner data-icon="inline-start" />
+              ) : job.active ? (
+                <CirclePauseIcon data-icon="inline-start" />
+              ) : (
+                <CirclePlayIcon data-icon="inline-start" />
+              )}
+            </T>
+            <T>{job.active ? "Pause" : "Resume"}</T>
           </Button>
         </div>
 
         <div className="min-w-0">
-          <h3 className="mb-2 text-sm font-medium">Recent runs</h3>
+          <h3 className="mb-2 text-sm font-medium">
+            <T>{"Recent runs"}</T>
+          </h3>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Started</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Duration</TableHead>
+                <TableHead>
+                  <T>{"Started"}</T>
+                </TableHead>
+                <TableHead>
+                  <T>{"Status"}</T>
+                </TableHead>
+                <TableHead className="text-right">
+                  <T>{"Duration"}</T>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -353,16 +429,19 @@ export function StatsJobCard({
                     colSpan={3}
                     className="text-center text-muted-foreground"
                   >
-                    <Spinner className="mr-2 inline-flex" /> Loading runs…
+                    <Spinner className="mr-2 inline-flex" />
+                    <T>{" Loading runs…"}</T>
                   </TableCell>
                 </TableRow>
               ) : runsQuery.data?.length ? (
                 runsQuery.data.map((run) => (
                   <TableRow key={run.id}>
                     <TableCell>
-                      {run.startedAt
-                        ? formatTimestamp(run.startedAt, time)
-                        : "—"}
+                      <T>
+                        {run.startedAt
+                          ? formatTimestamp(run.startedAt, time)
+                          : "—"}
+                      </T>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -370,13 +449,20 @@ export function StatsJobCard({
                           run.status === "succeeded" ? "secondary" : "outline"
                         }
                       >
-                        {run.status}
+                        <T>{run.status}</T>
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {run.durationMs === null
-                        ? "—"
-                        : `${(run.durationMs / 1000).toFixed(1)} s`}
+                      <T>
+                        {run.durationMs === null
+                          ? "—"
+                          : new Intl.NumberFormat(time.locale, {
+                              style: "unit",
+                              unit: "second",
+                              unitDisplay: "short",
+                              maximumFractionDigits: 1,
+                            }).format(run.durationMs / 1000)}
+                      </T>
                     </TableCell>
                   </TableRow>
                 ))
@@ -386,9 +472,11 @@ export function StatsJobCard({
                     colSpan={3}
                     className="text-center text-muted-foreground"
                   >
-                    {runsQuery.isError
-                      ? "Run history unavailable. Check pg_cron diagnostics above."
-                      : "No recorded runs."}
+                    <T>
+                      {runsQuery.isError
+                        ? "Run history unavailable. Check pg_cron diagnostics above."
+                        : "No recorded runs."}
+                    </T>
                   </TableCell>
                 </TableRow>
               )}
@@ -397,7 +485,8 @@ export function StatsJobCard({
         </div>
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground">
-        All displayed times use {time.timeZone}.
+        <T>{"All displayed times use "}</T>
+        <T>{time.timeZone}</T>.
       </CardFooter>
 
       <AlertDialog
@@ -410,23 +499,27 @@ export function StatsJobCard({
               <TriangleAlertIcon />
             </AlertDialogMedia>
             <AlertDialogTitle>
-              {confirmation === "pause"
-                ? "Pause this database job?"
-                : confirmation === "run"
-                  ? "Queue the daily refresh?"
-                  : "Change the cron schedule?"}
+              <T>
+                {confirmation === "pause"
+                  ? "Pause this database job?"
+                  : confirmation === "run"
+                    ? "Queue the daily refresh?"
+                    : "Change the cron schedule?"}
+              </T>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmation === "pause"
-                ? "Existing snapshots stay readable, but this dataset will become stale until the job resumes."
-                : confirmation === "run"
-                  ? "The request returns immediately. PostgreSQL will perform the full daily aggregation when the shared refresh lock is available."
-                  : `Replace ${job.schedule} with ${schedule.trim()}? PostgreSQL will keep the old schedule if validation fails.`}
+              <T>
+                {confirmation === "pause"
+                  ? "Existing snapshots stay readable, but this dataset will become stale until the job resumes."
+                  : confirmation === "run"
+                    ? "The request returns immediately. PostgreSQL will perform the full daily aggregation when the shared refresh lock is available."
+                    : `Replace ${job.schedule} with ${schedule.trim()}? PostgreSQL will keep the old schedule if validation fails.`}
+              </T>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={confirmationPending}>
-              Cancel
+              <T>{"Cancel"}</T>
             </AlertDialogCancel>
             <AlertDialogAction
               type="button"
@@ -437,10 +530,12 @@ export function StatsJobCard({
                 else if (confirmation === "schedule") scheduleMutation.mutate()
               }}
             >
-              {confirmationPending ? (
-                <Spinner data-icon="inline-start" />
-              ) : null}
-              {confirmationPending ? "Working…" : "Confirm"}
+              <T>
+                {confirmationPending ? (
+                  <Spinner data-icon="inline-start" />
+                ) : null}
+              </T>
+              <T>{confirmationPending ? "Working…" : "Confirm"}</T>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -450,11 +545,15 @@ export function StatsJobCard({
 }
 
 function Datum({ label, value }: { label: string; value: string }) {
+  const { t } = useTranslation()
+
   return (
     <div className="min-w-0 rounded-lg bg-muted/50 p-3">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 truncate text-sm font-medium" title={value}>
-        {value}
+      <p className="text-xs font-medium text-muted-foreground">
+        <T>{label}</T>
+      </p>
+      <p className="mt-1 truncate text-sm font-medium" title={t(value)}>
+        <T>{value}</T>
       </p>
     </div>
   )

@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { useMemo } from "react"
 import { ListFilterIcon } from "lucide-react"
 import {
@@ -57,6 +58,10 @@ export function RankedTable({
   onPageChange?: (page: number) => void
   renderValue?: (value: string) => React.ReactNode
 }) {
+  const { locale } = useTranslation()
+
+  const { t } = useTranslation()
+
   const columns = useMemo(
     () =>
       columnHelper.columns([
@@ -68,7 +73,7 @@ export function RankedTable({
                 variant="outline"
                 className="w-8 shrink-0 justify-center tabular-nums"
               >
-                {row.index + 1}
+                <T>{row.index + 1}</T>
               </Badge>
               <span className="min-w-0 break-all whitespace-normal">
                 {renderValue ? renderValue(getValue()) : getValue()}
@@ -78,10 +83,10 @@ export function RankedTable({
         }),
         columnHelper.accessor("count", {
           header: countLabel,
-          cell: ({ getValue }) => BigInt(getValue()).toLocaleString("en-US"),
+          cell: ({ getValue }) => BigInt(getValue()).toLocaleString(locale),
         }),
       ]),
-    [countLabel, renderValue, valueLabel]
+    [countLabel, renderValue, valueLabel, locale]
   )
   const effectivePageSize = Math.max(1, pageSize ?? rows.length)
   const lastPageIndex = Math.max(
@@ -115,9 +120,15 @@ export function RankedTable({
           <EmptyMedia variant="icon">
             <ListFilterIcon aria-hidden="true" />
           </EmptyMedia>
-          <EmptyTitle>No results for this period</EmptyTitle>
+          <EmptyTitle>
+            <T>{"No results for this period"}</T>
+          </EmptyTitle>
           <EmptyDescription>
-            Choose a longer period or a different chat scope to find activity.
+            <T>
+              {
+                "Choose a longer period or a different chat scope to find activity."
+              }
+            </T>
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -126,7 +137,9 @@ export function RankedTable({
 
   return (
     <div className="flex flex-col gap-4">
-      <Table aria-label={`${valueLabel} ranked by ${countLabel.toLowerCase()}`}>
+      <Table
+        aria-label={t(`${valueLabel} ranked by ${countLabel.toLowerCase()}`)}
+      >
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id}>
@@ -137,9 +150,11 @@ export function RankedTable({
                     header.column.id === "count" && "w-24 text-right"
                   )}
                 >
-                  {header.isPlaceholder ? null : (
-                    <table.FlexRender header={header} />
-                  )}
+                  <T>
+                    {header.isPlaceholder ? null : (
+                      <table.FlexRender header={header} />
+                    )}
+                  </T>
                 </TableHead>
               ))}
             </TableRow>
@@ -165,7 +180,7 @@ export function RankedTable({
         </TableBody>
       </Table>
       {pageSize && totalPages > 1 ? (
-        <Pagination aria-label={`${valueLabel} pagination`}>
+        <Pagination aria-label={t(`${valueLabel} pagination`)}>
           <PaginationContent>
             <PaginationItem>
               <PaginationPrevious
@@ -188,7 +203,10 @@ export function RankedTable({
                 aria-live="polite"
                 aria-atomic="true"
               >
-                Page {pagination.pageIndex + 1} of {totalPages}
+                <T>{"Page "}</T>
+                <T>{pagination.pageIndex + 1}</T>
+                <T>{" of "}</T>
+                <T>{totalPages}</T>
               </span>
             </PaginationItem>
             <PaginationItem>

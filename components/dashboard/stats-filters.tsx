@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { Field, FieldGroup, FieldLabel } from "@/components/controls"
 import { ToggleGroup, ToggleGroupItem } from "@/components/controls"
 import type { ChatScope, StatsRange } from "@/lib/stats/types"
@@ -32,6 +33,8 @@ export function StatsFilters({
   onScopeChange?: (scope: ChatScope) => void
   onRangeChange: (range: StatsRange) => void
 }) {
+  const { t } = useTranslation()
+
   return (
     <div
       className={cn("mb-7 rounded-2xl border bg-card p-2 sm:p-3", className)}
@@ -39,7 +42,9 @@ export function StatsFilters({
       <FieldGroup className="gap-3 lg:flex-row lg:items-center lg:justify-between">
         {showScope && scope ? (
           <Field orientation="responsive" className="gap-2 lg:w-auto">
-            <FieldLabel className="px-2">Audience</FieldLabel>
+            <FieldLabel className="px-2">
+              <T>{"Audience"}</T>
+            </FieldLabel>
             <ToggleGroup
               value={[scope]}
               onValueChange={(values) =>
@@ -48,7 +53,7 @@ export function StatsFilters({
               variant="default"
               size="lg"
               spacing={1}
-              aria-label="Chat scope"
+              aria-label={t("Chat scope")}
               className="w-full sm:w-fit"
             >
               {scopeOptions.map((option) => (
@@ -57,14 +62,16 @@ export function StatsFilters({
                   value={option.value}
                   className="min-h-11 flex-1 sm:min-w-20"
                 >
-                  {option.label}
+                  <T>{option.label}</T>
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
           </Field>
         ) : null}
         <Field orientation="responsive" className="gap-2 lg:w-auto">
-          <FieldLabel className="px-2">Period</FieldLabel>
+          <FieldLabel className="px-2">
+            <T>{"Period"}</T>
+          </FieldLabel>
           <ToggleGroup
             value={[range]}
             onValueChange={(values) =>
@@ -73,7 +80,7 @@ export function StatsFilters({
             variant="default"
             size="lg"
             spacing={1}
-            aria-label="Statistics period"
+            aria-label={t("Statistics period")}
             className="w-full sm:w-fit"
           >
             {rangeOptions.map((option) => (
@@ -82,7 +89,7 @@ export function StatsFilters({
                 value={option.value}
                 className="min-h-11 min-w-0 flex-1 sm:min-w-20"
               >
-                {option.value === "all" ? allRangeLabel : option.label}
+                <T>{option.value === "all" ? allRangeLabel : option.label}</T>
               </ToggleGroupItem>
             ))}
           </ToggleGroup>

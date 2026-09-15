@@ -1,3 +1,4 @@
+import { T, useTranslation } from "@/lib/i18n/provider"
 import { ExactCounter } from "./exact-counter"
 import { useId } from "react"
 import { useQuery } from "@tanstack/react-query"
@@ -32,8 +33,6 @@ import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
 import type { StatsBreakdown, TimeSeriesPoint } from "@/lib/stats/types"
 import "./overview-activity.css"
 
-const count = (value: string) => BigInt(value).toLocaleString("en-US")
-
 export function OverviewActivity({
   recent,
   lifetime,
@@ -43,6 +42,9 @@ export function OverviewActivity({
   lifetime: StatsBreakdown
   scope: "users" | "groups"
 }) {
+  const { t, locale } = useTranslation()
+  const count = (value: string) => BigInt(value).toLocaleString(locale)
+
   const total = BigInt(recent.downloads.total)
   const hits = BigInt(recent.downloads.cacheHits)
   const rate = total > 0n ? Number((hits * 1000n + total / 2n) / total) / 10 : 0
@@ -67,22 +69,27 @@ export function OverviewActivity({
       <div className="overview-daily-grid">
         <Card className="overview-daily-card">
           <CardHeader>
-            <CardTitle>Daily activity</CardTitle>
+            <CardTitle>
+              <T>{"Daily activity"}</T>
+            </CardTitle>
             <CardDescription>
-              {scope === "users" ? "Private users" : "Groups"} · completed
-              24-hour window
+              <T>{scope === "users" ? "Private users" : "Groups"}</T>
+              <T>{" · completed 24-hour window"}</T>
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overview-primary-metric">
               <div>
-                <p className="overview-metric-label">Video downloads</p>
+                <p className="overview-metric-label">
+                  <T>{"Video downloads"}</T>
+                </p>
                 <p className="overview-big-number">
                   <ExactCounter value={recent.downloads.total} />
                 </p>
                 <p className="overview-metric-note">
-                  Downloaded by {count(recent.downloads.uniqueUsers)} unique
-                  chats
+                  <T>{"Downloaded by "}</T>
+                  <T>{count(recent.downloads.uniqueUsers)}</T>
+                  <T>{" unique chats"}</T>
                 </p>
               </div>
               <DownloadIcon
@@ -91,27 +98,37 @@ export function OverviewActivity({
               />
             </div>
             <dl className="overview-supporting-metrics">
-              {supporting.map(({ label, value, icon: Icon }) => (
-                <div key={label}>
-                  <dt>
-                    <Icon aria-hidden="true" /> {label}
-                  </dt>
-                  <dd>{count(value)}</dd>
-                </div>
-              ))}
+              <T>
+                {supporting.map(({ label, value, icon: Icon }) => (
+                  <div key={label}>
+                    <dt>
+                      <Icon aria-hidden="true" /> <T>{label}</T>
+                    </dt>
+                    <dd>
+                      <T>{count(value)}</T>
+                    </dd>
+                  </div>
+                ))}
+              </T>
             </dl>
           </CardContent>
         </Card>
         <Card className="overview-cache-card">
           <CardHeader>
-            <CardTitle>Cache efficiency</CardTitle>
-            <CardDescription>How downloads were delivered</CardDescription>
+            <CardTitle>
+              <T>{"Cache efficiency"}</T>
+            </CardTitle>
+            <CardDescription>
+              <T>{"How downloads were delivered"}</T>
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div
               className="overview-cache-ring"
               role="img"
-              aria-label={`${rate.toFixed(1)}% of downloads served from cache`}
+              aria-label={t(
+                `${rate.toLocaleString(locale, { minimumFractionDigits: 1 })}% of downloads served from cache`
+              )}
             >
               <svg viewBox="0 0 160 160" aria-hidden="true">
                 <circle
@@ -119,7 +136,7 @@ export function OverviewActivity({
                   cy="80"
                   r="66"
                   fill="none"
-                  stroke="var(--muted)"
+                  stroke="var(--chart-2)"
                   strokeWidth="14"
                 />
                 <circle
@@ -137,26 +154,34 @@ export function OverviewActivity({
               </svg>
               <div>
                 <strong>
-                  {rate.toFixed(1)}
+                  <T>
+                    {rate.toLocaleString(locale, { minimumFractionDigits: 1 })}
+                  </T>
                   <small>%</small>
                 </strong>
-                <span>served from cache</span>
+                <span>
+                  <T>{"served from cache"}</T>
+                </span>
               </div>
             </div>
             <dl className="overview-cache-legend">
               <div>
                 <dt>
                   <i aria-hidden="true" />
-                  Cache hits
+                  <T>{"Cache hits"}</T>
                 </dt>
-                <dd>{count(recent.downloads.cacheHits)}</dd>
+                <dd>
+                  <T>{count(recent.downloads.cacheHits)}</T>
+                </dd>
               </div>
               <div>
                 <dt>
                   <i aria-hidden="true" />
-                  Cache misses
+                  <T>{"Cache misses"}</T>
                 </dt>
-                <dd>{count((total - hits).toString())}</dd>
+                <dd>
+                  <T>{count((total - hits).toString())}</T>
+                </dd>
               </div>
             </dl>
           </CardContent>
@@ -168,20 +193,28 @@ export function OverviewActivity({
           <TelegramMauCard />
           <Card className="overview-lifetime-card">
             <CardHeader>
-              <CardTitle>All time</CardTitle>
+              <CardTitle>
+                <T>{"All time"}</T>
+              </CardTitle>
               <CardDescription>
-                {scope === "users" ? "Private users" : "Groups"} · through
-                completed UTC days
+                <T>{scope === "users" ? "Private users" : "Groups"}</T>
+                <T>{" · through completed UTC days"}</T>
               </CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="overview-lifetime-ledger">
-                {lifetimeMetrics.map(({ label, value }) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>{count(value)}</dd>
-                  </div>
-                ))}
+                <T>
+                  {lifetimeMetrics.map(({ label, value }) => (
+                    <div key={label}>
+                      <dt>
+                        <T>{label}</T>
+                      </dt>
+                      <dd>
+                        <T>{count(value)}</T>
+                      </dd>
+                    </div>
+                  ))}
+                </T>
               </dl>
               <Button
                 variant="outline"
@@ -191,26 +224,38 @@ export function OverviewActivity({
                 }
                 className="overview-ledger-link"
               >
-                See full breakdown <ArrowUpRightIcon data-icon="inline-end" />
+                <T>{"See full breakdown "}</T>
+                <ArrowUpRightIcon data-icon="inline-end" />
               </Button>
             </CardContent>
           </Card>
         </div>
       </div>
-      <div className="overview-shortcuts" aria-label="Explore your statistics">
+      <div
+        className="overview-shortcuts"
+        aria-label={t("Explore bot statistics")}
+      >
         <a href="/dashboard/analytics?range=24h">
           <ChartNoAxesCombinedIcon aria-hidden="true" />
           <span>
-            <strong>Find the pattern</strong>
-            <small>Explore download and audience trends</small>
+            <strong>
+              <T>{"Find the pattern"}</T>
+            </strong>
+            <small>
+              <T>{"Explore download and audience trends"}</T>
+            </small>
           </span>
           <ArrowUpRightIcon aria-hidden="true" />
         </a>
         <a href="/dashboard/users">
           <SearchIcon aria-hidden="true" />
           <span>
-            <strong>Look up a chat</strong>
-            <small>Find activity by Telegram ID</small>
+            <strong>
+              <T>{"Look up a chat"}</T>
+            </strong>
+            <small>
+              <T>{"Find activity by Telegram ID"}</T>
+            </small>
           </span>
           <ArrowUpRightIcon aria-hidden="true" />
         </a>
@@ -224,48 +269,58 @@ function TrafficCard() {
   return (
     <Card className="overview-traffic-card">
       <CardHeader>
-        <CardTitle>Bot traffic</CardTitle>
+        <CardTitle>
+          <T>{"Bot traffic"}</T>
+        </CardTitle>
         <CardDescription>
-          All chats · last 24 hours · 30-minute intervals
+          <T>{"All chats · last 24 hours · 30-minute intervals"}</T>
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {query.data?.length ? (
-          <TrafficPlot points={query.data} />
-        ) : query.isError ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>Traffic is unavailable</EmptyTitle>
-              <EmptyDescription>
-                The activity totals above are still available.
-              </EmptyDescription>
-            </EmptyHeader>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void query.refetch()}
-            >
-              Retry chart
-            </Button>
-          </Empty>
-        ) : query.data ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyTitle>No traffic in this window</EmptyTitle>
-              <EmptyDescription>
-                Open Trends to explore a longer reporting period.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        ) : (
-          <Skeleton className="h-52 w-full" />
-        )}
+        <T>
+          {query.data?.length ? (
+            <TrafficPlot points={query.data} />
+          ) : query.isError ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>
+                  <T>{"Traffic is unavailable"}</T>
+                </EmptyTitle>
+                <EmptyDescription>
+                  <T>{"The activity totals above are still available."}</T>
+                </EmptyDescription>
+              </EmptyHeader>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void query.refetch()}
+              >
+                <T>{"Retry chart"}</T>
+              </Button>
+            </Empty>
+          ) : query.data ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>
+                  <T>{"No traffic in this window"}</T>
+                </EmptyTitle>
+                <EmptyDescription>
+                  <T>{"Open Trends to explore a longer reporting period."}</T>
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Skeleton className="h-52 w-full" />
+          )}
+        </T>
       </CardContent>
     </Card>
   )
 }
 
 function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
+  const { t, locale } = useTranslation()
+
   const id = useId().replaceAll(":", "")
   const time = useBrowserTime()
   const peak = Math.max(...points.map((point) => point.count))
@@ -287,7 +342,9 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
       <svg
         viewBox="0 0 620 188"
         role="img"
-        aria-label={`Video and image deliveries across all chats. ${points.length} half-hour intervals. Peak ${peak.toLocaleString("en-US")} downloads.`}
+        aria-label={t(
+          `Video and image deliveries across all chats. ${points.length} half-hour intervals. Peak ${peak.toLocaleString(locale)} downloads.`
+        )}
       >
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
@@ -327,28 +384,38 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
             fill="transparent"
           >
             <title>
-              {label(point.bucketEpoch)}: {point.count.toLocaleString("en-US")}{" "}
+              {label(point.bucketEpoch)}: {point.count.toLocaleString(locale)}{" "}
               downloads
             </title>
           </circle>
         ))}
       </svg>
       <div className="overview-chart-axis" aria-hidden="true">
-        <span>{label(start)}</span>
-        <span>{label(Math.round((start + end) / 2))}</span>
-        <span>{label(end)}</span>
+        <span>
+          <T>{label(start)}</T>
+        </span>
+        <span>
+          <T>{label(Math.round((start + end) / 2))}</T>
+        </span>
+        <span>
+          <T>{label(end)}</T>
+        </span>
       </div>
       <figcaption>
         <span>
-          Peak{" "}
+          <T>{"Peak"}</T>{" "}
           <strong>
-            {Math.max(...points.map((point) => point.count)).toLocaleString(
-              "en-US"
-            )}
+            <T>
+              {Math.max(...points.map((point) => point.count)).toLocaleString(
+                locale
+              )}
+            </T>
           </strong>{" "}
-          downloads / 30 min
+          <T>{"downloads / 30 min"}</T>
         </span>
-        <span>{time.timeZone}</span>
+        <span>
+          <T>{time.timeZone}</T>
+        </span>
       </figcaption>
     </figure>
   )
