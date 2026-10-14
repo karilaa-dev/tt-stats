@@ -16,8 +16,8 @@ test("every Astro dashboard route loads without browser errors", async ({
     ["detailed", "Breakdown", "Cache misses"],
     ["users", "User lookup", "Enter an ID to begin"],
     ["referrals", "Referrals", "Referral ranking"],
-    ["other", "Audience insights", "Top downloaders"],
-    ["jobs", "Database jobs", "Controls disabled in fake-data mode"],
+    ["other", "Audience", "Top downloaders"],
+    ["jobs", "Operations", "Controls disabled in fake-data mode"],
   ]) {
     await page.goto(`/dashboard/${route}`)
     await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
@@ -62,7 +62,7 @@ test("lookup, pagination, CSV and browser history work", async ({ page }) => {
   await page.getByRole("button", { name: "Go to next page" }).click()
   await expect(page).toHaveURL(/page=2/)
   await page.goBack()
-  await expect(page).toHaveURL(/page=1/)
+  await expect(page).not.toHaveURL(/page=/)
   await input.fill("not-an-id")
   await expect(
     page.getByText("Invalid Telegram ID", { exact: true })

@@ -76,7 +76,9 @@ test("personal statistics, filters, mobile access, and logout", async ({
         .nth(4)
         .getByRole("button", { name: "View media" })
     ).toHaveCount(0)
-    const savedOnly = page.getByRole("switch", { name: "Show only records with media preview" })
+    const savedOnly = page.getByRole("switch", {
+      name: "Show only records with media preview",
+    })
     await savedOnly.click()
     await expect(savedOnly).toBeChecked()
     await expect(page).toHaveURL(/savedMediaOnly=true/)
@@ -116,7 +118,9 @@ test("personal statistics, filters, mobile access, and logout", async ({
         () => document.documentElement.scrollWidth <= innerWidth
       )
     ).toBe(true)
-    await expect(page.locator(".profile-summary").getByText(/English/)).toBeVisible()
+    await expect(
+      page.locator(".profile-summary").getByText(/English/)
+    ).toBeVisible()
     const summary = await page.locator(".profile-summary").boundingBox()
     const chart = await page.locator(".profile-activity-card").boundingBox()
     if (isMobile) {
@@ -198,7 +202,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await page.getByLabel("From date", { exact: true }).fill("2026-08-09")
     await page.getByLabel("Through date", { exact: true }).fill("2026-08-09")
     await page.getByRole("button", { name: "Apply dates", exact: true }).click()
-    await expect(page).toHaveURL(/page=1/)
+    await expect(page).not.toHaveURL(/page=/)
     await expect(history.getByRole("listitem")).toHaveCount(6)
     await expect
       .poll(() => historyRequests.at(-1))
@@ -259,7 +263,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await page
       .getByRole("combobox", { name: "Show", exact: true })
       .selectOption("first")
-    await expect(page).toHaveURL(/page=1/)
+    await expect(page).not.toHaveURL(/page=/)
     await expect(history.getByRole("listitem")).toHaveCount(6)
     for (const row of await history.getByRole("listitem").all()) {
       await expect(row).toContainText("You were first")

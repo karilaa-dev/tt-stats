@@ -1,13 +1,17 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useQuery } from "@tanstack/react-query"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/controls"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/controls"
 import { Skeleton } from "@/components/controls"
 import { telegramMauQueryOptions } from "@/lib/telegram/query-options"
 
 export function TelegramMauCard() {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const query = useQuery(telegramMauQueryOptions())
   const count = query.data?.status === "available" ? query.data.count : null
@@ -23,6 +27,9 @@ export function TelegramMauCard() {
         <CardTitle>
           <T>{"Telegram MAU"}</T>
         </CardTitle>
+        <CardDescription>
+          <T>{"Monthly active users reported by Telegram"}</T>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <T>

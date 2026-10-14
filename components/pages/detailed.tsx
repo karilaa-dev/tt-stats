@@ -53,22 +53,24 @@ export function DetailedPage() {
           })
         }
       />
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 px-1">
+      <div className="section-heading">
         <div>
-          <h2 className="font-heading text-xl font-semibold tracking-tight">
+          <h2>
             <T>{audience}</T>
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p>
             <T>{period}</T>
             <T>{" · Downloads, formats, and cache usage"}</T>
           </p>
         </div>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           nativeButton={false}
           render={
-            <a href={`/dashboard/analytics?scope=${scope}&range=${range}`} />
+            <a
+              href={`/dashboard/analytics${range === "24h" ? "" : `?range=${range}`}`}
+            />
           }
         >
           <T>{"View activity over time "}</T>

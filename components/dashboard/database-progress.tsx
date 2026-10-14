@@ -21,7 +21,11 @@ import {
 export function DatabaseProgress() {
   const { t, locale } = useTranslation()
 
-  const tasks = useSyncExternalStore(subscribeTasks, getTasks, getServerTasks)
+  const tasks = useSyncExternalStore(
+    subscribeTasks,
+    getTasks,
+    getServerTasks
+  ).filter((task) => !task.quiet)
   const [now, setNow] = useState(0)
   const active = tasks.length > 0
   useEffect(() => {

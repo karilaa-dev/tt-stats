@@ -1,0 +1,20 @@
+import type { ChatScope, SeriesMetric, StatsRange } from "./types"
+
+// Browser queries and server-rendered initial data must use identical keys.
+export const queryKeys = {
+  session: () => ["session"] as const,
+  snapshotMetadata: () => ["stats", "metadata"] as const,
+  overview: () => ["stats", "overview"] as const,
+  breakdown: (scope: ChatScope, range: StatsRange) =>
+    ["stats", "breakdown", scope, range] as const,
+  timeSeries: (metric: SeriesMetric, range: StatsRange) =>
+    ["stats", "time-series", metric, range] as const,
+  referrals: () => ["stats", "referrals"] as const,
+  otherStats: () => ["stats", "other"] as const,
+  popularVideos: (range: StatsRange, page: number) =>
+    ["stats", "popular-videos", range, page] as const,
+  telegramMau: () => ["telegram-mau"] as const,
+  /** Personal statistics for the signed-in account, or an admin lookup. */
+  userStats: (own: boolean, userId: string) =>
+    ["stats", own ? "me" : "user", userId] as const,
+}

@@ -10,6 +10,7 @@ import { FilesIcon, LanguagesIcon, TrophyIcon } from "lucide-react"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
+import { SummaryStrip } from "@/components/dashboard/summary-strip"
 import { LanguageValue } from "@/components/dashboard/language-value"
 import { RankedTable } from "@/components/dashboard/ranked-table"
 import {
@@ -21,13 +22,12 @@ import {
   CardTitle,
 } from "@/components/controls"
 import { otherStatsQueryOptions } from "@/lib/stats/query-options"
+import { cn } from "@/lib/utils"
 
 const PAGE_SIZE = 20
 
 export function OtherPage() {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const { authenticated } = useAdminAccess()
   const statsQuery = useQuery(otherStatsQueryOptions())
@@ -43,9 +43,11 @@ export function OtherPage() {
   return (
     <>
       <PageHeading
-        title={t("Audience insights")}
+        title={t("Audience")}
         description={t(
-          "Audience languages, download leaders, and file preferences."
+          authenticated
+            ? "Audience languages, download leaders, and file preferences."
+            : "Audience languages and file preferences."
         )}
       />
       {statsQuery.isError && !stats ? (
@@ -54,50 +56,45 @@ export function OtherPage() {
           reset={() => void statsQuery.refetch()}
         />
       ) : !stats ? (
-        <DashboardLoading />
+        <DashboardLoading variant="summary-table" />
       ) : (
-        <div className="flex flex-col gap-6">
-          <dl className="grid gap-5 rounded-2xl border bg-card p-6 sm:grid-cols-3 sm:gap-8">
-            <div>
-              <dt className="flex items-center gap-2 text-sm text-muted-foreground">
-                <FilesIcon className="size-4" aria-hidden="true" />
-                <T>{"Users with file mode enabled"}</T>
-              </dt>
-              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                <T>{BigInt(stats.fileModeUsers).toLocaleString(locale)}</T>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                <T>{"Language values"}</T>
-              </dt>
-              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                <T>{stats.languages.length.toLocaleString(locale)}</T>
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-sm text-muted-foreground">
-                <T>{"Most common language"}</T>
-              </dt>
-              <dd className="mt-2 text-xl font-semibold tracking-tight">
-                {stats.languages[0] ? (
+        <>
+          <SummaryStrip
+            items={[
+              {
+                label: "Users with file mode enabled",
+                value: BigInt(stats.fileModeUsers).toLocaleString(locale),
+                icon: FilesIcon,
+              },
+              {
+                label: "Language values",
+                value: stats.languages.length.toLocaleString(locale),
+                icon: LanguagesIcon,
+              },
+              {
+                label: "Most common language",
+                value: stats.languages[0] ? (
                   <LanguageValue value={stats.languages[0].value} />
                 ) : (
                   "No language data"
-                )}
-              </dd>
-            </div>
-          </dl>
-          <div className="grid items-start gap-6 xl:grid-cols-2">
+                ),
+                wide: true,
+              },
+            ]}
+          />
+          <div
+            className={cn(
+              "grid items-start gap-6",
+              authenticated && "xl:grid-cols-2"
+            )}
+          >
             <Card>
               <CardHeader>
                 <CardTitle>
                   <T>{"Languages"}</T>
                 </CardTitle>
                 <CardDescription>
-                  <T>
-                    {"Bot audience by language."}
-                  </T>
+                  <T>{"Bot audience by language."}</T>
                 </CardDescription>
                 <CardAction>
                   <LanguagesIcon
@@ -117,42 +114,48 @@ export function OtherPage() {
                     navigate({ search: { page: nextPage } })
                   }
                   renderValue={(value) => <LanguageValue value={value} />}
+                  emptyTitle="No language data"
+                  emptyDescription="Languages appear here after the next daily update."
                 />
               </CardContent>
             </Card>
-            <T>
-              {authenticated ? (
-                <div className="flex min-w-0 flex-col gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>
-                        <T>{"Top downloaders"}</T>
-                      </CardTitle>
-                      <CardDescription>
-                        <T>
-                          {"Private users and groups by video history count."}
-                        </T>
-                      </CardDescription>
-                      <CardAction>
-                        <TrophyIcon
-                          className="size-5 text-muted-foreground"
-                          aria-hidden="true"
-                        />
-                      </CardAction>
-                    </CardHeader>
-                    <CardContent>
-                      <RankedTable
-                        rows={stats.topDownloaders}
-                        valueLabel="Telegram ID"
-                        countLabel="Downloads"
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : null}
-            </T>
+            {authenticated ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    <T>{"Top downloaders"}</T>
+                  </CardTitle>
+                  <CardDescription>
+                    <T>{"Private users and groups by video history count."}</T>
+                  </CardDescription>
+                  <CardAction>
+                    <TrophyIcon
+                      className="size-5 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <RankedTable
+                    rows={stats.topDownloaders}
+                    valueLabel="Telegram ID"
+                    countLabel="Downloads"
+                    renderValue={(value) => (
+                      <a
+                        className="ranking-link font-mono"
+                        href={`/dashboard/users?id=${encodeURIComponent(value)}`}
+                      >
+                        {value}
+                      </a>
+                    )}
+                    emptyTitle="No downloads yet"
+                    emptyDescription="Download leaders appear here after the next daily update."
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
-        </div>
+        </>
       )}
     </>
   )

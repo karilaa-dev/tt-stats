@@ -281,7 +281,7 @@ function setupFailure(step: string, error: unknown): Error {
   }
   if (kind === "permission") {
     return new Error(
-      `Database setup stopped during ${step} because DB_URL lacks a required privilege. Follow the administrator guide on Database jobs, then retry.`
+      `Database setup stopped during ${step} because DB_URL lacks a required privilege. Follow the administrator guide on Operations, then retry.`
     )
   }
   if (step === "job scheduling") {
@@ -319,7 +319,7 @@ export async function configureDatabaseJobsRaw(input: {
   }
   if (!capabilities.pg_cron_installed) {
     throw new Error(
-      "pg_cron is not installed in this database. Complete the one-time PostgreSQL administrator steps shown on Database jobs, then retry."
+      "pg_cron is not installed in this database. Complete the one-time PostgreSQL administrator steps shown on Operations, then retry."
     )
   }
 

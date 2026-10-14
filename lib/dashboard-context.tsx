@@ -4,7 +4,11 @@ import {
   useContext,
   useSyncExternalStore,
 } from "react"
-import { parseChatScope, parseStatsRange } from "@/lib/stats/validation"
+import {
+  dashboardSearchString,
+  parseDashboardSearch as parseSearch,
+  type DashboardSearch as Search,
+} from "@/lib/dashboard-search"
 
 export const DashboardContext = createContext({
   pathname: "/dashboard",
@@ -17,38 +21,12 @@ const subscribe = (callback: () => void) => {
   return () => window.removeEventListener("popstate", callback)
 }
 const browserSearch = () => window.location.search
-function parseSearch(search: string) {
-  const params = new URLSearchParams(search)
-  const page = Number(params.get("page"))
-  return {
-    range: parseStatsRange(params.get("range")),
-    fromDate: params.get("fromDate") ?? "",
-    throughDate: params.get("throughDate") ?? "",
-    savedMediaOnly: params.get("savedMediaOnly") === "true",
-    discovery: (["others", "first"].includes(params.get("discovery") ?? "")
-      ? params.get("discovery")
-      : "all") as "all" | "others" | "first",
-    category: (params.get("category") === "popular" ||
-    params.get("sort") === "popular"
-      ? "popular"
-      : "history") as "history" | "popular",
-    sort: (params.get("sort") === "oldest" ? "oldest" : "newest") as
-      "newest" | "oldest",
-    mediaKind: (["video", "images"].includes(params.get("mediaKind") ?? "")
-      ? params.get("mediaKind")
-      : "all") as "all" | "video" | "images",
-    scope: parseChatScope(params.get("scope")),
-    id: params.get("id") ?? "",
-    page: Number.isInteger(page) && page > 0 ? page : 1,
-  }
-}
 export function useDashboardSearch() {
   const { search } = useDashboardContext()
   return parseSearch(
     useSyncExternalStore(subscribe, browserSearch, () => search)
   )
 }
-type Search = ReturnType<typeof parseSearch>
 export function useDashboardNavigate() {
   return useCallback(
     async ({
@@ -63,9 +41,7 @@ export function useDashboardNavigate() {
           ? search(parseSearch(window.location.search))
           : search
       const url = new URL(window.location.href)
-      url.search = ""
-      for (const [key, value] of Object.entries(next))
-        if (value !== "") url.searchParams.set(key, String(value))
+      url.search = dashboardSearchString(next)
       if (url.href === window.location.href) return
       window.history[replace ? "replaceState" : "pushState"](null, "", url)
       window.dispatchEvent(new PopStateEvent("popstate"))

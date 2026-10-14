@@ -9,13 +9,7 @@ import {
   useTable,
 } from "@tanstack/react-table"
 
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/controls"
+import { Pager } from "./pager"
 import { Badge } from "@/components/controls"
 import {
   Empty,
@@ -49,6 +43,8 @@ export function RankedTable({
   pageSize,
   onPageChange,
   renderValue,
+  emptyTitle = "No results for this period",
+  emptyDescription = "Choose a longer period or a different chat scope to find activity.",
 }: {
   rows: RankedValue[]
   valueLabel: string
@@ -57,6 +53,8 @@ export function RankedTable({
   pageSize?: number
   onPageChange?: (page: number) => void
   renderValue?: (value: string) => React.ReactNode
+  emptyTitle?: string
+  emptyDescription?: string
 }) {
   const { locale } = useTranslation()
 
@@ -69,11 +67,8 @@ export function RankedTable({
           header: valueLabel,
           cell: ({ getValue, row }) => (
             <div className="flex min-w-0 items-center gap-3">
-              <Badge
-                variant="outline"
-                className="w-8 shrink-0 justify-center tabular-nums"
-              >
-                <T>{row.index + 1}</T>
+              <Badge variant="outline" className="ranking-badge">
+                {(row.index + 1).toLocaleString(locale)}
               </Badge>
               <span className="min-w-0 break-all whitespace-normal">
                 {renderValue ? renderValue(getValue()) : getValue()}
@@ -121,14 +116,10 @@ export function RankedTable({
             <ListFilterIcon aria-hidden="true" />
           </EmptyMedia>
           <EmptyTitle>
-            <T>{"No results for this period"}</T>
+            <T>{emptyTitle}</T>
           </EmptyTitle>
           <EmptyDescription>
-            <T>
-              {
-                "Choose a longer period or a different chat scope to find activity."
-              }
-            </T>
+            <T>{emptyDescription}</T>
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -179,52 +170,13 @@ export function RankedTable({
           ))}
         </TableBody>
       </Table>
-      {pageSize && totalPages > 1 ? (
-        <Pagination aria-label={t(`${valueLabel} pagination`)}>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                aria-disabled={!table.getCanPreviousPage()}
-                tabIndex={table.getCanPreviousPage() ? 0 : -1}
-                className={cn(
-                  !table.getCanPreviousPage() &&
-                    "pointer-events-none opacity-50"
-                )}
-                onClick={(event) => {
-                  event.preventDefault()
-                  if (table.getCanPreviousPage()) table.previousPage()
-                }}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span
-                className="px-3 text-sm text-muted-foreground"
-                aria-live="polite"
-                aria-atomic="true"
-              >
-                <T>{"Page "}</T>
-                <T>{pagination.pageIndex + 1}</T>
-                <T>{" of "}</T>
-                <T>{totalPages}</T>
-              </span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                aria-disabled={!table.getCanNextPage()}
-                tabIndex={table.getCanNextPage() ? 0 : -1}
-                className={cn(
-                  !table.getCanNextPage() && "pointer-events-none opacity-50"
-                )}
-                onClick={(event) => {
-                  event.preventDefault()
-                  if (table.getCanNextPage()) table.nextPage()
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+      {pageSize ? (
+        <Pager
+          page={pagination.pageIndex + 1}
+          totalPages={totalPages}
+          label={`${valueLabel} pagination`}
+          onPageChange={(next) => table.setPageIndex(next - 1)}
+        />
       ) : null}
     </div>
   )

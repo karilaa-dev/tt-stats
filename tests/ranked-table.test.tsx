@@ -42,7 +42,7 @@ describe("ranked table", () => {
       />
     )
     const previous = screen.getByRole("button", { name: "Go to previous page" })
-    expect(previous.getAttribute("tabindex")).toBe("-1")
+    expect(previous.hasAttribute("disabled")).toBe(true)
     fireEvent.click(previous)
     expect(onPageChange).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole("button", { name: "Go to next page" }))

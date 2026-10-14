@@ -11,9 +11,9 @@ import {
   getStatsJobs,
   getStatsBreakdown,
   getTimeSeries,
-  getUserDownloads,
-  getUserStats,
 } from "@/lib/stats/functions"
+import { isBackgroundRefresh } from "@/lib/tasks/background"
+import { queryKeys } from "@/lib/stats/query-keys"
 import type {
   ChatScope,
   SeriesMetric,
@@ -26,7 +26,6 @@ const AGGREGATE_STALE_TIME = 5 * 60 * 1000
 const ROLLING_REFRESH_INTERVAL = 5 * 60 * 1000
 const DAILY_REFRESH_INTERVAL = 24 * 60 * 60 * 1000
 const OPERATIONS_REFRESH_INTERVAL = 60 * 1000
-const USER_STALE_TIME = 5 * 60 * 1000
 
 const rollingRefreshOptions = {
   placeholderData: keepPreviousData,
@@ -42,7 +41,7 @@ const dailyRefreshOptions = {
 
 export function overviewQueryOptions() {
   return queryOptions({
-    queryKey: [...statsQueryKey, "overview"],
+    queryKey: queryKeys.overview(),
     queryFn: ({ signal }) => getOverview(signal),
     ...rollingRefreshOptions,
   })
@@ -53,7 +52,7 @@ export function statsBreakdownQueryOptions(
   range: StatsRange
 ) {
   return queryOptions({
-    queryKey: [...statsQueryKey, "breakdown", scope, range],
+    queryKey: queryKeys.breakdown(scope, range),
     queryFn: ({ signal }) =>
       getStatsBreakdown({ signal, data: { scope, range } }),
     ...(range === "24h" ? rollingRefreshOptions : dailyRefreshOptions),
@@ -65,7 +64,7 @@ export function timeSeriesQueryOptions(
   range: StatsRange
 ) {
   return queryOptions({
-    queryKey: [...statsQueryKey, "time-series", metric, range],
+    queryKey: queryKeys.timeSeries(metric, range),
     queryFn: ({ signal }) => getTimeSeries({ signal, data: { metric, range } }),
     ...(range === "24h" ? rollingRefreshOptions : dailyRefreshOptions),
   })
@@ -73,7 +72,7 @@ export function timeSeriesQueryOptions(
 
 export function referralStatsQueryOptions() {
   return queryOptions({
-    queryKey: [...statsQueryKey, "referrals"],
+    queryKey: queryKeys.referrals(),
     queryFn: ({ signal }) => getReferralStats(signal),
     ...dailyRefreshOptions,
   })
@@ -81,7 +80,7 @@ export function referralStatsQueryOptions() {
 
 export function otherStatsQueryOptions() {
   return queryOptions({
-    queryKey: [...statsQueryKey, "other"],
+    queryKey: queryKeys.otherStats(),
     queryFn: ({ signal }) => getOtherStats(signal),
     ...dailyRefreshOptions,
   })
@@ -89,7 +88,7 @@ export function otherStatsQueryOptions() {
 
 export function snapshotMetadataQueryOptions() {
   return queryOptions({
-    queryKey: [...statsQueryKey, "metadata"],
+    queryKey: queryKeys.snapshotMetadata(),
     queryFn: ({ signal }) => getSnapshotMetadata(signal),
     ...rollingRefreshOptions,
   })
@@ -98,7 +97,8 @@ export function snapshotMetadataQueryOptions() {
 export function statsJobsQueryOptions() {
   return queryOptions({
     queryKey: [...statsQueryKey, "jobs"],
-    queryFn: ({ signal }) => getStatsJobs(signal),
+    queryFn: (context) =>
+      getStatsJobs(context.signal, isBackgroundRefresh(context)),
     placeholderData: keepPreviousData,
     refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
     staleTime: 30_000,
@@ -108,7 +108,8 @@ export function statsJobsQueryOptions() {
 export function databaseSetupQueryOptions() {
   return queryOptions({
     queryKey: [...statsQueryKey, "database-setup"],
-    queryFn: ({ signal }) => getDatabaseSetupStatus(signal),
+    queryFn: (context) =>
+      getDatabaseSetupStatus(context.signal, isBackgroundRefresh(context)),
     placeholderData: keepPreviousData,
     refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
     staleTime: 30_000,
@@ -118,34 +119,14 @@ export function databaseSetupQueryOptions() {
 export function statsJobRunsQueryOptions(dataset: StatsDataset) {
   return queryOptions({
     queryKey: [...statsQueryKey, "jobs", dataset, "runs"],
-    queryFn: ({ signal }) =>
-      getStatsJobRuns({ signal, data: { dataset, limit: 10 } }),
+    queryFn: (context) =>
+      getStatsJobRuns({
+        signal: context.signal,
+        data: { dataset, limit: 10 },
+        background: isBackgroundRefresh(context),
+      }),
     placeholderData: keepPreviousData,
     refetchInterval: databaseRefreshInterval(OPERATIONS_REFRESH_INTERVAL),
     staleTime: 30_000,
-  })
-}
-
-export function userStatsQueryOptions(userId: string) {
-  return queryOptions({
-    queryKey: [...statsQueryKey, "user", userId],
-    queryFn: ({ signal }) => getUserStats({ signal, data: { userId } }),
-    refetchInterval: databaseRefreshInterval(USER_STALE_TIME),
-    staleTime: USER_STALE_TIME,
-  })
-}
-
-export function userDownloadsQueryOptions(
-  userId: string,
-  page: number,
-  pageSize: number
-) {
-  return queryOptions({
-    queryKey: [...statsQueryKey, "user", userId, "downloads", page, pageSize],
-    queryFn: ({ signal }) =>
-      getUserDownloads({ signal, data: { userId, page, pageSize } }),
-    placeholderData: keepPreviousData,
-    refetchInterval: databaseRefreshInterval(USER_STALE_TIME),
-    staleTime: USER_STALE_TIME,
   })
 }

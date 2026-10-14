@@ -175,7 +175,7 @@ export function UserLookupForm({
                     <T>
                       {authenticated
                         ? "Results update as you type."
-                        : "Searching requires the admin token."}
+                        : "Log in as the administrator to search."}
                     </T>
                   </FieldDescription>
                   <Button

@@ -14,6 +14,8 @@ export interface BrowserTask {
   cancelling?: boolean
   cancelError?: string
   expectedMs?: number
+  /** Background work keeps cancellation but never opens the progress dialog. */
+  quiet?: boolean
 }
 const tasks = new Map<string, BrowserTask>()
 const listeners = new Set<() => void>()
@@ -75,7 +77,10 @@ export async function clearBrowserTasks() {
   await Promise.allSettled(pending)
 }
 export async function refreshTaskProgress(signal: AbortSignal) {
-  const ids = [...tasks.keys()].slice(0, 8)
+  const ids = [...tasks.values()]
+    .filter((task) => !task.quiet)
+    .map((task) => task.id)
+    .slice(0, 8)
   if (!ids.length) return
   await requestWithCooldown("read", async () => {
     const response = await fetch(`/api/tasks?ids=${ids.join(",")}`, {
@@ -101,7 +106,8 @@ export async function trackDatabaseRequest<Output>(
   label: string,
   signal: AbortSignal | undefined,
   operation: (id: string, signal: AbortSignal) => Promise<Output>,
-  kind: "read" | "metadata" | "csv" = "read"
+  kind: "read" | "metadata" | "csv" = "read",
+  quiet = false
 ): Promise<Output> {
   return requestWithCooldown(kind, async () => {
     signal?.throwIfAborted()
@@ -122,6 +128,7 @@ export async function trackDatabaseRequest<Output>(
       started,
       controller,
       expectedMs: durations.get(label),
+      quiet,
     })
     emit()
     try {

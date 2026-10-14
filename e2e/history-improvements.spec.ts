@@ -29,8 +29,8 @@ test.describe("localization", () => {
     )
     const frame = await page.locator(".dashboard-main").boundingBox()
     const section = await page.locator(".profile-history").boundingBox()
-    if (!isMobile) expect(section!.width / frame!.width).toBeGreaterThan(0.6)
-    if (!isMobile) expect(section!.width / frame!.width).toBeLessThan(0.69)
+    // History uses the full content width, aligned with the summary above it.
+    if (!isMobile) expect(section!.width / frame!.width).toBeGreaterThan(0.9)
     await page.getByRole("combobox", { name: "Мова сайту" }).click()
     await page.getByRole("option", { name: "Русский", exact: true }).click()
     await expect(

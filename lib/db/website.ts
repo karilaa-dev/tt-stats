@@ -173,8 +173,28 @@ export function ensureWebsiteSchema() {
   return globalState.ttStatsWebsiteReady
 }
 
-export async function cleanWebsiteStorage(pool: Pool = getPool()) {
+const CLEANUP_BATCH_SIZE = 1000
+const CLEANUP_MAX_BATCHES = 25
+
+/**
+ * Removes expired rows in short transactions of at most 1,000 rows per table.
+ * A run continues while any table still fills a batch, so bursts of history
+ * comparisons cannot outgrow the five-minute cleanup cadence.
+ */
+export async function cleanWebsiteStorage(
+  pool: Pool = getPool(),
+  maxBatches = CLEANUP_MAX_BATCHES
+) {
+  for (let batch = 0; batch < maxBatches; batch++) {
+    const removed = await cleanWebsiteStorageBatch(pool)
+    if (removed < CLEANUP_BATCH_SIZE) return
+  }
+}
+
+/** Returns the largest number of rows removed from one table, or 0 when another process is cleaning. */
+async function cleanWebsiteStorageBatch(pool: Pool) {
   const client = await pool.connect()
+  let largest = 0
   try {
     await client.query("BEGIN")
     const lock = await client.query<{ acquired: boolean }>(
@@ -186,12 +206,14 @@ export async function cleanWebsiteStorage(pool: Pool = getPool()) {
           table === "query_cache"
             ? "(expires_at IS NULL OR expires_at <= now()) AND (lease_until IS NULL OR lease_until <= now())"
             : "expires_at <= now()"
-        await client.query(
-          `DELETE FROM tt_stats_web.${table} WHERE ctid IN (SELECT ctid FROM tt_stats_web.${table} WHERE ${predicate} LIMIT 1000)`
+        const result = await client.query(
+          `DELETE FROM tt_stats_web.${table} WHERE ctid IN (SELECT ctid FROM tt_stats_web.${table} WHERE ${predicate} LIMIT ${CLEANUP_BATCH_SIZE})`
         )
+        largest = Math.max(largest, result.rowCount ?? 0)
       }
     }
     await client.query("COMMIT")
+    return largest
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {})
     throw error

@@ -22,7 +22,13 @@ TanStack Charts is currently pre-alpha. The lockfile pins the tested release use
 
 ## App structure
 
-Astro routes live in `src/pages`. Each dashboard page hydrates its own React island, sharing the shell in `components/dashboard/dashboard-shell.tsx`. Filters and lookup pagination stay in the URL and support browser back/forward. `src/actions` validates server inputs and calls the existing PostgreSQL query layer. Database and credential modules are blocked from browser builds.
+Astro routes live in `src/pages`. Each dashboard page hydrates its own React island, sharing the shell in `components/dashboard/dashboard-shell.tsx`. Filters and lookup pagination stay in the URL and support browser back/forward. URLs omit default history filters and page 1; period and audience stay explicit so shared links keep their meaning. `src/actions` validates server inputs and calls the existing PostgreSQL query layer. Database and credential modules are blocked from browser builds.
+
+Pages render with the verified session and, for public statistics, the page's
+initial data (`lib/page-data.ts`), so navigation, login state and totals appear
+without a loading flash. Server rendering waits at most one second for that
+data; slower reads continue in the browser with skeleton placeholders. The
+browser re-checks the session once after hydration.
 
 The notification monitor starts with the dev server and with `bun run start`, and closes its listeners on shutdown. `bun run build` bundles it separately as `dist/monitor.mjs`.
 
@@ -77,7 +83,7 @@ of total inactivity. A download after at least five quiet minutes sends a
 recovery notification that the bot is working and resets the escalation cycle.
 Listener connections recover automatically, delivery failures retry on the next
 check, and PostgreSQL state plus an advisory lock prevent duplicate alerts
-across restarts and multiple app instances. The Database jobs page includes a
+across restarts and multiple app instances. The Operations page includes a
 test button that sends a notification without changing monitor state. Generic
 webhooks receive JSON; ntfy destinations receive the message and priority
 headers expected by an ntfy topic URL.
@@ -97,15 +103,27 @@ after ten minutes and are consumed atomically once.
 PostgreSQL refreshes the completed rolling 24-hour snapshot every five minutes
 and daily-backed snapshots at 00:07 UTC. Browsers poll inexpensive snapshot
 metadata every five minutes and reload daily-backed views when their snapshot
-version changes, including after manual rebuilds. Recent views refresh every five
+version changes, including after manual rebuilds.
+
+Public statistics (overview, breakdowns, time series, referrals, audience and
+Top videos) are cached in each app process by snapshot version. The server
+re-reads `tt_stats_cache.refresh_metadata` at most every ten seconds, and any
+cached result is reused for at most one minute, which bounds saved-media
+availability on ranking pages. Concurrent identical reads share one query, a
+cancelled request never cancels the shared read, and failures are not cached.
+A completed manual rebuild is visible on the next read. Recent views refresh every five
 minutes; operational status keeps its separate polling interval. Previous results
 remain visible during refresh. Personal and admin summaries, activity, history pages, and downloader lists use
-five-minute database cache entries. Keys include account identity, visibility,
+five-minute database cache entries. Each process also keeps a bounded copy
+(32 MiB) of entries it has read or written until their stored expiry, so
+repeated page loads skip the cache round trip, and identical requests in one
+process share a single fill. Keys include account identity, visibility,
 filters, ordering, and pagination. Expiring leases deduplicate concurrent fills
 across app instances; history comparisons share the same cache, and derived
 results inherit their earliest expiry. Errors, cancellations, and payloads over
-1 MiB are not cached. Expired entries and sessions are removed in batches of up
-to 1,000 rows per table every five minutes. CSV exports and media authorization
+1 MiB are not cached. Every five minutes, expired entries and sessions are
+removed in short transactions of up to 1,000 rows per table; a run continues
+for up to 25 batches while a table still fills a batch. CSV exports and media authorization
 remain live. Browser reloads do not bypass the cache.
 
 The rolling charts use 48 completed 30-minute buckets. All-time snapshots keep
@@ -144,7 +162,7 @@ The final file seeds both snapshots and installs only these named jobs:
 - `tt-stats-daily` — `7 0 * * *`
 
 Verify `tt_stats_cache.refresh_metadata` and the sanitized run history on the
-Database jobs page before deploying the web application.
+Operations page (`/dashboard/jobs`) before deploying the web application.
 
 For rollback, first redeploy the preceding web version and then run
 `database/rollback_stats_snapshots.sql` as an administrator. It unschedules TT
@@ -229,7 +247,7 @@ test server and are guarded by `RUN_PG_CRON_INTEGRATION=1`.
 - `/dashboard/videos` — public most-downloaded videos by period, ranked by unique chats with public media previews
 - `/dashboard/referrals` — top referral values
 - `/dashboard/other` — file mode, languages, and top downloaders
-- `/dashboard/jobs` — fixed database schedules, run history, and asynchronous run-now controls
+- `/dashboard/jobs` — Operations: fixed database schedules, run history, and asynchronous run-now controls
 - `/api/health` — detail-free database/configuration health check
 
 The health endpoint returns only `{"status":"ok"}` with HTTP 200 or `{"status":"unavailable"}` with HTTP 503.
@@ -475,8 +493,11 @@ Set the health check path to `/api/health`. Keep PostgreSQL private where possib
 
 ### Database request progress
 
-Database reads, saved-media metadata, and CSV exports show a cancellable dialog
-after 650 ms. Fast requests keep their inline loading state. Popularity sorting
+Personal and admin data reads and CSV exports show a cancellable dialog after
+650 ms. Fast requests keep their inline loading state. Public snapshot reads,
+saved-media previews (which have their own loading state inside the media
+dialog), and background refreshes of data already on screen never open the
+dialog; they are still cancelled when their view closes. Popularity sorting
 reports completed comparison batches; CSV exports report processed rows. Remaining
 time is estimated from completed work. Other queries use the previous request's
 duration when available, with an approximate percentage. A first request with no

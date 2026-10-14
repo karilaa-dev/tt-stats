@@ -260,8 +260,23 @@
   }
   .control-skeleton {
     border-radius: 0.4rem;
-    background: var(--muted);
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--foreground), transparent 94%) 50%,
+        transparent 100%
+      )
+      0 0 / 200% 100% var(--muted);
     min-height: 1rem;
+    animation: control-shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes control-shimmer {
+    from {
+      background-position: 150% 0;
+    }
+    to {
+      background-position: -50% 0;
+    }
   }
   .control-spinner {
     width: 1rem;
@@ -341,12 +356,20 @@
   .control-switch:disabled {
     opacity: 0.5;
   }
+  .control-switch {
+    transition:
+      background-color 0.15s,
+      border-color 0.15s;
+  }
   .control-switch-thumb {
     display: block;
     width: 1rem;
     height: 1rem;
     background: var(--foreground);
     border-radius: 50%;
+    transition:
+      transform 0.15s ease-out,
+      background-color 0.15s;
   }
   .control-switch[data-checked] .control-switch-thumb {
     transform: translateX(1rem);
@@ -358,6 +381,11 @@
     background: #000b;
     backdrop-filter: blur(4px);
     z-index: 50;
+    transition: opacity 0.15s;
+  }
+  .control-backdrop[data-starting-style],
+  .control-backdrop[data-ending-style] {
+    opacity: 0;
   }
   .control-dialog {
     position: fixed;
@@ -379,6 +407,14 @@
     z-index: 51;
     outline: none;
     box-shadow: 0 30px 100px #0008;
+    transition:
+      opacity 0.15s,
+      transform 0.15s ease-out;
+  }
+  .control-dialog[data-starting-style],
+  .control-dialog[data-ending-style] {
+    opacity: 0;
+    transform: translate(-50%, -48%) scale(0.98);
   }
   .control-confirmation {
     max-width: 29rem;
@@ -428,6 +464,11 @@
     border: 1px solid var(--input);
     border-radius: 1rem 1rem 0 0;
     outline: none;
+    transition: transform 0.2s ease-out;
+  }
+  .control-sheet[data-starting-style],
+  .control-sheet[data-ending-style] {
+    transform: translateY(100%);
   }
   .control-tooltip-positioner {
     z-index: 60;
@@ -461,6 +502,9 @@
     color: var(--muted-foreground);
     border-radius: 0.35rem;
     cursor: pointer;
+    transition:
+      background-color 0.15s,
+      color 0.15s;
   }
   .control-toggle[data-pressed],
   .control-tab[data-active] {
@@ -517,8 +561,12 @@
       right: 1rem;
     }
   }
+  .control-table-body .control-table-row {
+    transition: background-color 0.12s;
+  }
   @media (prefers-reduced-motion: reduce) {
-    .control-spinner {
+    .control-spinner,
+    .control-skeleton {
       animation: none;
     }
   }

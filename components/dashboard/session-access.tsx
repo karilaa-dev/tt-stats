@@ -14,6 +14,7 @@ import { buttonVariants } from "@/components/controls"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/controls/toast"
 import { UserRoundIcon } from "lucide-react"
+import { queryKeys } from "@/lib/stats/query-keys"
 
 const SessionContext = createContext<
   BrowserSession & {
@@ -31,9 +32,11 @@ export const useSession = () => useContext(SessionContext)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient()
   const session = useQuery<BrowserSession>({
-    queryKey: ["session"],
+    queryKey: queryKeys.session(),
     queryFn: sessionRequest,
     retry: false,
+    // Pages render with the session the server verified. One check after
+    // hydration catches a login or logout that happened in the meantime.
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   })
@@ -60,17 +63,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [identity, cacheIdentity, client, session.isPending])
   useEffect(() => {
     const refresh = () => {
-      void client.invalidateQueries({ queryKey: ["session"] })
+      void client.invalidateQueries({ queryKey: queryKeys.session() })
+    }
+    // Pages restored from the back/forward cache may predate a login change.
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) refresh()
     }
     const channel =
       typeof BroadcastChannel !== "undefined"
         ? new BroadcastChannel("tt-stats-session")
         : null
     if (channel) channel.onmessage = refresh
-    window.addEventListener("pageshow", refresh)
+    window.addEventListener("pageshow", restored)
     return () => {
       channel?.close()
-      window.removeEventListener("pageshow", refresh)
+      window.removeEventListener("pageshow", restored)
     }
   }, [client])
   async function logout() {

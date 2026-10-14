@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query"
+import { queryKeys } from "@/lib/stats/query-keys"
 import { getTelegramChat, getTelegramMau } from "@/lib/telegram/functions"
 import {
   TELEGRAM_CHAT_CACHE_MS,
@@ -20,7 +21,7 @@ export function telegramChatQueryOptions(chatId: string) {
 
 export function telegramMauQueryOptions() {
   return queryOptions({
-    queryKey: ["telegram-mau"],
+    queryKey: queryKeys.telegramMau(),
     queryFn: getTelegramMau,
     staleTime: TELEGRAM_MAU_CHECK_INTERVAL_MS,
     refetchInterval: TELEGRAM_MAU_CHECK_INTERVAL_MS,

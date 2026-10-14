@@ -63,7 +63,7 @@ export function AnalyticsPage() {
               description={t("Video and image deliveries")}
               points={videosQuery.data ?? []}
               range={range}
-              color="var(--chart-2)"
+              color="var(--chart-1)"
             />
             <div className="grid min-w-0 gap-6 xl:grid-cols-2">
               <TimeSeriesChart
@@ -71,7 +71,7 @@ export function AnalyticsPage() {
                 description={t("New private users and groups")}
                 points={usersQuery.data ?? []}
                 range={range}
-                color="var(--chart-1)"
+                color="var(--chart-2)"
               />
               <TimeSeriesChart
                 title={t("Music downloads")}

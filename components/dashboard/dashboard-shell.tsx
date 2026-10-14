@@ -2,7 +2,12 @@ import { T } from "@/lib/i18n/provider"
 import { LocaleProvider } from "@/lib/i18n/provider"
 import type { Locale } from "@/lib/i18n/locale"
 import { useState, type ReactNode } from "react"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  hydrate,
+  QueryClient,
+  QueryClientProvider,
+  type DehydratedState,
+} from "@tanstack/react-query"
 import { TooltipProvider } from "@/components/controls"
 import { Toaster } from "@/components/controls/toast"
 import { AppSidebar } from "./app-sidebar"
@@ -16,21 +21,28 @@ export interface DashboardShellProps {
   pathname: string
   search: string
   fakeMode: boolean
+  /** Session and public statistics already read while rendering the page. */
+  initialState?: DehydratedState
   children: ReactNode
 }
-export function DashboardShell({ children, ...context }: DashboardShellProps) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            gcTime: 60 * 60 * 1000,
-            refetchOnWindowFocus: false,
-            retry: false,
-          },
+export function DashboardShell({
+  children,
+  initialState,
+  ...context
+}: DashboardShellProps) {
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: {
+          gcTime: 60 * 60 * 1000,
+          refetchOnWindowFocus: false,
+          retry: false,
         },
-      })
-  )
+      },
+    })
+    if (initialState) hydrate(client, initialState)
+    return client
+  })
   return (
     <LocaleProvider initialLocale={context.locale}>
       <QueryClientProvider client={queryClient}>

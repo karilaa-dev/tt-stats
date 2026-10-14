@@ -3,12 +3,9 @@ import { getPrincipal } from "@/lib/auth/session"
 import { canReadMedia } from "@/lib/media/access"
 import { ActionError, defineAction } from "astro:actions"
 import { z } from "zod"
-import {
-  isFakeDataEnabled,
-  getFakeUserDownloads,
-  getFakePopularVideos,
-} from "@/lib/dev/fake-data"
-import { getPopularVideosRaw, getStoredMedia } from "@/lib/media/queries"
+import { isFakeDataEnabled, getFakeUserDownloads } from "@/lib/dev/fake-data"
+import { getStoredMedia } from "@/lib/media/queries"
+import { loadPopularVideos } from "@/lib/stats/public-data"
 import { describeMedia } from "@/lib/media/telegram"
 import { STATS_RANGES } from "@/lib/stats/types"
 import { getSafeDatabaseError } from "@/lib/db/errors"
@@ -93,8 +90,5 @@ export const getDownloaders = defineAction({
 
 export const getPopularVideos = defineAction({
   input: z.object({ page, range: z.enum(STATS_RANGES).default("all") }),
-  handler: safe(async ({ page, range }) => {
-    if (!isFakeDataEnabled()) return getPopularVideosRaw(page, undefined, range)
-    return getFakePopularVideos(page, range)
-  }),
+  handler: safe(({ page, range }) => loadPopularVideos(page, range)),
 })

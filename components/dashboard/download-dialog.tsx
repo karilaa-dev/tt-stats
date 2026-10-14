@@ -34,6 +34,7 @@ import {
 } from "@/lib/media/query-options"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { useAdminAccess } from "./admin-access"
+import { Pager } from "./pager"
 
 export interface SelectedDownload {
   id: string
@@ -122,7 +123,12 @@ function MediaPreview({ id }: { id: string }) {
   const current = Math.min(index, Math.max(0, items.length - 1))
   const move = (offset: number) =>
     setIndex((value) => Math.max(0, Math.min(items.length - 1, value + offset)))
-  if (query.isPending) return <Spinner aria-label={t("Loading saved media")} />
+  if (query.isPending)
+    return (
+      <div className="dialog-loading">
+        <Spinner aria-label={t("Loading saved media")} />
+      </div>
+    )
   if (query.isError)
     return (
       <LoadError
@@ -345,15 +351,17 @@ function MediaItem({
 }
 
 function DownloadersList({ id }: { id: string }) {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const [page, setPage] = useState(1)
   const query = useQuery(downloadersQueryOptions(id, page))
   const time = useBrowserTime()
   if (query.isPending)
-    return <Spinner aria-label={t("Loading other downloaders")} />
+    return (
+      <div className="dialog-loading">
+        <Spinner aria-label={t("Loading other downloaders")} />
+      </div>
+    )
   if (query.isError) return <LoadError retry={() => void query.refetch()} />
   return (
     <div className="flex flex-col gap-4">
@@ -377,14 +385,14 @@ function DownloadersList({ id }: { id: string }) {
               <TableRow key={item.userId}>
                 <TableCell>
                   <a
-                    className="text-primary underline"
+                    className="ranking-link font-mono"
                     href={`/dashboard/users?id=${encodeURIComponent(item.userId)}`}
                   >
                     {item.userId}
                   </a>
                 </TableCell>
-                <TableCell>
-                  <T>{BigInt(item.downloads).toLocaleString(locale)}</T>
+                <TableCell className="ranking-count">
+                  {BigInt(item.downloads).toLocaleString(locale)}
                 </TableCell>
                 <TableCell>
                   <T>
@@ -409,26 +417,13 @@ function DownloadersList({ id }: { id: string }) {
           </EmptyHeader>
         </Empty>
       )}
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          variant="outline"
-          disabled={page === 1 || query.isFetching}
-          onClick={() => setPage(page - 1)}
-        >
-          <T>{"Previous"}</T>
-        </Button>
-        <span className="text-sm text-muted-foreground">
-          <T>{"Page "}</T>
-          <T>{page}</T>
-        </span>
-        <Button
-          variant="outline"
-          disabled={!query.data.hasMore || query.isFetching}
-          onClick={() => setPage(page + 1)}
-        >
-          <T>{"Next"}</T>
-        </Button>
-      </div>
+      <Pager
+        page={query.data.page}
+        hasMore={query.data.hasMore}
+        disabled={query.isFetching}
+        label="Other downloaders pagination"
+        onPageChange={setPage}
+      />
     </div>
   )
 }

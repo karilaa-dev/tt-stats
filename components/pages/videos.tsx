@@ -1,23 +1,31 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { PlayIcon, VideoIcon } from "lucide-react"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
-import { useAdminAccess } from "@/components/dashboard/admin-access"
 import { PageHeading } from "@/components/dashboard/page-heading"
+import { DashboardError } from "@/components/dashboard/dashboard-error"
+import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
+import { Pager } from "@/components/dashboard/pager"
 import {
   DownloadDialog,
   type SelectedDownload,
 } from "@/components/dashboard/download-dialog"
-import { Button } from "@/components/controls"
 import {
+  Badge,
+  Button,
   Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/controls"
-import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  Spinner,
   Table,
   TableBody,
   TableCell,
@@ -26,38 +34,28 @@ import {
   TableRow,
 } from "@/components/controls"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
-import { getSafeDatabaseError } from "@/lib/db/errors"
-import { isRequestCancelled } from "@/lib/http-client"
-import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
-import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/controls"
-import { Spinner } from "@/components/controls"
 import { popularVideosQueryOptions } from "@/lib/media/query-options"
 import {
   useDashboardSearch,
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
 
+const PAGE_SIZE = 20
+const MAX_PAGES = 50
+
 export function VideosPage() {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
-
-  const { page: requestedPage, range } = useDashboardSearch()
-  const page = Math.min(requestedPage, 1_000_000)
+  const { t, locale } = useTranslation()
+  const { page, range } = useDashboardSearch()
   const time = useBrowserTime()
   const navigate = useDashboardNavigate()
-  const { authenticated } = useAdminAccess()
   const query = useQuery(popularVideosQueryOptions(page, range))
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
+  const data = query.data?.range === range ? query.data : undefined
+  const refreshing = query.isFetching && Boolean(data)
   return (
     <>
       <PageHeading
-        title={t("Most downloaded videos")}
+        title={t("Top videos")}
         description={t(
           "Ranked by people who downloaded each video. Each user or group counts once in the selected period."
         )}
@@ -65,183 +63,162 @@ export function VideosPage() {
       <StatsFilters
         range={range}
         showScope={false}
-        allRangeLabel="Total"
         onRangeChange={(nextRange) => {
           setSelection(null)
-          void navigate({ search: { range: nextRange, page: 1 } })
+          void navigate({ search: { range: nextRange } })
         }}
       />
       <DownloadDialog
         selection={selection}
         onClose={() => setSelection(null)}
       />
-      <Card aria-busy={query.isFetching}>
-        <CardHeader>
-          <CardTitle>
-            <T>{"Top 1,000 videos"}</T>
-          </CardTitle>
-          <CardDescription>
-            <T>
-              {
-                "Each user or group counts once. Image albums and legacy downloads without a video ID are excluded."
-              }
-            </T>{" "}
-            <T>
-              {range === "24h"
-                ? "24 hours through the last completed half-hour. Rankings update every five minutes."
-                : range === "all"
-                  ? "All recorded downloads. Rankings update daily."
-                  : `${range === "7d" ? "7" : "31"} complete days in UTC. Rankings update daily.`}
-            </T>
-            <T>
-              {query.data
-                ? ` Last updated ${formatTimestamp(query.data.refreshedAt, time)}.`
-                : ""}
-            </T>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {query.isPending ? (
-            <Spinner aria-label={t("Loading top videos")} />
-          ) : query.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>
-                <T>
-                  {isRequestCancelled(query.error)
-                    ? "Loading cancelled"
-                    : authenticated
-                      ? getSafeDatabaseError(query.error).title
-                      : "Rankings are unavailable"}
-                </T>
-              </AlertTitle>
-              <AlertDescription className="flex flex-col items-start gap-2">
-                {isRequestCancelled(query.error) ? (
-                  <p>
-                    <T>{"You can try again when you are ready."}</T>
-                  </p>
-                ) : authenticated ? (
-                  <>
-                    <p>
-                      <T>{getSafeDatabaseError(query.error).description}</T>
-                    </p>
-                    <p>
-                      <T>
-                        {
-                          "If the ranking has not been installed, open Operations, update database definitions, then wait for the selected period to refresh."
-                        }
-                      </T>
-                    </p>
-                    <a href="/dashboard/jobs" className="underline">
-                      <T>{"Open Operations"}</T>
-                    </a>
-                  </>
-                ) : (
-                  <p>
-                    <T>
-                      {
-                        "The ranking for this period is not available yet. Please try again later."
-                      }
-                    </T>
-                  </p>
-                )}
-                <Button variant="outline" onClick={() => void query.refetch()}>
-                  <T>{"Try again"}</T>
-                </Button>
-              </AlertDescription>
-            </Alert>
-          ) : query.data.items.length ? (
-            <Table aria-label={t("Most downloaded videos")}>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <T>{"Rank"}</T>
-                  </TableHead>
-                  <TableHead>
-                    <T>{"Video ID"}</T>
-                  </TableHead>
-                  <TableHead>
-                    <T>{"People downloaded"}</T>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {query.data.items.map((item, index) => (
-                  <TableRow key={item.downloadId}>
-                    <TableCell>
-                      <T>{(query.data.page - 1) * 20 + index + 1}</T>
-                    </TableCell>
-                    <TableCell className="max-w-48 sm:max-w-96">
-                      <div className="flex flex-col items-start gap-2">
-                        <span className="max-w-full font-mono text-sm break-all">
-                          {item.videoId}
+      {query.isError && !data ? (
+        <DashboardError
+          error={query.error}
+          reset={() => void query.refetch()}
+          title="Rankings are unavailable"
+          description="The ranking for this period is not available yet. Please try again later."
+          adminHint="If the ranking has not been installed, open Operations, update database definitions, then wait for the selected period to refresh."
+        />
+      ) : !data ? (
+        <DashboardLoading variant="table" />
+      ) : (
+        <Card aria-busy={query.isFetching}>
+          <CardHeader>
+            <CardTitle>
+              <T>{"Top 1,000 videos"}</T>
+            </CardTitle>
+            <CardDescription>
+              <T>
+                {range === "24h"
+                  ? "24 hours through the last completed half-hour. Rankings update every five minutes."
+                  : range === "all"
+                    ? "All recorded downloads. Rankings update daily."
+                    : `${range === "7d" ? "7" : "31"} complete days in UTC. Rankings update daily.`}
+              </T>{" "}
+              <T>{`Last updated ${formatTimestamp(data.refreshedAt, time)}.`}</T>{" "}
+              <T>
+                {
+                  "Image albums and legacy downloads without a video ID are excluded."
+                }
+              </T>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.items.length ? (
+              <Table
+                aria-label={t("Most downloaded videos")}
+                className="ranking-table"
+              >
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="ranking-rank">
+                      <T>{"Rank"}</T>
+                    </TableHead>
+                    <TableHead>
+                      <T>{"Video ID"}</T>
+                    </TableHead>
+                    <TableHead className="ranking-count">
+                      <T>{"People downloaded"}</T>
+                    </TableHead>
+                    <TableHead className="ranking-action">
+                      <span className="sr-only">
+                        <T>{"Saved media"}</T>
+                      </span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.items.map((item, index) => (
+                    <TableRow key={item.downloadId}>
+                      <TableCell className="ranking-rank">
+                        <Badge variant="outline" className="ranking-badge">
+                          {(
+                            (data.page - 1) * PAGE_SIZE +
+                            index +
+                            1
+                          ).toLocaleString(locale)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <span className="ranking-video-id" title={item.videoId}>
+                          <VideoIcon aria-hidden="true" />
+                          <span>{item.videoId}</span>
                         </span>
+                      </TableCell>
+                      <TableCell className="ranking-count">
+                        {BigInt(item.uniqueChats).toLocaleString(locale)}
+                      </TableCell>
+                      <TableCell className="ranking-action">
                         {item.hasSavedMedia ? (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={async () => {
+                            aria-label={t("View media")}
+                            onClick={() =>
                               setSelection({
                                 id: item.downloadId,
                                 sharedLink: item.sharedLink,
                                 mode: "media",
                               })
-                            }}
+                            }
                           >
-                            <T>{"View media"}</T>
+                            <PlayIcon data-icon="inline-start" />
+                            <span className="ranking-action-label">
+                              <T>{"View media"}</T>
+                            </span>
                           </Button>
                         ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <T>{BigInt(item.uniqueChats).toLocaleString(locale)}</T>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>
-                  <T>{"No videos found"}</T>
-                </EmptyTitle>
-                <EmptyDescription>
-                  <T>
-                    {page > 1
-                      ? "There are no more videos on this page. Return to the previous page."
-                      : "Downloaded videos will appear here."}
-                  </T>
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-        </CardContent>
-        <CardFooter className="justify-between gap-2">
-          <Button
-            variant="outline"
-            disabled={page <= 1 || query.isFetching}
-            onClick={() => void navigate({ search: { range, page: page - 1 } })}
-          >
-            <T>{"Previous"}</T>
-          </Button>
-          <span className="text-sm text-muted-foreground" aria-live="polite">
-            <T>{"Page "}</T>
-            <T>{query.data?.page ?? page}</T>
-          </span>
-          <Button
-            variant="outline"
-            disabled={
-              !query.data?.hasMore ||
-              query.isFetching ||
-              query.isError ||
-              page >= 1_000_000
-            }
-            onClick={() => void navigate({ search: { range, page: page + 1 } })}
-          >
-            <T>{"Next"}</T>
-          </Button>
-        </CardFooter>
-      </Card>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <VideoIcon />
+                  </EmptyMedia>
+                  <EmptyTitle>
+                    <T>{"No videos found"}</T>
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    <T>
+                      {page > 1
+                        ? "There are no more videos on this page. Return to the previous page."
+                        : "Downloaded videos will appear here."}
+                    </T>
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
+          </CardContent>
+          {data.page > 1 || data.hasMore || refreshing ? (
+            <CardFooter className="card-footer-divided">
+              <Pager
+                className="w-full"
+                page={data.page}
+                hasMore={data.hasMore && data.page < MAX_PAGES}
+                disabled={query.isFetching}
+                label="Top videos pagination"
+                summary={
+                  refreshing ? (
+                    <>
+                      <Spinner />
+                      <T>{"Updating rankings"}</T>
+                    </>
+                  ) : undefined
+                }
+                onPageChange={(nextPage) => {
+                  setSelection(null)
+                  void navigate({ search: { range, page: nextPage } })
+                }}
+              />
+            </CardFooter>
+          ) : null}
+        </Card>
+      )}
     </>
   )
 }

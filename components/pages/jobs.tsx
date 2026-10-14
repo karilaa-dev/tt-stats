@@ -47,7 +47,7 @@ export function DatabaseJobsPage() {
   return (
     <>
       <PageHeading
-        title={t("Database jobs")}
+        title={t("Operations")}
         description={t(
           "Check database health and manage automatic statistics updates."
         )}

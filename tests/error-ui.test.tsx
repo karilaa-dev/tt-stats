@@ -46,9 +46,7 @@ describe("dashboard infrastructure failures", () => {
       screen.getByText("@ttgrab Stats database objects need repair")
     ).toBeTruthy()
     expect(
-      screen
-        .getByRole("link", { name: "Open Database jobs" })
-        .getAttribute("href")
+      screen.getByRole("link", { name: "Open Operations" }).getAttribute("href")
     ).toBe("/dashboard/jobs")
   })
 })

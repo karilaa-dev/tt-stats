@@ -3,6 +3,7 @@ import "../styles.css"
 import { localeFromRequest } from "@/lib/i18n/locale"
 import { translate } from "@/lib/i18n/translate"
 import bodyLatin from "@fontsource/ibm-plex-sans/files/ibm-plex-sans-latin-400-normal.woff2?url"
+import headingLatin from "@fontsource/barlow-condensed/files/barlow-condensed-latin-600-normal.woff2?url"
 interface Props {
   title: string
 }
@@ -30,6 +31,17 @@ const locale = localeFromRequest(Astro.cookies, Astro.request)
       type="font/woff2"
       crossorigin
     />
+    {
+      locale === "en" ? (
+        <link
+          rel="preload"
+          href={headingLatin}
+          as="font"
+          type="font/woff2"
+          crossorigin
+        />
+      ) : null
+    }
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" type="image/png" href="/favicon.png" />
     <title>{translate(title, locale)}</title>

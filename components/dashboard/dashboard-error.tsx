@@ -1,6 +1,6 @@
 import { T } from "@/lib/i18n/provider"
 import { useAdminAccess } from "./admin-access"
-import { DatabaseZapIcon, TriangleAlertIcon } from "lucide-react"
+import { DatabaseZapIcon, RotateCwIcon, TriangleAlertIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import { Button, buttonVariants } from "@/components/controls"
@@ -10,9 +10,17 @@ import { isRequestCancelled } from "@/lib/http-client"
 export function DashboardError({
   error,
   reset,
+  title = "Statistics are unavailable",
+  description = "Please try again in a moment.",
+  adminHint,
 }: {
   error?: unknown
   reset: () => void
+  /** Shown to visitors, who never see database details. */
+  title?: string
+  description?: string
+  /** Extra guidance for administrators, such as a setup step. */
+  adminHint?: string
 }) {
   const { authenticated } = useAdminAccess()
   const presentation = isRequestCancelled(error)
@@ -23,43 +31,51 @@ export function DashboardError({
       }
     : authenticated
       ? getSafeDatabaseError(error)
-      : {
-          title: "Statistics are unavailable",
-          description: "Please try again in a moment.",
-          kind: "unavailable",
-        }
-  const showJobs = [
-    "snapshotSchema",
-    "snapshotsMissing",
-    "permission",
-    "unavailable",
-  ].includes(presentation.kind)
+      : { title, description, kind: "unavailable" }
+  const showOperations =
+    authenticated &&
+    (Boolean(adminHint) ||
+      [
+        "snapshotSchema",
+        "snapshotsMissing",
+        "permission",
+        "unavailable",
+      ].includes(presentation.kind))
 
   return (
-    <div className="flex flex-col gap-4">
-      <Alert variant="destructive">
-        <TriangleAlertIcon />
-        <AlertTitle>
-          <T>{presentation.title}</T>
-        </AlertTitle>
-        <AlertDescription>
+    <Alert
+      variant={presentation.kind === "cancelled" ? "default" : "destructive"}
+      className="dashboard-error"
+    >
+      <TriangleAlertIcon />
+      <AlertTitle>
+        <T>{presentation.title}</T>
+      </AlertTitle>
+      <AlertDescription>
+        <p>
           <T>{presentation.description}</T>
-        </AlertDescription>
-      </Alert>
-      <div className="flex flex-wrap gap-2">
-        <Button onClick={reset}>
-          <T>{"Try again"}</T>
-        </Button>
-        {showJobs && authenticated ? (
-          <a
-            href="/dashboard/jobs"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            <DatabaseZapIcon data-icon="inline-start" />
-            <T>{"Open Database jobs"}</T>
-          </a>
+        </p>
+        {authenticated && adminHint && presentation.kind !== "cancelled" ? (
+          <p>
+            <T>{adminHint}</T>
+          </p>
         ) : null}
-      </div>
-    </div>
+        <div className="dashboard-error-actions">
+          <Button variant="outline" size="sm" onClick={reset}>
+            <RotateCwIcon data-icon="inline-start" />
+            <T>{"Try again"}</T>
+          </Button>
+          {showOperations ? (
+            <a
+              href="/dashboard/jobs"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              <DatabaseZapIcon data-icon="inline-start" />
+              <T>{"Open Operations"}</T>
+            </a>
+          ) : null}
+        </div>
+      </AlertDescription>
+    </Alert>
   )
 }

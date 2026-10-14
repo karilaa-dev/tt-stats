@@ -10,13 +10,7 @@ import { getSafeDatabaseError } from "@/lib/db/errors"
 import { z } from "zod"
 
 import {
-  getFakeOtherStats,
-  getFakeOverview,
-  getFakeReferralStats,
-  getFakeSnapshotMetadata,
-  getFakeStatsBreakdown,
   getFakeStatsJobs,
-  getFakeTimeSeries,
   getFakeUserDownloads,
   getFakeUserStats,
   getFakeUserActivity,
@@ -30,18 +24,21 @@ import {
 import type { DatabaseSetupStatus } from "@/lib/stats/setup-types"
 import {
   getManualRefreshRequestRaw,
-  getOtherStatsRaw,
-  getOverviewRaw,
-  getReferralStatsRaw,
-  getSnapshotMetadataRaw,
-  getStatsBreakdownRaw,
   getStatsJobRunsRaw,
   getStatsJobsRaw,
-  getTimeSeriesRaw,
   requestStatsJobRunRaw,
   setStatsJobActiveRaw,
   updateStatsJobScheduleRaw,
 } from "@/lib/stats/queries"
+import {
+  loadOtherStats,
+  loadOverview,
+  loadReferralStats,
+  loadSnapshotMetadata,
+  loadStatsBreakdown,
+  loadTimeSeries,
+} from "@/lib/stats/public-data"
+import { invalidateSnapshotMetadata } from "@/lib/stats/snapshot-cache"
 import {
   CHAT_SCOPES,
   SERIES_METRICS,
@@ -122,46 +119,30 @@ export const getDashboardMeta = defineAction({
 })
 
 export const getSnapshotMetadata = defineAction({
-  handler: safeHandler(() =>
-    isFakeDataEnabled() ? getFakeSnapshotMetadata() : getSnapshotMetadataRaw()
-  ),
+  handler: safeHandler(loadSnapshotMetadata),
 })
 
 export const getOverview = defineAction({
-  handler: safeHandler(() =>
-    isFakeDataEnabled() ? getFakeOverview() : getOverviewRaw()
-  ),
+  handler: safeHandler(loadOverview),
 })
 
 export const getStatsBreakdown = defineAction({
   input: z.object({ scope: chatScope, range: statsRange }),
-  handler: safeHandler((data) =>
-    isFakeDataEnabled()
-      ? getFakeStatsBreakdown(data.scope, data.range)
-      : getStatsBreakdownRaw(data.scope, data.range)
-  ),
+  handler: safeHandler((data) => loadStatsBreakdown(data.scope, data.range)),
 })
 
 export const getTimeSeries = defineAction({
   input: z.object({ metric: seriesMetric, range: statsRange }),
-  handler: safeHandler((data) =>
-    isFakeDataEnabled()
-      ? getFakeTimeSeries(data.metric, data.range)
-      : getTimeSeriesRaw(data.metric, data.range)
-  ),
+  handler: safeHandler((data) => loadTimeSeries(data.metric, data.range)),
 })
 
 export const getReferralStats = defineAction({
-  handler: safeHandler(() =>
-    isFakeDataEnabled() ? getFakeReferralStats() : getReferralStatsRaw()
-  ),
+  handler: safeHandler(loadReferralStats),
 })
 
 export const getOtherStats = defineAction({
   handler: async (_input, context) => {
-    const data = await safeHandler(() =>
-      isFakeDataEnabled() ? getFakeOtherStats() : getOtherStatsRaw()
-    )(undefined)
+    const data = await safeHandler(loadOtherStats)(undefined)
     return {
       ...data,
       topDownloaders: (await getPrincipal(context.cookies)).admin
@@ -416,9 +397,12 @@ export const requestStatsJobRun = defineAction({
 
 export const getManualRefreshRequest = defineAction({
   input: z.object({ requestId }),
-  handler: safeHandler((data) =>
-    isFakeDataEnabled() ? null : getManualRefreshRequestRaw(data.requestId)
-  ),
+  handler: safeHandler(async (data) => {
+    if (isFakeDataEnabled()) return null
+    const request = await getManualRefreshRequestRaw(data.requestId)
+    if (request?.status === "succeeded") invalidateSnapshotMetadata()
+    return request
+  }),
 })
 
 function safeHandler<Input, Output>(handler: (input: Input) => Output) {

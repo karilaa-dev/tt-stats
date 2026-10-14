@@ -68,8 +68,14 @@ export function getLanguagePresentation(
 
   let name = value || "Unknown"
   try {
-    name =
-      new Intl.DisplayNames([locale], { type: "language" }).of(code) ?? name
+    const display = new Intl.DisplayNames([locale], { type: "language" }).of(
+      code
+    )
+    // Runtimes disagree on capitalization (Bun: "Английский", Chrome:
+    // "английский"). Labels stand alone, so normalize to avoid hydration
+    // mismatches between server and browser.
+    if (display)
+      name = display.charAt(0).toLocaleUpperCase(locale) + display.slice(1)
   } catch {
     // Preserve unusual values from the database instead of failing the table.
   }

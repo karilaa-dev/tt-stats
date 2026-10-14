@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto"
 import { setTimeout as delay } from "node:timers/promises"
 import type { Pool } from "pg"
 import { getPool } from "./pool"
+import { awaitForCurrentTask, MemoryLru } from "./memory-cache"
 import {
   currentDatabaseTask,
   reportDatabaseProgress,
@@ -13,12 +14,61 @@ import {
 export const QUERY_CACHE_MS = 300_000
 export const MAX_CACHE_BYTES = 1024 * 1024
 const LEASE_MS = 150_000
+// PostgreSQL remains the shared source of truth. Each process also keeps a
+// bounded copy of entries it has read or written until their stored expiry, so
+// repeated page loads skip the round trip and identical requests share a fill.
+const LOCAL_MAX_ENTRIES = 50_000
+const LOCAL_MAX_BYTES = 32 * 1024 * 1024
 interface Freshness {
   expires: number
 }
 interface Entry<T> {
   value: T
   expires: number
+}
+interface LocalCache {
+  values: MemoryLru<unknown>
+  fills: Map<string, Promise<Entry<unknown>>>
+}
+const localState = globalThis as typeof globalThis & {
+  ttStatsLocalQueryCache?: WeakMap<object, LocalCache>
+}
+const localCaches = (localState.ttStatsLocalQueryCache ??= new WeakMap())
+function localCache(pool: object): LocalCache {
+  let cache = localCaches.get(pool)
+  if (!cache) {
+    cache = {
+      values: new MemoryLru(LOCAL_MAX_ENTRIES, LOCAL_MAX_BYTES),
+      fills: new Map(),
+    }
+    localCaches.set(pool, cache)
+  }
+  return cache
+}
+/**
+ * Keeps a local copy shaped exactly like a PostgreSQL JSONB read, so local and
+ * shared hits are indistinguishable to callers.
+ */
+function remember(
+  pool: object,
+  key: string,
+  payload: string | undefined,
+  expires: number,
+  stored?: unknown
+) {
+  if (payload === undefined) return
+  const size = Buffer.byteLength(payload)
+  if (size <= MAX_CACHE_BYTES)
+    localCache(pool).values.set(
+      key,
+      stored === undefined ? JSON.parse(payload) : stored,
+      expires,
+      size + key.length
+    )
+}
+/** Forget this process's copies, as a different instance would see them. */
+export function clearLocalQueryCache(pool: object = getPool()) {
+  localCaches.get(pool)?.values.clear()
 }
 const freshness = new AsyncLocalStorage<Freshness>()
 const cacheEnabled = new AsyncLocalStorage<boolean>()
@@ -49,6 +99,17 @@ export async function readCacheBatch<T>(
   pool: Pick<Pool, "query">
 ): Promise<Map<string, Entry<T>>> {
   if (!keys.length || cacheEnabled.getStore() === false) return new Map()
+  const entries = new Map<string, Entry<T>>()
+  const local = localCache(pool).values
+  const missing: string[] = []
+  for (const key of keys) {
+    const hit = local.get(key)
+    if (hit) {
+      dependOn(hit.expires)
+      entries.set(key, { value: hit.value as T, expires: hit.expires })
+    } else missing.push(key)
+  }
+  if (!missing.length) return entries
   const result = await pool.query<{
     cache_key: string
     payload: T
@@ -56,15 +117,21 @@ export async function readCacheBatch<T>(
   }>(
     `SELECT cache_key, payload, (extract(epoch FROM expires_at) * 1000)::text AS expires
     FROM tt_stats_web.query_cache WHERE cache_key = ANY($1::text[]) AND computed_at IS NOT NULL AND expires_at > now()`,
-    [keys]
+    [missing]
   )
-  return new Map(
-    result.rows.map((row) => {
-      const expires = Number(row.expires)
-      dependOn(expires)
-      return [row.cache_key, { value: row.payload, expires }]
-    })
-  )
+  for (const row of result.rows) {
+    const expires = Number(row.expires)
+    dependOn(expires)
+    remember(
+      pool,
+      row.cache_key,
+      JSON.stringify(row.payload),
+      expires,
+      row.payload
+    )
+    entries.set(row.cache_key, { value: row.payload, expires })
+  }
+  return entries
 }
 export async function writeCacheBatch<T>(
   entries: { key: string; value: T }[],
@@ -84,6 +151,8 @@ export async function writeCacheBatch<T>(
     WHERE tt_stats_web.query_cache.lease_until IS NULL OR tt_stats_web.query_cache.lease_until <= now()`,
     [JSON.stringify(values), expires]
   )
+  for (const entry of values)
+    remember(pool, entry.key, JSON.stringify(entry.value), expires)
 }
 export async function cachedQuery<T>(
   kind: string,
@@ -93,8 +162,48 @@ export async function cachedQuery<T>(
 ): Promise<T> {
   if (cacheEnabled.getStore() === false) return load()
   const key = cacheKey(kind, input)
-  const token = randomUUID()
+  const local = localCache(pool)
   const signal = currentDatabaseTask()?.controller.signal
+  for (;;) {
+    signal?.throwIfAborted()
+    const hit = local.values.get(key)
+    if (hit) {
+      dependOn(hit.expires)
+      reportDatabaseProgress("Loaded saved results")
+      return hit.value as T
+    }
+    const leader = local.fills.get(key)
+    if (!leader) break
+    reportDatabaseProgress("Waiting for saved results")
+    try {
+      const entry = await awaitForCurrentTask(leader)
+      dependOn(entry.expires)
+      return entry.value as T
+    } catch {
+      signal?.throwIfAborted()
+      // The leading request failed or was cancelled. Retry with this request's
+      // own lease rather than inheriting another request's outcome.
+      if (local.fills.get(key) === leader) local.fills.delete(key)
+    }
+  }
+  const fill = fillCachedQuery(key, load, pool, signal)
+  local.fills.set(key, fill as Promise<Entry<unknown>>)
+  try {
+    const entry = await fill
+    dependOn(entry.expires)
+    return entry.value
+  } finally {
+    if (local.fills.get(key) === fill) local.fills.delete(key)
+  }
+}
+
+async function fillCachedQuery<T>(
+  key: string,
+  load: () => Promise<T>,
+  pool: Pick<Pool, "query">,
+  signal: AbortSignal | undefined
+): Promise<Entry<T>> {
+  const token = randomUUID()
   const deadline = Date.now() + 120_000
   let attempt = 0
   while (Date.now() < deadline) {
@@ -102,7 +211,7 @@ export async function cachedQuery<T>(
     const entry = (await readCacheBatch<T>([key], pool)).get(key)
     if (entry) {
       reportDatabaseProgress("Loaded saved results")
-      return entry.value
+      return entry
     }
     const claimed = await pool.query(
       `INSERT INTO tt_stats_web.query_cache(cache_key, lease_token, lease_until)
@@ -114,6 +223,7 @@ export async function cachedQuery<T>(
     )
     if (claimed.rows.length) {
       const lifetime = { expires: Date.now() + QUERY_CACHE_MS }
+      let released = false
       try {
         const value = await freshness.run(lifetime, load)
         signal?.throwIfAborted()
@@ -123,21 +233,24 @@ export async function cachedQuery<T>(
           Buffer.byteLength(payload) <= MAX_CACHE_BYTES &&
           lifetime.expires > Date.now()
         ) {
+          // Storing the result also releases the lease.
           await pool.query(
             `UPDATE tt_stats_web.query_cache SET payload = $3::jsonb, computed_at = now(), expires_at = to_timestamp($4 / 1000.0), lease_token = NULL, lease_until = NULL WHERE cache_key = $1 AND lease_token = $2`,
             [key, token, payload, lifetime.expires]
           )
+          released = true
+          remember(pool, key, payload, lifetime.expires)
         }
-        dependOn(lifetime.expires)
-        return value
+        return { value, expires: lifetime.expires }
       } finally {
         // Release with independent cancellation state so another request can retry immediately.
-        await withoutDatabaseTask(() =>
-          pool.query(
-            "UPDATE tt_stats_web.query_cache SET lease_token = NULL, lease_until = NULL WHERE cache_key = $1 AND lease_token = $2",
-            [key, token]
-          )
-        ).catch(() => {})
+        if (!released)
+          await withoutDatabaseTask(() =>
+            pool.query(
+              "UPDATE tt_stats_web.query_cache SET lease_token = NULL, lease_until = NULL WHERE cache_key = $1 AND lease_token = $2",
+              [key, token]
+            )
+          ).catch(() => {})
       }
     }
     reportDatabaseProgress("Waiting for saved results")
@@ -181,33 +294,46 @@ export async function cachedBatch<T>(
     const owned = claimed.rows.map((row) => row.cache_key)
     if (owned.length) {
       const lifetime = { expires: Date.now() + QUERY_CACHE_MS }
+      let unreleased = owned
       try {
         const loaded = await freshness.run(lifetime, () => load(owned))
         signal?.throwIfAborted()
         if (owned.some((key) => !loaded.has(key)))
           throw new Error("Incomplete comparison batch")
         const entries = owned
-          .map((key) => ({ key, value: loaded.get(key)! }))
+          .map((key) => {
+            const value = loaded.get(key)!
+            return { key, value, payload: JSON.stringify(value) }
+          })
           .filter(
-            (entry) =>
-              Buffer.byteLength(JSON.stringify(entry.value)) <= MAX_CACHE_BYTES
+            (entry) => Buffer.byteLength(entry.payload) <= MAX_CACHE_BYTES
           )
         if (entries.length && lifetime.expires > Date.now()) {
           await pool.query(
             `UPDATE tt_stats_web.query_cache c SET payload = e.value, computed_at = now(), expires_at = to_timestamp($3 / 1000.0), lease_token = NULL, lease_until = NULL
             FROM jsonb_to_recordset($1::jsonb) AS e(key text, value jsonb) WHERE c.cache_key = e.key AND c.lease_token = $2`,
-            [JSON.stringify(entries), token, lifetime.expires]
+            [
+              JSON.stringify(entries.map(({ key, value }) => ({ key, value }))),
+              token,
+              lifetime.expires,
+            ]
           )
+          const stored = new Set(entries.map((entry) => entry.key))
+          unreleased = owned.filter((key) => !stored.has(key))
+          for (const entry of entries)
+            remember(pool, entry.key, entry.payload, lifetime.expires)
         }
         for (const key of owned) results.set(key, loaded.get(key)!)
         dependOn(lifetime.expires)
       } finally {
-        await withoutDatabaseTask(() =>
-          pool.query(
-            "UPDATE tt_stats_web.query_cache SET lease_token = NULL, lease_until = NULL WHERE cache_key = ANY($1::text[]) AND lease_token = $2",
-            [owned, token]
-          )
-        ).catch(() => {})
+        // Stored entries released their leases; release the rest immediately.
+        if (unreleased.length)
+          await withoutDatabaseTask(() =>
+            pool.query(
+              "UPDATE tt_stats_web.query_cache SET lease_token = NULL, lease_until = NULL WHERE cache_key = ANY($1::text[]) AND lease_token = $2",
+              [unreleased, token]
+            )
+          ).catch(() => {})
       }
     } else {
       await delay(Math.min(1000, 100 * 2 ** attempt++), undefined, { signal })

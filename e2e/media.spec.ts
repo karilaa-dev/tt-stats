@@ -21,7 +21,9 @@ test("history opens media and links cache-hit downloads to other chats", async (
   await expect(
     rows.nth(4).getByRole("button", { name: "View media" })
   ).toHaveCount(0)
-  await page.getByRole("switch", { name: "Show only records with media preview" }).click()
+  await page
+    .getByRole("switch", { name: "Show only records with media preview" })
+    .click()
   await expect(history.getByRole("listitem")).toHaveCount(17)
   await expect(history.getByRole("button", { name: "View media" })).toHaveCount(
     17
@@ -74,17 +76,18 @@ test("top videos show ranked counts and preserve page navigation", async ({
   await table.getByRole("button", { name: "View media" }).first().click()
   await expect(page.getByRole("dialog", { name: "Saved media" })).toBeVisible()
   await page.keyboard.press("Escape")
-  await page.getByRole("button", { name: "Next", exact: true }).click()
+  await page.getByRole("button", { name: "Go to next page" }).click()
   await expect(page).toHaveURL(/page=2/)
   await expect(
     table.getByRole("row").nth(1).getByRole("cell").first()
   ).toHaveText("21")
   await expect(
-    page.getByRole("button", { name: "Next", exact: true })
+    page.getByRole("button", { name: "Go to next page" })
   ).toBeDisabled()
-  await page.getByRole("button", { name: "Previous", exact: true }).click()
+  await page.getByRole("button", { name: "Go to previous page" }).click()
   await expect(table).toBeVisible()
-  await expect(page).toHaveURL(/page=1/)
+  // The first page is the default and is omitted from canonical URLs.
+  await expect(page).not.toHaveURL(/page=/)
   await page.goBack()
   await expect(
     table.getByRole("row").nth(1).getByRole("cell").first()
@@ -131,11 +134,14 @@ test("an unbuilt ranking shows setup instructions without automatic retries", as
         type: "AstroActionError",
         code: "INTERNAL_SERVER_ERROR",
         message:
-          "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
+          "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Operations.",
       }),
     })
   })
-  await page.goto("/dashboard/videos?range=all")
+  // The first period arrives server-rendered; another period loads in the browser.
+  await page.goto("/dashboard/videos")
+  await expect(page.locator("astro-island[ssr]")).toHaveCount(0)
+  await page.getByRole("button", { name: "All time", exact: true }).click()
   await expect(page.getByRole("alert")).toContainText(
     "Statistics snapshots are not ready"
   )

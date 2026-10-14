@@ -5,6 +5,7 @@ import { noteCooldown, requestWithCooldown } from "@/lib/http-client"
 import type { DownloadMedia } from "./types"
 import { queryOptions, keepPreviousData } from "@tanstack/react-query"
 import type { StatsRange } from "@/lib/stats/types"
+import { queryKeys } from "@/lib/stats/query-keys"
 import { actions } from "astro:actions"
 
 export const mediaQueryOptions = (downloadId: string) =>
@@ -34,7 +35,9 @@ export const mediaQueryOptions = (downloadId: string) =>
             )
           return (await response.json()) as DownloadMedia
         },
-        "metadata"
+        "metadata",
+        // The media dialog shows its own loading state and cancels on close.
+        true
       ),
     retry: false,
     staleTime: 60_000,
@@ -44,20 +47,27 @@ export const downloadersQueryOptions = (downloadId: string, page: number) =>
     queryKey: ["stats", "downloaders", downloadId, page],
     queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
-        databaseAction(actions.getDownloaders, { downloadId, page }, signal)
+        databaseAction(actions.getDownloaders, { downloadId, page }, signal, {
+          quiet: true,
+        })
       ),
+    placeholderData: keepPreviousData,
     staleTime: 300_000,
     refetchInterval: databaseRefreshInterval(300_000),
   })
 export const popularVideosQueryOptions = (page: number, range: StatsRange) =>
   queryOptions({
-    queryKey: ["stats", "popular-videos", range, page],
+    queryKey: queryKeys.popularVideos(range, page),
     queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
-        databaseAction(actions.getPopularVideos, { page, range }, signal)
+        databaseAction(actions.getPopularVideos, { page, range }, signal, {
+          quiet: true,
+        })
       ),
     retry: false,
-    refetchInterval: databaseRefreshInterval(range === "24h" ? 300_000 : 86_400_000),
+    refetchInterval: databaseRefreshInterval(
+      range === "24h" ? 300_000 : 86_400_000
+    ),
     staleTime: range === "24h" ? 300_000 : 86_400_000,
     placeholderData: (previous) =>
       previous?.range === range ? keepPreviousData(previous) : undefined,

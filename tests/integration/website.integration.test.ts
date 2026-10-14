@@ -20,6 +20,7 @@ import {
   cacheKey,
   cachedQuery,
   cachedBatch,
+  clearLocalQueryCache,
   readCacheBatch,
   writeCacheBatch,
   MAX_CACHE_BYTES,
@@ -222,6 +223,10 @@ describe.runIf(run)("website database storage", () => {
       "UPDATE tt_stats_web.query_cache SET expires_at=now()-interval '1 second' WHERE cache_key=$1",
       [cacheKey("counts", input)]
     )
+    // A process keeps its own copy until the stored expiry; a process without
+    // that copy reads the shared row and refreshes it.
+    expect(await cachedQuery("counts", input, load, pool)).toEqual(first)
+    clearLocalQueryCache(pool)
     expect(await cachedQuery("counts", input, load, pool)).not.toEqual(first)
     expect(load).toHaveBeenCalledTimes(2)
     const exact = { count: "9223372036854775807" }
@@ -369,6 +374,42 @@ describe.runIf(run)("website database storage", () => {
       Array(3).fill({ payload: null, lease_token: null })
     )
   })
+  it("shares fills within a process without inheriting a cancelled leader", async () => {
+    let calls = 0
+    const load = async () => {
+      calls++
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return { call: calls }
+    }
+    expect(
+      await Promise.all([
+        cachedQuery("in-process", {}, load, pool),
+        cachedQuery("in-process", {}, load, pool),
+      ])
+    ).toEqual([{ call: 1 }, { call: 1 }])
+    expect(calls).toBe(1)
+    const task = new DatabaseTask()
+    const leader = withDatabaseTask(task, () =>
+      cachedQuery(
+        "cancelled-leader",
+        {},
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 30))
+          return "leader"
+        },
+        pool
+      )
+    )
+    const follower = cachedQuery(
+      "cancelled-leader",
+      {},
+      async () => "follower",
+      pool
+    )
+    task.controller.abort()
+    await expect(leader).rejects.toThrow()
+    expect(await follower).toBe("follower")
+  })
   it("cleans expired storage in bounded batches while preserving profiles and active leases", async () => {
     await pool.query(
       "INSERT INTO tt_stats_web.query_cache(cache_key,expires_at) SELECT 'cleanup-'||n,now()-interval '1 second' FROM generate_series(1,1100) n"
@@ -376,16 +417,19 @@ describe.runIf(run)("website database storage", () => {
     await pool.query(
       "INSERT INTO tt_stats_web.query_cache(cache_key,lease_token,lease_until) VALUES ('active-cleanup','active',now()+interval '1 minute')"
     )
+    const remaining = async () =>
+      Number(
+        (
+          await pool.query(
+            "SELECT count(*) FROM tt_stats_web.query_cache WHERE cache_key LIKE 'cleanup-%'"
+          )
+        ).rows[0].count
+      )
+    await cleanWebsiteStorage(pool, 1)
+    expect(await remaining()).toBeGreaterThanOrEqual(100)
+    expect(await remaining()).toBeLessThan(1100)
     await cleanWebsiteStorage(pool)
-    const remaining = Number(
-      (
-        await pool.query(
-          "SELECT count(*) FROM tt_stats_web.query_cache WHERE cache_key LIKE 'cleanup-%'"
-        )
-      ).rows[0].count
-    )
-    expect(remaining).toBeGreaterThanOrEqual(100)
-    expect(remaining).toBeLessThan(1100)
+    expect(await remaining()).toBe(0)
     expect(
       (
         await pool.query(

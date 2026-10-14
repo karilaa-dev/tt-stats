@@ -10,6 +10,7 @@ import {
   ImageIcon,
   SearchIcon,
   UsersIcon,
+  VideoIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/controls"
@@ -28,6 +29,7 @@ import {
 } from "@/components/controls"
 import { Skeleton } from "@/components/controls"
 import { TelegramMauCard } from "./telegram-mau-card"
+import { useAdminAccess } from "./admin-access"
 import { formatEpoch, useBrowserTime } from "@/lib/browser-time"
 import { timeSeriesQueryOptions } from "@/lib/stats/query-options"
 import type { StatsBreakdown, TimeSeriesPoint } from "@/lib/stats/types"
@@ -43,6 +45,7 @@ export function OverviewActivity({
   scope: "users" | "groups"
 }) {
   const { t, locale } = useTranslation()
+  const { authenticated } = useAdminAccess()
   const count = (value: string) => BigInt(value).toLocaleString(locale)
 
   const total = BigInt(recent.downloads.total)
@@ -235,7 +238,7 @@ export function OverviewActivity({
         className="overview-shortcuts"
         aria-label={t("Explore bot statistics")}
       >
-        <a href="/dashboard/analytics?range=24h">
+        <a href="/dashboard/analytics">
           <ChartNoAxesCombinedIcon aria-hidden="true" />
           <span>
             <strong>
@@ -247,18 +250,33 @@ export function OverviewActivity({
           </span>
           <ArrowUpRightIcon aria-hidden="true" />
         </a>
-        <a href="/dashboard/users">
-          <SearchIcon aria-hidden="true" />
-          <span>
-            <strong>
-              <T>{"Look up a chat"}</T>
-            </strong>
-            <small>
-              <T>{"Find activity by Telegram ID"}</T>
-            </small>
-          </span>
-          <ArrowUpRightIcon aria-hidden="true" />
-        </a>
+        {authenticated ? (
+          <a href="/dashboard/users">
+            <SearchIcon aria-hidden="true" />
+            <span>
+              <strong>
+                <T>{"Look up a chat"}</T>
+              </strong>
+              <small>
+                <T>{"Find activity by Telegram ID"}</T>
+              </small>
+            </span>
+            <ArrowUpRightIcon aria-hidden="true" />
+          </a>
+        ) : (
+          <a href="/dashboard/videos">
+            <VideoIcon aria-hidden="true" />
+            <span>
+              <strong>
+                <T>{"See what is popular"}</T>
+              </strong>
+              <small>
+                <T>{"The most downloaded videos by period"}</T>
+              </small>
+            </span>
+            <ArrowUpRightIcon aria-hidden="true" />
+          </a>
+        )}
       </div>
     </div>
   )
@@ -341,6 +359,7 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
     <figure className="overview-traffic-figure">
       <svg
         viewBox="0 0 620 188"
+        preserveAspectRatio="none"
         role="img"
         aria-label={t(
           `Video and image deliveries across all chats. ${points.length} half-hour intervals. Peak ${peak.toLocaleString(locale)} downloads.`
@@ -361,6 +380,7 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
             y2={y}
             stroke="var(--border)"
             strokeDasharray="3 5"
+            vectorEffect="non-scaling-stroke"
           />
         ))}
         <path
@@ -374,6 +394,7 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
           strokeWidth="2.5"
           strokeLinejoin="round"
           strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
         />
         {coordinates.map(({ x, y, point }) => (
           <circle
@@ -383,10 +404,9 @@ function TrafficPlot({ points }: { points: TimeSeriesPoint[] }) {
             r="5"
             fill="transparent"
           >
-            <title>
-              {label(point.bucketEpoch)}: {point.count.toLocaleString(locale)}{" "}
-              downloads
-            </title>
+            <title>{`${label(point.bucketEpoch)}: ${t(
+              `${point.count.toLocaleString(locale)} downloads`
+            )}`}</title>
           </circle>
         ))}
       </svg>

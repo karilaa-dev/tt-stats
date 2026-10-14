@@ -12,17 +12,17 @@ export const DATABASE_ERROR_COPY = {
   snapshotSchema: {
     title: "@ttgrab Stats database objects need repair",
     description:
-      "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Database jobs to install or repair it.",
+      "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Operations to install or repair it.",
   },
   snapshotsMissing: {
     title: "Statistics snapshots are not ready",
     description:
-      "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.",
+      "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Operations.",
   },
   snapshotData: {
     title: "Statistics snapshot needs repair",
     description:
-      "The stored chart snapshot is invalid. Open Database jobs, update the database definitions, then run the affected snapshot job.",
+      "The stored chart snapshot is invalid. Open Operations, update the database definitions, then run the affected snapshot job.",
   },
   permission: {
     title: "Database permissions are incomplete",
@@ -37,7 +37,7 @@ export const DATABASE_ERROR_COPY = {
   unavailable: {
     title: "Statistics could not be loaded",
     description:
-      "PostgreSQL returned an unexpected error. Retry the request, then check Database jobs for setup diagnostics.",
+      "PostgreSQL returned an unexpected error. Retry the request, then check Operations for setup diagnostics.",
   },
 } as const
 

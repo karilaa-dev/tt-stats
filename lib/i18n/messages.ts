@@ -1355,20 +1355,20 @@ export const messages = {
       ru: "PostgreSQL доступен, но роль приложения не может читать снимки @ttgrab Stats или выполнять разрешённые функции заданий.",
       uk: "PostgreSQL доступний, але роль застосунку не може читати знімки @ttgrab Stats або виконувати дозволені функції завдань.",
     },
-  "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Database jobs to install or repair it.":
+  "PostgreSQL is reachable, but the snapshot schema or its read API is missing or outdated. Open Operations to install or repair it.":
     {
-      ru: "PostgreSQL доступен, но схема снимков или API чтения отсутствует либо устарели. Откройте Задания базы для установки или исправления.",
-      uk: "PostgreSQL доступний, але схема знімків або API читання відсутні чи застарілі. Відкрийте Завдання бази для встановлення або виправлення.",
+      ru: "PostgreSQL доступен, но схема снимков или API чтения отсутствует либо устарели. Откройте раздел «Управление» для установки или исправления.",
+      uk: "PostgreSQL доступний, але схема знімків або API читання відсутні чи застарілі. Відкрийте розділ «Керування» для встановлення або виправлення.",
     },
   "PostgreSQL rejected that cron schedule. The previous schedule is unchanged.":
     {
       ru: "PostgreSQL отклонил расписание cron. Прежнее расписание сохранено.",
       uk: "PostgreSQL відхилив розклад cron. Попередній розклад збережено.",
     },
-  "PostgreSQL returned an unexpected error. Retry the request, then check Database jobs for setup diagnostics.":
+  "PostgreSQL returned an unexpected error. Retry the request, then check Operations for setup diagnostics.":
     {
-      ru: "PostgreSQL вернул неожиданную ошибку. Повторите запрос, затем проверьте диагностику в Заданиях базы.",
-      uk: "PostgreSQL повернув неочікувану помилку. Повторіть запит, потім перевірте діагностику в Завданнях бази.",
+      ru: "PostgreSQL вернул неожиданную ошибку. Повторите запрос, затем проверьте диагностику в разделе «Управление».",
+      uk: "PostgreSQL повернув неочікувану помилку. Повторіть запит, потім перевірте діагностику в розділі «Керування».",
     },
   "PostgreSQL scheduler": {
     ru: "Планировщик PostgreSQL",
@@ -1811,10 +1811,10 @@ export const messages = {
     ru: "Ссылка входа истекла. Начните вход заново ниже.",
     uk: "Посилання входу прострочене. Почніть вхід знову нижче.",
   },
-  "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Database jobs.":
+  "The @ttgrab Stats schema exists, but its initial rolling or daily refresh has not completed. Check the queued refreshes under Operations.":
     {
-      ru: "Схема @ttgrab Stats установлена, но первое обновление за 24 часа или ежедневное обновление не завершено. Проверьте очередь в Заданиях базы.",
-      uk: "Схему @ttgrab Stats встановлено, але перше оновлення за 24 години або щоденне оновлення не завершено. Перевірте чергу в Завданнях бази.",
+      ru: "Схема @ttgrab Stats установлена, но первое обновление за 24 часа или ежедневное обновление не завершено. Проверьте очередь в разделе «Управление».",
+      uk: "Схему @ttgrab Stats встановлено, але перше оновлення за 24 години або щоденне оновлення не завершено. Перевірте чергу в розділі «Керування».",
     },
   "The PostgreSQL request may still be running. Reload this page or check the recent job runs before queuing another refresh.":
     {
@@ -1878,10 +1878,10 @@ export const messages = {
       ru: "Сервер проверяет каждую минуту и сразу после обновления статистики за 24 часа. Новое скачивание сбрасывает обе стадии уведомлений.",
       uk: "Сервер перевіряє щохвилини й одразу після оновлення статистики за 24 години. Нове завантаження скидає обидві стадії сповіщень.",
     },
-  "The stored chart snapshot is invalid. Open Database jobs, update the database definitions, then run the affected snapshot job.":
+  "The stored chart snapshot is invalid. Open Operations, update the database definitions, then run the affected snapshot job.":
     {
-      ru: "Сохранённый снимок графика некорректен. Откройте Задания базы, обновите определения и запустите нужное задание снимка.",
-      uk: "Збережений знімок графіка некоректний. Відкрийте Завдання бази, оновіть визначення й запустіть потрібне завдання знімка.",
+      ru: "Сохранённый снимок графика некорректен. Откройте раздел «Управление», обновите определения и запустите нужное задание снимка.",
+      uk: "Збережений знімок графіка некоректний. Відкрийте розділ «Керування», оновіть визначення й запустіть потрібне завдання знімка.",
     },
   "The test notification could not be sent.": {
     ru: "Не удалось отправить тестовое уведомление.",
@@ -2581,10 +2581,10 @@ export const messages = {
     ru: "Сессия истекла. Войдите снова для просмотра медиа.",
     uk: "Сесія прострочена. Увійдіть знову для перегляду медіа.",
   },
-  "pg_cron is not installed in this database. Complete the one-time PostgreSQL administrator steps shown on Database jobs, then retry.":
+  "pg_cron is not installed in this database. Complete the one-time PostgreSQL administrator steps shown on Operations, then retry.":
     {
-      ru: "pg_cron не установлен в базе. Выполните однократные шаги администратора PostgreSQL в Заданиях базы и повторите попытку.",
-      uk: "pg_cron не встановлено в базі. Виконайте одноразові кроки адміністратора PostgreSQL у Завданнях бази й повторіть спробу.",
+      ru: "pg_cron не установлен в базе. Выполните однократные шаги администратора PostgreSQL из раздела «Управление» и повторите попытку.",
+      uk: "pg_cron не встановлено в базі. Виконайте одноразові кроки адміністратора PostgreSQL з розділу «Керування» й повторіть спробу.",
     },
   "tt-bot workspace": {
     ru: "Панель tt-bot",
@@ -2645,10 +2645,10 @@ export const messages = {
       ru: "DB_URL не хватает прав: {0}. Предоставьте права для работы по инструкции администратора и повторите попытку.",
       uk: "DB_URL бракує прав: {0}. Надайте права для роботи за інструкцією адміністратора й повторіть спробу.",
     },
-  "Database setup stopped during {0} because DB_URL lacks a required privilege. Follow the administrator guide on Database jobs, then retry.":
+  "Database setup stopped during {0} because DB_URL lacks a required privilege. Follow the administrator guide on Operations, then retry.":
     {
-      ru: "Настройка базы остановилась на этапе «{0}»: DB_URL не хватает прав. Выполните инструкцию администратора в Заданиях базы и повторите попытку.",
-      uk: "Налаштування бази зупинилося на етапі «{0}»: DB_URL бракує прав. Виконайте інструкцію адміністратора в Завданнях бази й повторіть спробу.",
+      ru: "Настройка базы остановилась на этапе «{0}»: DB_URL не хватает прав. Выполните инструкцию администратора в разделе «Управление» и повторите попытку.",
+      uk: "Налаштування бази зупинилося на етапі «{0}»: DB_URL бракує прав. Виконайте інструкцію адміністратора в розділі «Керування» й повторіть спробу.",
     },
   "Database setup stopped during {0}. No existing snapshots or schedules were deleted.":
     {
@@ -2674,6 +2674,79 @@ export const messages = {
   "database definition update": {
     ru: "обновление определений базы",
     uk: "оновлення визначень бази",
+  },
+  "Page {0}": {
+    ru: "Страница {0}",
+    uk: "Сторінка {0}",
+  },
+  "Page {0} of {1}": {
+    ru: "Страница {0} из {1}",
+    uk: "Сторінка {0} з {1}",
+  },
+  "{0} downloads": {
+    ru: "{0} скачиваний",
+    uk: "{0} завантажень",
+  },
+  "Operations · @ttgrab Stats": {
+    ru: "Управление · @ttgrab Stats",
+    uk: "Керування · @ttgrab Stats",
+  },
+  "Monthly active users reported by Telegram": {
+    ru: "Ежемесячно активные пользователи по данным Telegram",
+    uk: "Щомісячно активні користувачі за даними Telegram",
+  },
+  "See what is popular": {
+    ru: "Что сейчас популярно",
+    uk: "Що зараз популярне",
+  },
+  "The most downloaded videos by period": {
+    ru: "Самые скачиваемые видео за период",
+    uk: "Найпопулярніші відео за період",
+  },
+  "Showing {0}–{1} of {2}": {
+    ru: "Показано {0}–{1} из {2}",
+    uk: "Показано {0}–{1} з {2}",
+  },
+  "Audience languages and file preferences.": {
+    ru: "Языки аудитории и настройки файлов.",
+    uk: "Мови аудиторії та налаштування файлів.",
+  },
+  "Languages appear here after the next daily update.": {
+    ru: "Языки появятся после следующего ежедневного обновления.",
+    uk: "Мови з'являться після наступного щоденного оновлення.",
+  },
+  "No downloads yet": {
+    ru: "Скачиваний пока нет",
+    uk: "Завантажень поки немає",
+  },
+  "Download leaders appear here after the next daily update.": {
+    ru: "Лидеры по скачиваниям появятся после следующего ежедневного обновления.",
+    uk: "Лідери за завантаженнями з'являться після наступного щоденного оновлення.",
+  },
+  "Image albums and legacy downloads without a video ID are excluded.": {
+    ru: "Альбомы изображений и старые скачивания без ID видео не учитываются.",
+    uk: "Альбоми зображень і старі завантаження без ID відео не враховуються.",
+  },
+  "All recorded downloads for this chat.": {
+    ru: "Все записанные скачивания этого чата.",
+    uk: "Усі записані завантаження цього чату.",
+  },
+  "No downloads match these filters. Try clearing the dates or selecting all downloads.":
+    {
+      ru: "Нет скачиваний по этим фильтрам. Попробуйте очистить даты или выбрать все скачивания.",
+      uk: "Немає завантажень за цими фільтрами. Спробуйте очистити дати або вибрати всі завантаження.",
+    },
+  "Log in as the administrator to search.": {
+    ru: "Войдите как администратор, чтобы искать.",
+    uk: "Увійдіть як адміністратор, щоб шукати.",
+  },
+  "Top videos pagination": {
+    ru: "Страницы топа видео",
+    uk: "Сторінки топу відео",
+  },
+  "Updating rankings": {
+    ru: "Рейтинг обновляется",
+    uk: "Рейтинг оновлюється",
   },
 } as const satisfies Record<string, { ru: string; uk: string }>
 export type MessageKey = keyof typeof messages

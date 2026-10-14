@@ -5,11 +5,15 @@ import { actions } from "astro:actions"
 export const getDashboardMeta = () =>
   requestWithCooldown("read", () => actions.getDashboardMeta.orThrow())
 
+// Public snapshot reads are short indexed reads behind a shared server cache.
+// They keep request cancellation but show inline loading states only.
+const quiet = { quiet: true }
+
 export const getSnapshotMetadata = (signal?: AbortSignal) =>
-  databaseAction(actions.getSnapshotMetadata, undefined, signal)
+  databaseAction(actions.getSnapshotMetadata, undefined, signal, quiet)
 
 export const getOverview = (signal?: AbortSignal) =>
-  databaseAction(actions.getOverview, undefined, signal)
+  databaseAction(actions.getOverview, undefined, signal, quiet)
 
 export const getStatsBreakdown = ({
   data,
@@ -17,7 +21,7 @@ export const getStatsBreakdown = ({
 }: {
   data: Parameters<typeof actions.getStatsBreakdown>[0]
   signal?: AbortSignal
-}) => databaseAction(actions.getStatsBreakdown, data, signal)
+}) => databaseAction(actions.getStatsBreakdown, data, signal, quiet)
 
 export const getTimeSeries = ({
   data,
@@ -25,35 +29,26 @@ export const getTimeSeries = ({
 }: {
   data: Parameters<typeof actions.getTimeSeries>[0]
   signal?: AbortSignal
-}) => databaseAction(actions.getTimeSeries, data, signal)
+}) => databaseAction(actions.getTimeSeries, data, signal, quiet)
 
 export const getReferralStats = (signal?: AbortSignal) =>
-  databaseAction(actions.getReferralStats, undefined, signal)
+  databaseAction(actions.getReferralStats, undefined, signal, quiet)
 
 export const getOtherStats = (signal?: AbortSignal) =>
-  databaseAction(actions.getOtherStats, undefined, signal)
+  databaseAction(actions.getOtherStats, undefined, signal, quiet)
 
-export const getUserStats = ({
-  data,
-  signal,
-}: {
-  data: Parameters<typeof actions.getUserStats>[0]
-  signal?: AbortSignal
-}) => databaseAction(actions.getUserStats, data, signal)
+export const getStatsJobs = (signal?: AbortSignal, background = false) =>
+  databaseAction(actions.getStatsJobs, undefined, signal, {
+    quiet: background,
+  })
 
-export const getUserDownloads = ({
-  data,
-  signal,
-}: {
-  data: Parameters<typeof actions.getUserDownloads>[0]
-  signal?: AbortSignal
-}) => databaseAction(actions.getUserDownloads, data, signal)
-
-export const getStatsJobs = (signal?: AbortSignal) =>
-  databaseAction(actions.getStatsJobs, undefined, signal)
-
-export const getDatabaseSetupStatus = (signal?: AbortSignal) =>
-  databaseAction(actions.getDatabaseSetupStatus, undefined, signal)
+export const getDatabaseSetupStatus = (
+  signal?: AbortSignal,
+  background = false
+) =>
+  databaseAction(actions.getDatabaseSetupStatus, undefined, signal, {
+    quiet: background,
+  })
 
 export const configureDatabaseJobs = ({
   data,
@@ -74,10 +69,13 @@ export const updateDatabaseDefinitions = ({
 export const getStatsJobRuns = ({
   data,
   signal,
+  background = false,
 }: {
   data: Parameters<typeof actions.getStatsJobRuns>[0]
   signal?: AbortSignal
-}) => databaseAction(actions.getStatsJobRuns, data, signal)
+  background?: boolean
+}) =>
+  databaseAction(actions.getStatsJobRuns, data, signal, { quiet: background })
 
 export const updateStatsJobSchedule = ({
   data,

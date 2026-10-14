@@ -2,6 +2,7 @@ import { T, useTranslation } from "@/lib/i18n/provider"
 import { databaseRefreshInterval } from "@/lib/http-client"
 import { HistoryExport } from "@/components/dashboard/history-export"
 import { databaseAction } from "@/lib/tasks/action"
+import { isBackgroundRefresh } from "@/lib/tasks/background"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { actions } from "astro:actions"
@@ -44,9 +45,8 @@ import {
   EmptyMedia,
 } from "@/components/controls"
 import { Alert, AlertTitle, AlertDescription } from "@/components/controls"
-import { Button } from "@/components/controls"
+import { Button, buttonVariants } from "@/components/controls"
 import { Switch } from "@/components/controls"
-import { Field, FieldLabel } from "@/components/controls"
 import { Skeleton } from "@/components/controls"
 import {
   ToggleGroup,
@@ -57,6 +57,7 @@ import {
 } from "@/components/controls"
 import { Badge } from "@/components/controls"
 import { parseTelegramId } from "@/lib/stats/validation"
+import { queryKeys } from "@/lib/stats/query-keys"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { getLanguagePresentation } from "@/lib/language"
 import type {
@@ -123,9 +124,32 @@ export function UsersPage({ own = false }: { own?: boolean }) {
   }
   if (!own && !authenticated)
     return (
-      <p>
-        <T>{"Admin access required."}</T>
-      </p>
+      <>
+        <PageHeading
+          title={t("User lookup")}
+          description={t(
+            "Download history and statistics for a user or group."
+          )}
+        />
+        <Empty className="mx-auto w-full max-w-xl border-solid bg-card">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UserRoundIcon />
+            </EmptyMedia>
+            <EmptyTitle>
+              <T>{"Admin access required."}</T>
+            </EmptyTitle>
+            <EmptyDescription>
+              <T>
+                {"Log in with the Telegram account assigned to this website."}
+              </T>
+            </EmptyDescription>
+          </EmptyHeader>
+          <a href="/admin" className={buttonVariants()}>
+            <T>{"Open admin login"}</T>
+          </a>
+        </Empty>
+      </>
     )
   return (
     <>
@@ -214,13 +238,24 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     savedMediaOnly,
   }
   const userQuery = useQuery({
-    queryKey: ["stats", own ? "me" : "user", userId],
-    queryFn: ({ signal }) =>
-      requestWithCooldown("read", () =>
-        own
-          ? databaseAction(actions.getMyStats, undefined, signal)
-          : databaseAction(actions.getUserStats, { userId }, signal)
-      ),
+    queryKey: queryKeys.userStats(own, userId),
+    queryFn: (context) =>
+      requestWithCooldown("read", () => {
+        const options = { quiet: isBackgroundRefresh(context) }
+        return own
+          ? databaseAction(
+              actions.getMyStats,
+              undefined,
+              context.signal,
+              options
+            )
+          : databaseAction(
+              actions.getUserStats,
+              { userId },
+              context.signal,
+              options
+            )
+      }),
     staleTime: 300_000,
     refetchInterval: databaseRefreshInterval(300_000),
     retry: false,
@@ -235,25 +270,23 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
       page,
       filters,
     ],
-    queryFn: ({ signal }) =>
-      requestWithCooldown("read", () =>
-        own
+    queryFn: (context) =>
+      requestWithCooldown("read", () => {
+        const options = { quiet: isBackgroundRefresh(context) }
+        return own
           ? databaseAction(
               actions.getMyDownloads,
               { page, pageSize: 20, ...filters },
-              signal
+              context.signal,
+              options
             )
           : databaseAction(
               actions.getUserDownloads,
-              {
-                userId,
-                page,
-                pageSize: 20,
-                ...filters,
-              },
-              signal
+              { userId, page, pageSize: 20, ...filters },
+              context.signal,
+              options
             )
-      ),
+      }),
     staleTime: 300_000,
     refetchInterval: databaseRefreshInterval(300_000),
     retry: false,
@@ -293,18 +326,24 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                 {session.user?.name}
               </h2>
               <p className="text-sm text-muted-foreground">
-                {session.user?.username
-                  ? `@${session.user.username}`
-                  : "Your Telegram account"}
+                {session.user?.username ? (
+                  `@${session.user.username}`
+                ) : (
+                  <T>{"Your Telegram account"}</T>
+                )}
               </p>
             </div>
           </div>
-          <Button variant="ghost" onClick={() => void session.logout()}>
+          <Button
+            variant="ghost"
+            disabled={!hydrated}
+            onClick={() => void session.logout()}
+          >
             <T>{"Log out"}</T>
           </Button>
         </div>
       )}
-      <div className="profile-overview">
+      <div className="profile-overview" inert={!hydrated}>
         <T>
           {userQuery.isPending ? (
             <Skeleton
@@ -318,7 +357,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               retry={() => void userQuery.refetch()}
             />
           ) : user ? (
-            <UserSummary user={user} />
+            <UserSummary user={user} own={own} />
           ) : (
             <Alert>
               <AlertTitle>
@@ -346,25 +385,39 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
       </div>
       <section
         className="profile-history"
-        aria-label={t("Your download history")}
+        aria-label={t(own ? "Your download history" : "Download history")}
+        // Every control here needs JavaScript; ignore input until hydrated.
+        inert={!hydrated}
       >
-        <Tabs
-          value={category}
-          onValueChange={(value) =>
-            changeFilters({ category: value as "history" | "popular" })
-          }
-        >
-          <TabsList aria-label={t("History category")}>
-            <TabsTrigger value="history">
-              <T>{"Download history"}</T>
-            </TabsTrigger>
-            <TabsTrigger value="popular">
-              <T>{"Popular downloads"}</T>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="history-toolbar">
-          <div className="history-discovery-filters">
+        <div className="history-filters">
+          <div className="history-filters-top">
+            <Tabs
+              value={category}
+              onValueChange={(value) =>
+                changeFilters({ category: value as "history" | "popular" })
+              }
+            >
+              <TabsList aria-label={t("History category")}>
+                <TabsTrigger value="history">
+                  <T>{"Download history"}</T>
+                </TabsTrigger>
+                <TabsTrigger value="popular">
+                  <T>{"Popular downloads"}</T>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {user ? (
+              <HistoryExport
+                userId={userId}
+                href={
+                  own
+                    ? "/api/me/history.csv"
+                    : `/api/users/${encodeURIComponent(userId)}/history.csv`
+                }
+              />
+            ) : null}
+          </div>
+          <div className="history-filter-grid">
             <label className="history-select-field">
               <span>
                 <T>{"Show"}</T>
@@ -372,12 +425,12 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               <select
                 className="history-select"
                 value={discovery}
-                onChange={(event) => {
-                  const next = event.target.value as HistoryFilters["discovery"]
+                onChange={(event) =>
                   changeFilters({
-                    discovery: next,
+                    discovery: event.target
+                      .value as HistoryFilters["discovery"],
                   })
-                }}
+                }
               >
                 <option value="all">
                   <T>{"All downloads"}</T>
@@ -411,19 +464,21 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                 </option>
               </select>
             </label>
-            <ToggleGroup
-              aria-label={t("Media type")}
-              value={[mediaKind]}
-              onValueChange={(value) => {
-                if (value[0])
-                  changeFilters({
-                    mediaKind: value[0] as HistoryFilters["mediaKind"],
-                  })
-              }}
-              variant="outline"
-              size="sm"
-            >
-              <T>
+            <div className="history-select-field">
+              <span id="history-media-label">
+                <T>{"Media type"}</T>
+              </span>
+              <ToggleGroup
+                aria-labelledby="history-media-label"
+                value={[mediaKind]}
+                onValueChange={(value) => {
+                  if (value[0])
+                    changeFilters({
+                      mediaKind: value[0] as HistoryFilters["mediaKind"],
+                    })
+                }}
+                spacing={1}
+              >
                 {[
                   ["all", "All media"],
                   ["video", "Videos"],
@@ -433,9 +488,9 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                     <T>{label}</T>
                   </ToggleGroupItem>
                 ))}
-              </T>
-            </ToggleGroup>
-            <Field orientation="horizontal" className="w-auto">
+              </ToggleGroup>
+            </div>
+            <div className="history-switch-field">
               <Switch
                 id="saved-media-only"
                 checked={savedMediaOnly}
@@ -443,25 +498,19 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                   changeFilters({ savedMediaOnly: checked })
                 }
               />
-              <FieldLabel htmlFor="saved-media-only">
+              <label htmlFor="saved-media-only">
                 <T>{"Show only records with media preview"}</T>
-              </FieldLabel>
-            </Field>
+              </label>
+            </div>
           </div>
-          {user ? (
-            <HistoryExport
-              userId={userId}
-              href={
-                own
-                  ? "/api/me/history.csv"
-                  : `/api/users/${encodeURIComponent(userId)}/history.csv`
-              }
-            />
-          ) : null}
-        </div>
-        <T>
+          <HistoryDateFilter
+            key={`${fromDate}:${throughDate}`}
+            fromDate={fromDate}
+            throughDate={throughDate}
+            onApply={changeFilters}
+          />
           {discovery === "first" ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="history-filter-note">
               <T>
                 {own
                   ? "Only posts you downloaded first that others also downloaded."
@@ -469,13 +518,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               </T>
             </p>
           ) : null}
-        </T>
-        <HistoryDateFilter
-          key={`${fromDate}:${throughDate}`}
-          fromDate={fromDate}
-          throughDate={throughDate}
-          onApply={changeFilters}
-        />
+        </div>
         {dateRange.error ? (
           <Alert variant="destructive">
             <AlertTitle>
@@ -517,7 +560,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     </section>
   )
 }
-function UserSummary({ user }: { user: UserStats }) {
+function UserSummary({ user, own }: { user: UserStats; own: boolean }) {
   const { locale } = useTranslation()
 
   const time = useBrowserTime()
@@ -530,7 +573,11 @@ function UserSummary({ user }: { user: UserStats }) {
           <T>{"Download statistics"}</T>
         </CardTitle>
         <CardDescription>
-          <T>{"All your recorded downloads."}</T>
+          <T>
+            {own
+              ? "All your recorded downloads."
+              : "All recorded downloads for this chat."}
+          </T>
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
@@ -609,12 +656,23 @@ function UserActivityChart({
   const [range, setRange] = useState<UserActivityRange>("31d")
   const query = useQuery({
     queryKey: ["stats", own ? "me" : "user", userId, "activity", range],
-    queryFn: ({ signal }) =>
-      requestWithCooldown("read", () =>
-        own
-          ? databaseAction(actions.getMyActivity, { range }, signal)
-          : databaseAction(actions.getUserActivity, { userId, range }, signal)
-      ),
+    queryFn: (context) =>
+      requestWithCooldown("read", () => {
+        const options = { quiet: isBackgroundRefresh(context) }
+        return own
+          ? databaseAction(
+              actions.getMyActivity,
+              { range },
+              context.signal,
+              options
+            )
+          : databaseAction(
+              actions.getUserActivity,
+              { userId, range },
+              context.signal,
+              options
+            )
+      }),
     enabled: range !== "31d",
     staleTime: 300_000,
     refetchInterval: databaseRefreshInterval(300_000),

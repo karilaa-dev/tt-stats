@@ -1,13 +1,6 @@
 import { otherDownloaders } from "@/lib/i18n/format"
 import { T, useTranslation } from "@/lib/i18n/provider"
-import {
-  EyeIcon,
-  HeartIcon,
-  ImagesIcon,
-  VideoIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react"
+import { EyeIcon, HeartIcon, ImagesIcon, VideoIcon } from "lucide-react"
 import { Badge } from "@/components/controls"
 import { Button } from "@/components/controls"
 import {
@@ -18,6 +11,7 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/controls"
+import { Pager } from "./pager"
 import {
   Empty,
   EmptyHeader,
@@ -53,10 +47,7 @@ export function UserDownloadsTable({
   sort?: "newest" | "oldest"
   category?: "history" | "popular"
 }) {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
-
+  const { t, locale } = useTranslation()
   const time = useBrowserTime()
   const first = data?.items.length ? (data.page - 1) * data.pageSize + 1 : 0
   return (
@@ -293,40 +284,19 @@ export function UserDownloadsTable({
           </Empty>
         )}
       </CardContent>
-      <T>
-        {data?.items.length ? (
-          <CardFooter className="flex-col justify-between gap-3 sm:flex-row">
-            <p className="text-xs text-muted-foreground" aria-live="polite">
-              <T>{"Showing "}</T>
-              <T>{first}</T>–<T>{first + data.items.length - 1}</T>
-              <T>{" of"}</T> <T>{BigInt(data.total).toLocaleString(locale)}</T>
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                disabled={refreshing || data.page <= 1}
-                aria-label={t("Go to previous page")}
-                onClick={() => onPageChange(data.page - 1)}
-              >
-                <ChevronLeftIcon data-icon="inline-start" />
-                <T>{"Previous"}</T>
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                <T>{data.page}</T> / <T>{data.totalPages}</T>
-              </span>
-              <Button
-                variant="outline"
-                disabled={refreshing || data.page >= data.totalPages}
-                aria-label={t("Go to next page")}
-                onClick={() => onPageChange(data.page + 1)}
-              >
-                <T>{"Next"}</T>
-                <ChevronRightIcon data-icon="inline-end" />
-              </Button>
-            </div>
-          </CardFooter>
-        ) : null}
-      </T>
+      {data?.items.length ? (
+        <CardFooter className="card-footer-divided">
+          <Pager
+            className="w-full"
+            page={data.page}
+            totalPages={data.totalPages}
+            disabled={refreshing}
+            label="Download history pagination"
+            summary={`Showing ${first.toLocaleString(locale)}–${(first + data.items.length - 1).toLocaleString(locale)} of ${BigInt(data.total).toLocaleString(locale)}`}
+            onPageChange={onPageChange}
+          />
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }

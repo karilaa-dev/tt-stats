@@ -22,7 +22,7 @@ test("visitors can browse every period and keep filters through pagination and h
     ["24 hours", "24h", "6"],
     ["7 days", "7d", "18"],
     ["31 days", "31d", "36"],
-    ["Total", "all", "60"],
+    ["All time", "all", "60"],
   ]) {
     await page.getByRole("button", { name: label, exact: true }).click()
     await expect(
@@ -34,10 +34,10 @@ test("visitors can browse every period and keep filters through pagination and h
     if (range !== "24h")
       await expect(page).toHaveURL(new RegExp(`range=${range}`))
   }
-  await page.getByRole("button", { name: "Next", exact: true }).click()
+  await page.getByRole("button", { name: "Go to next page" }).click()
   await expect(page).toHaveURL(/range=all&page=2/)
   await page.getByRole("button", { name: "7 days", exact: true }).click()
-  await expect(page).toHaveURL(/range=7d&page=1/)
+  await expect(page).toHaveURL(/range=7d$/)
   await expect(
     table.getByRole("row").nth(1).getByRole("cell").first()
   ).toHaveText("1")
@@ -48,7 +48,7 @@ test("visitors can browse every period and keep filters through pagination and h
   ).toHaveText("21")
   await page.reload()
   await expect(
-    page.getByRole("button", { name: "Total", exact: true })
+    page.getByRole("button", { name: "All time", exact: true })
   ).toHaveAttribute("aria-pressed", "true")
   await expect(table).toBeVisible()
   await table.getByRole("button", { name: "View media" }).first().click()

@@ -1,10 +1,11 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useQuery } from "@tanstack/react-query"
-import { Share2Icon } from "lucide-react"
+import { Share2Icon, UsersIcon } from "lucide-react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
 import { PageHeading } from "@/components/dashboard/page-heading"
+import { SummaryStrip } from "@/components/dashboard/summary-strip"
 import { RankedTable } from "@/components/dashboard/ranked-table"
 import {
   Card,
@@ -13,19 +14,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/controls"
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/controls"
 import { referralStatsQueryOptions } from "@/lib/stats/query-options"
 
 export function ReferralsPage() {
-  const { locale } = useTranslation()
-
-  const { t } = useTranslation()
+  const { t, locale } = useTranslation()
 
   const referralsQuery = useQuery(referralStatsQueryOptions())
   const rows = referralsQuery.data
@@ -43,35 +35,32 @@ export function ReferralsPage() {
           reset={() => void referralsQuery.refetch()}
         />
       ) : !rows ? (
-        <DashboardLoading variant="table" />
+        <DashboardLoading variant="summary-table" count={6} />
       ) : (
-        <div className="flex flex-col gap-6">
-          <dl className="grid gap-6 rounded-2xl border bg-card p-6 sm:grid-cols-3">
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                <T>{"Chats from ranked sources"}</T>
-              </dt>
-              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                <T>{rankedChats.toLocaleString(locale)}</T>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                <T>{"Ranked sources"}</T>
-              </dt>
-              <dd className="mt-2 text-3xl font-semibold tracking-tight tabular-nums">
-                <T>{rows.length}</T>
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-sm text-muted-foreground">
-                <T>{"Leading referral"}</T>
-              </dt>
-              <dd className="mt-2 text-xl font-semibold break-all">
-                {rows[0]?.value ?? "No referrals yet"}
-              </dd>
-            </div>
-          </dl>
+        <>
+          <SummaryStrip
+            items={[
+              {
+                label: "Chats from ranked sources",
+                value: rankedChats.toLocaleString(locale),
+                icon: UsersIcon,
+              },
+              {
+                label: "Ranked sources",
+                value: rows.length.toLocaleString(locale),
+                icon: Share2Icon,
+              },
+              {
+                label: "Leading referral",
+                value: rows[0] ? (
+                  <span className="font-mono">{rows[0].value}</span>
+                ) : (
+                  "No referrals yet"
+                ),
+                wide: true,
+              },
+            ]}
+          />
           <Card>
             <CardHeader>
               <CardTitle>
@@ -84,36 +73,16 @@ export function ReferralsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <T>
-                {rows.length ? (
-                  <RankedTable
-                    rows={rows}
-                    valueLabel="Referral"
-                    countLabel="Registered chats"
-                  />
-                ) : (
-                  <Empty>
-                    <EmptyHeader>
-                      <EmptyMedia variant="icon">
-                        <Share2Icon />
-                      </EmptyMedia>
-                      <EmptyTitle>
-                        <T>{"No referrals yet"}</T>
-                      </EmptyTitle>
-                      <EmptyDescription>
-                        <T>
-                          {
-                            "Referrals appear here when new chats register through a referral link."
-                          }
-                        </T>
-                      </EmptyDescription>
-                    </EmptyHeader>
-                  </Empty>
-                )}
-              </T>
+              <RankedTable
+                rows={rows}
+                valueLabel="Referral"
+                countLabel="Registered chats"
+                emptyTitle="No referrals yet"
+                emptyDescription="Referrals appear here when new chats register through a referral link."
+              />
             </CardContent>
           </Card>
-        </div>
+        </>
       )}
     </>
   )

@@ -1,4 +1,7 @@
 .overview-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
   min-width: 0;
 }
 .overview-lifetime-stack {
@@ -8,7 +11,7 @@
   min-width: 0;
 }
 .overview-composition .overview-mau-card {
-  --card-spacing: 1.2rem;
+  --card-spacing: 1.25rem;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
@@ -17,9 +20,6 @@
 .overview-mau-card [data-slot="card-header"] {
   flex: 1;
   min-width: 0;
-}
-.overview-composition .overview-mau-card [data-slot="card-title"] {
-  font-size: 0.8rem;
 }
 .overview-mau-number {
   font-family: var(--font-heading);
@@ -38,7 +38,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: 0.25rem 0 1rem;
+  margin-bottom: 1.25rem;
 }
 .overview-toolbar .overview-audience-tabs {
   height: 2.8rem;
@@ -223,9 +223,22 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+/* The traffic plot grows with its row so it never leaves an empty band. */
+.overview-traffic-card [data-slot="card-content"] {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+.overview-traffic-figure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
 .overview-traffic-figure svg {
+  flex: 1;
   width: 100%;
-  height: 188px;
+  height: auto;
+  min-height: 188px;
   overflow: visible;
 }
 .overview-chart-axis {
@@ -406,8 +419,7 @@
     margin-left: 1rem;
   }
   .overview-traffic-figure svg {
-    height: auto;
-    min-height: 135px;
+    min-height: 160px;
   }
   .overview-shortcuts {
     grid-template-columns: minmax(0, 1fr);
