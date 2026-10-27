@@ -5,34 +5,29 @@ import { DataAccessError, getPool } from "@/lib/db/pool"
 import { withDatabaseStage } from "@/lib/db/diagnostics"
 import { getHistoryComparisons } from "./history-comparisons"
 import { savedMediaSql } from "@/lib/media/saved"
+import { userHistorySql, historyMatches } from "./history-source"
 import type { HistoryFilters, PaginatedUserDownloads } from "./types"
-
-// Only stable video identities can establish other downloaders or who was first.
-// Comparisons deliberately include events outside the selected history dates.
-function matches(source: string) {
-  return `SELECT user_id, downloaded_at, pk_id FROM public.videos
-    WHERE ${source}.video_details_id IS NOT NULL
-      AND video_details_id = ${source}.video_details_id AND user_id <> 0`
-}
 
 function comparisons(source: string) {
   return `CROSS JOIN LATERAL (
     SELECT count(DISTINCT matched.user_id) FILTER (WHERE matched.user_id <> $1::bigint) AS other_chats,
       coalesce(bool_or(matched.downloaded_at IS NULL OR matched.downloaded_at < 946684800
         OR matched.downloaded_at > floor(extract(epoch FROM now()))::bigint), true) AS uncertain
-    FROM (${matches(source)}) matched
+    FROM (${historyMatches(source)}) matched
   ) comparison
   LEFT JOIN LATERAL (
-    SELECT user_id FROM (${matches(source)}) matched
+    SELECT user_id FROM (${historyMatches(source)}) matched
     ORDER BY downloaded_at ASC NULLS LAST, pk_id ASC LIMIT 1
   ) first_download ON true`
 }
 
-const fields = `page.pk_id::text AS id, page.downloaded_at, page.shared_link, page.media_kind,
+const fields = `page.pk_id::text AS id, page.event_id, page.downloaded_at, page.shared_link, page.media_kind,
   page.cache_hit, page.video_details_id::text,
-  details.platform, details.platform_video_id, details.creator_username, details.canonical_link,
+  coalesce(details.platform, CASE WHEN page.media_kind = 'audio' THEN 'tiktok' END) AS platform,
+  coalesce(details.platform_video_id, page.audio_video_id) AS platform_video_id,
+  details.creator_username, details.canonical_link,
   details.views_display, details.likes_display,
-  ${savedMediaSql("page.video_details_id")} AS has_saved_media`
+  (page.media_kind <> 'audio' AND ${savedMediaSql("page.video_details_id")}) AS has_saved_media`
 interface HistoryRow {
   id: string | null
   platform: string | null
@@ -43,7 +38,7 @@ interface HistoryRow {
   likes_display: string | null
   downloaded_at: string | null
   shared_link: string
-  media_kind: "video" | "images"
+  media_kind: "video" | "images" | "audio"
   cache_hit: boolean
   video_details_id: string | null
   has_saved_media: boolean
@@ -74,10 +69,10 @@ export async function getUserDownloadsRaw(
     AND ($2::bigint IS NULL OR downloaded_at >= $2::bigint)
     AND ($3::bigint IS NULL OR downloaded_at < $3::bigint)
     AND ($4::text IS NULL OR media_kind = $4)
-    ${filters.savedMediaOnly ? `AND ${savedMediaSql("videos.video_details_id")}` : ""}`
+    ${filters.savedMediaOnly ? `AND media_kind <> 'audio' AND ${savedMediaSql("history.video_details_id")}` : ""}`
   const direction = filters.sort === "oldest" ? "ASC" : "DESC"
   const popular = filters.category === "popular" || filters.sort === "popular"
-  const chronological = `page.downloaded_at ${direction} NULLS LAST, page.pk_id ${direction}`
+  const chronological = `page.downloaded_at ${direction} NULLS LAST, page.event_id ${direction}, page.media_kind ${direction}`
   let rows: HistoryRow[]
   let total: string
   let page: number
@@ -86,7 +81,7 @@ export async function getUserDownloadsRaw(
       // Ordinary browsing compares only the requested page.
       const count = await withDatabaseStage("history.count", () =>
         pool.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM public.videos WHERE ${predicate}`,
+          `WITH history AS (${userHistorySql}) SELECT count(*)::text AS count FROM history WHERE ${predicate}`,
           values
         )
       )
@@ -97,9 +92,9 @@ export async function getUserDownloadsRaw(
       )
       const result = await withDatabaseStage("history.page", () =>
         pool.query<HistoryRow>(
-          `WITH page AS (
-          SELECT * FROM public.videos WHERE ${predicate}
-          ORDER BY downloaded_at ${direction} NULLS LAST, pk_id ${direction} LIMIT $5 OFFSET $6
+          `WITH history AS (${userHistorySql}), page AS (
+          SELECT * FROM history WHERE ${predicate}
+          ORDER BY downloaded_at ${direction} NULLS LAST, event_id ${direction}, media_kind ${direction} LIMIT $5 OFFSET $6
         ) SELECT ${fields}, comparison.other_chats::text, comparison.uncertain,
           first_download.user_id::text AS first_user
         FROM page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ${comparisons("page")} ORDER BY ${chronological}`,
@@ -131,9 +126,8 @@ export async function getUserDownloadsRaw(
           AS c(content_id bigint, other_chats bigint, uncertain boolean, first_user bigint)
       ), first_downloads AS (SELECT content_id, first_user FROM compared)`
         : `matched AS MATERIALIZED (
-          SELECT identities.content_id, v.user_id, v.downloaded_at, v.pk_id
-          FROM identities JOIN public.videos v ON identities.video_details_id IS NOT NULL
-            AND v.video_details_id = identities.video_details_id AND v.user_id <> 0
+          SELECT identities.content_id, matched.*
+          FROM identities CROSS JOIN LATERAL (${historyMatches("identities")}) matched
         ), compared AS (
           SELECT content_id,
             count(DISTINCT user_id) FILTER (WHERE user_id <> $1::bigint) AS other_chats,
@@ -146,16 +140,18 @@ export async function getUserDownloadsRaw(
         )`
       const result = await withDatabaseStage("history.rank", () =>
         pool.query<HistoryRow>(
-          `WITH candidates AS MATERIALIZED (
+          `WITH history AS (${userHistorySql}), candidates AS MATERIALIZED (
           SELECT *
-          FROM public.videos WHERE ${predicate}
+          FROM history WHERE ${predicate}
         ), identities AS (
-          SELECT min(pk_id) AS content_id, video_details_id
-          FROM candidates WHERE video_details_id IS NOT NULL GROUP BY 2
+          SELECT min(pk_id) AS content_id, video_details_id, audio_video_id
+          FROM candidates WHERE video_details_id IS NOT NULL OR audio_video_id IS NOT NULL GROUP BY 2, 3
         ), ${comparisonCtes}, annotated AS MATERIALIZED (
           SELECT candidates.*, coalesce(compared.other_chats, 0) AS other_chats,
             coalesce(compared.uncertain, true) AS uncertain, first_downloads.first_user
-          FROM candidates LEFT JOIN identities USING (video_details_id)
+          FROM candidates LEFT JOIN identities
+            ON coalesce('audio:' || candidates.audio_video_id, 'video:' || candidates.video_details_id::text)
+              = coalesce('audio:' || identities.audio_video_id, 'video:' || identities.video_details_id::text)
           LEFT JOIN compared USING (content_id) LEFT JOIN first_downloads USING (content_id)
         ), qualified AS MATERIALIZED (
           SELECT * FROM annotated WHERE ${discovery}
@@ -167,7 +163,7 @@ export async function getUserDownloadsRaw(
           LIMIT $5 OFFSET (least($6::bigint, greatest(1, ceil(totals.total::numeric / $5)::bigint)) - 1) * $5
         ) selected ON true
         ORDER BY ${popular ? "selected.other_chats::bigint DESC," : ""}
-          selected.downloaded_at ${direction} NULLS LAST, selected.id::bigint ${direction}`,
+          selected.downloaded_at ${direction} NULLS LAST, selected.event_id ${direction}, selected.media_kind ${direction}`,
           [
             ...values,
             pageSize,
@@ -185,7 +181,7 @@ export async function getUserDownloadsRaw(
     }
     return {
       items: rows.map((row) => ({
-        id: row.id!,
+        id: row.media_kind === "audio" ? `audio:${-BigInt(row.id!)}` : row.id!,
         videoId: row.platform_video_id?.trim() || null,
         canonicalUrl: canonicalPostUrl({
           platform: row.platform,
@@ -201,7 +197,8 @@ export async function getUserDownloadsRaw(
         sharedLink: row.shared_link,
         mediaKind: row.media_kind,
         cacheHit: row.cache_hit,
-        videoDetailsId: row.video_details_id,
+        videoDetailsId:
+          row.media_kind === "audio" ? null : row.video_details_id,
         hasSavedMedia: row.has_saved_media,
         otherUniqueChats: row.other_chats,
         isFirstDownloader: row.uncertain ? null : row.first_user === userId,

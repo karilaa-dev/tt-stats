@@ -15,6 +15,11 @@ test("visitors can browse every period and keep filters through pagination and h
   await expect(page).toHaveURL(/dashboard\/videos/)
   const table = page.getByRole("table", { name: "Most downloaded videos" })
   await expect(table).toBeVisible()
+  const first = table.getByRole("row").nth(1)
+  await expect(first.getByText("First download", { exact: true })).toBeVisible()
+  await expect(first.getByText("Last download", { exact: true })).toBeVisible()
+  await expect(first.locator("time")).toHaveCount(2)
+  await expect(first.locator("time").first()).toHaveAttribute("datetime", /T/)
   await expect(
     page.getByRole("dialog", { name: "Admin access", exact: true })
   ).toHaveCount(0)

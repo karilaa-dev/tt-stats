@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { cleanup, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
 import type { TelegramChatProfile } from "@/lib/telegram/types"
@@ -67,6 +67,17 @@ describe("Telegram chat details", () => {
     expect(await screen.findByText("Our group")).toBeTruthy()
     expect(screen.getByText("No public username")).toBeTruthy()
     expect(screen.queryByRole("link")).toBeNull()
+  })
+
+  it("shows a profile photo with an icon fallback when the photo fails", async () => {
+    actions.getTelegramChat.mockResolvedValue(profile)
+    const { container } = renderCard()
+    await screen.findByText("Alex Example")
+    const photo = container.querySelector(".profile-avatar img")!
+    expect(photo.getAttribute("src")).toBe("/api/users/123/avatar")
+    fireEvent.error(photo)
+    expect(container.querySelector(".profile-avatar img")).toBeNull()
+    expect(container.querySelector(".profile-avatar svg")).toBeTruthy()
   })
 
   it.each([

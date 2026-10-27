@@ -4,6 +4,7 @@ import {
   EyeIcon,
   HeartIcon,
   ImagesIcon,
+  MusicNotesIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react"
 import { Badge } from "@/components/controls"
@@ -120,7 +121,9 @@ export function UserDownloadsTable({
                 <li key={download.id} className="download-entry">
                   <span className="download-kind" aria-hidden="true">
                     <T>
-                      {download.mediaKind === "images" ? (
+                      {download.mediaKind === "audio" ? (
+                        <MusicNotesIcon />
+                      ) : download.mediaKind === "images" ? (
                         <ImagesIcon />
                       ) : (
                         <VideoCameraIcon />
@@ -131,9 +134,11 @@ export function UserDownloadsTable({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground">
                         <T>
-                          {download.mediaKind === "images"
-                            ? "Image album"
-                            : "Video"}
+                          {download.mediaKind === "audio"
+                            ? "Audio"
+                            : download.mediaKind === "images"
+                              ? "Image album"
+                              : "Video"}
                         </T>
                       </span>
                       <T>

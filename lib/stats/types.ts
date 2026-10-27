@@ -92,6 +92,7 @@ export interface UserStats {
   fileMode: boolean
   downloads: string
   images: string
+  audio?: string
   uniqueVideos?: string
   firstDownloadAt?: number | null
   latestDownloadAt?: number | null
@@ -102,7 +103,7 @@ export interface HistoryFilters {
   savedMediaOnly?: boolean
   from?: number
   until?: number
-  mediaKind: "all" | "video" | "images"
+  mediaKind: "all" | "video" | "images" | "audio"
   discovery: "all" | "others" | "first"
   category?: "history" | "popular"
   /** popular is accepted for links and clients predating categories. */
@@ -117,7 +118,7 @@ export interface UserDownload {
   id: string
   downloadedAt: number | null
   sharedLink: string
-  mediaKind: "video" | "images"
+  mediaKind: "video" | "images" | "audio"
   cacheHit: boolean
   videoDetailsId: string | null
   hasSavedMedia: boolean

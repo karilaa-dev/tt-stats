@@ -45,6 +45,121 @@ const windowEnd = Math.floor(now / 3600) * 3600
 let pool: Pool
 
 integration("PostgreSQL statistics queries", () => {
+  it("merges audio and post downloads without ID collisions and compares audio independently", async () => {
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      const db = client as unknown as Pool
+      await client.query(
+        "INSERT INTO users(user_id) VALUES (998090), (998091), (998092)"
+      )
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id, creator_username, telegram_bot_id, telegram_files)
+        VALUES (998090, 'tiktok', '7539876543210000090', 'audio_creator', 123,
+          '[{"position":0,"media_type":"video","file_id":"video","file_unique_id":"video-unique"}]')`)
+      await client.query(`INSERT INTO videos(pk_id,user_id,video_details_id,downloaded_at,shared_link,media_kind,delivery_surface) VALUES
+        (998090,998090,998090,1700000010,'https://vm.tiktok.com/audio-post','video','chat'),
+        (998091,998092,998090,1600000000,'https://vm.tiktok.com/video-only','video','chat')`)
+      await client.query(`INSERT INTO music(pk_id,user_id,downloaded_at,video_id) VALUES
+        (998090,998090,1700000000,7539876543210000090),
+        (998091,998090,1700000010,7539876543210000090),
+        (998092,998091,1700000020,7539876543210000090),
+        (998093,998090,NULL,7539876543210000091)`)
+      const base = {
+        mediaKind: "all",
+        discovery: "all",
+        sort: "newest",
+      } as const
+      const history = await getUserDownloadsRaw("998090", 1, 20, db, base)
+      expect(history.total).toBe("4")
+      expect(new Set(history.items.map((item) => item.id)).size).toBe(4)
+      expect(
+        history.items.filter((item) => item.mediaKind === "audio")
+      ).toHaveLength(3)
+      const audio = history.items.find((item) => item.id === "audio:998090")!
+      expect(audio).toMatchObject({
+        videoId: "7539876543210000090",
+        canonicalUrl:
+          "https://www.tiktok.com/@audio_creator/video/7539876543210000090",
+        hasSavedMedia: false,
+        videoDetailsId: null,
+        otherUniqueChats: "1",
+        isFirstDownloader: true,
+      })
+      const unknown = history.items.at(-1)!
+      expect(unknown).toMatchObject({
+        id: "audio:998093",
+        downloadedAt: null,
+        videoId: "7539876543210000091",
+        canonicalUrl: "https://www.tiktok.com/@/video/7539876543210000091",
+        isFirstDownloader: null,
+        hasSavedMedia: false,
+      })
+      const second = await getUserDownloadsRaw("998090", 2, 2, db, base)
+      expect(second.items.map((item) => item.id)).toEqual([
+        "audio:998090",
+        "audio:998093",
+      ])
+      expect(
+        (
+          await getUserDownloadsRaw("998090", 1, 20, db, {
+            ...base,
+            mediaKind: "audio",
+          })
+        ).total
+      ).toBe("3")
+      expect(
+        (
+          await getUserDownloadsRaw("998090", 1, 20, db, {
+            ...base,
+            mediaKind: "video",
+          })
+        ).total
+      ).toBe("1")
+      expect(
+        (
+          await getUserDownloadsRaw("998090", 1, 20, db, {
+            ...base,
+            savedMediaOnly: true,
+          })
+        ).items.map((item) => item.id)
+      ).toEqual(["998090"])
+      for (const discovery of ["all", "others", "first"] as const) {
+        const ranked = await getUserDownloadsRaw("998090", 1, 20, db, {
+          ...base,
+          mediaKind: "audio",
+          category: "popular",
+          discovery,
+          from: 1700000005,
+        })
+        expect(ranked.items.map((item) => item.id)).toEqual(["audio:998091"])
+        expect(ranked.items[0]?.isFirstDownloader).toBe(true)
+      }
+      expect(await getUserStatsRaw("998090", db)).toMatchObject({
+        downloads: "4",
+        audio: "3",
+        images: "0",
+        uniqueVideos: "1",
+        firstDownloadAt: 1700000000,
+        latestDownloadAt: 1700000010,
+      })
+      expect(
+        (await getUserActivityRaw("998090", "all", db)).points.reduce(
+          (sum, point) => sum + point.count,
+          0
+        )
+      ).toBe(3)
+      await client.query(
+        "UPDATE music SET downloaded_at = NULL WHERE pk_id = 998092"
+      )
+      const uncertain = await getUserDownloadsRaw("998090", 1, 20, db, base)
+      expect(
+        uncertain.items.find((item) => item.id === audio.id)?.isFirstDownloader
+      ).toBeNull()
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
   it("joins platform metadata and stored engagement once, orders categories, and separates cached filters", async () => {
     await pool.query("INSERT INTO users(user_id) VALUES (998080), (998081)")
     await pool.query(`INSERT INTO video_details(pk_id,platform,platform_video_id,creator_username,canonical_link,views_display,likes_display) VALUES
@@ -896,8 +1011,9 @@ integration("PostgreSQL statistics queries", () => {
       language: "en",
       referral: "alpha",
       fileMode: true,
-      downloads: "1",
+      downloads: "2",
       images: "1",
+      audio: "1",
     })
     expect(await getUserStatsRaw("999", pool)).toBeNull()
   })
@@ -907,18 +1023,21 @@ integration("PostgreSQL statistics queries", () => {
     expect(firstPage).toMatchObject({
       page: 1,
       pageSize: 2,
-      total: "3",
+      total: "4",
       totalPages: 2,
     })
     expect(firstPage.items.map((item) => item.sharedLink)).toEqual([
       "https://example.test/new",
-      'https://example.test/images,"quoted"',
+      "https://www.tiktok.com/@/video/101",
     ])
     expect(firstPage.items.map((item) => item.cacheHit)).toEqual([true, false])
 
     const clampedPage = await getUserDownloadsRaw("1", 99, 2, pool)
     expect(clampedPage.page).toBe(2)
-    expect(clampedPage.items[0]?.sharedLink).toBe("https://example.test/old")
+    expect(clampedPage.items.map((item) => item.sharedLink)).toEqual([
+      'https://example.test/images,"quoted"',
+      "https://example.test/old",
+    ])
   })
 
   it("resolves albums, lists related chats independently of cache, and ranks unique chats by video identity", async () => {
@@ -1051,7 +1170,7 @@ integration("PostgreSQL statistics queries", () => {
       })
       await client.query("DELETE FROM tt_stats_cache.popular_videos")
       await client.query(
-        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 3)",
+        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 4)",
         [now]
       )
       expect(await getPopularVideosRaw(1, db)).toEqual({
@@ -1108,6 +1227,18 @@ integration("PostgreSQL statistics queries", () => {
         const ranking = await getPopularVideosRaw(1, db, range)
         expect(ranking.range).toBe(range)
         expect(ranking.items[0]).toMatchObject({ uniqueChats })
+        expect(ranking.items[0]).toMatchObject({
+          firstDownloadedAt:
+            end -
+            (range === "24h"
+              ? 86400
+              : range === "7d"
+                ? 604800
+                : range === "31d"
+                  ? 604801
+                  : 2678401),
+          lastDownloadedAt: range === "all" ? end : end - 1,
+        })
         expect(ranking.items[0]).not.toHaveProperty("downloads")
         expect(ranking.items[0]?.videoId).toBe("period-test")
         expect(ranking.items).toHaveLength(1)
@@ -1323,6 +1454,8 @@ integration("PostgreSQL statistics queries", () => {
       'attachment; filename="user_1.csv"'
     )
     const csv = await response.text()
+    expect(csv).toContain("Time,Video,Type")
+    expect(csv).toContain("https://www.tiktok.com/@/video/101,audio")
     expect(csv).toContain('"https://example.test/images,""quoted"""')
     expect(csv.indexOf("https://example.test/new")).toBeLessThan(
       csv.indexOf("https://example.test/old")

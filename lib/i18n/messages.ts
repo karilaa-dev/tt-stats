@@ -1,5 +1,11 @@
 // English source messages are the shared, typed dictionary keys.
 export const messages = {
+  Audio: { ru: "Аудио", uk: "Аудіо" },
+  "Last download": { ru: "Последнее скачивание", uk: "Останнє завантаження" },
+  "First and last downloads are within the selected period.": {
+    ru: "Первое и последнее скачивания указаны за выбранный период.",
+    uk: "Перше й останнє завантаження вказані за вибраний період.",
+  },
   "(opens in a new tab)": {
     ru: "(откроется в новой вкладке)",
     uk: "(відкриється в новій вкладці)",

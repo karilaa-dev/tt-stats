@@ -78,7 +78,9 @@ ALTER TABLE tt_stats_cache.popular_videos_metadata
 
 ALTER TABLE tt_stats_cache.popular_videos
   ADD COLUMN IF NOT EXISTS video_details_id BIGINT,
-  ADD COLUMN IF NOT EXISTS video_id TEXT;
+  ADD COLUMN IF NOT EXISTS video_id TEXT,
+  ADD COLUMN IF NOT EXISTS first_downloaded_at BIGINT,
+  ADD COLUMN IF NOT EXISTS last_downloaded_at BIGINT;
 
 DROP FUNCTION IF EXISTS tt_stats_cache._refresh_popular_videos(TIMESTAMPTZ);
 CREATE OR REPLACE FUNCTION tt_stats_cache._refresh_popular_videos(
@@ -112,12 +114,15 @@ BEGIN
   -- that could scan all 50 million events for a short-window ranking.
   EXECUTE format($query$
   INSERT INTO tt_stats_cache.popular_videos (
-    range, position, download_id, shared_link, downloads, unique_chats, video_details_id, video_id
+    range, position, download_id, shared_link, downloads, unique_chats, video_details_id, video_id,
+    first_downloaded_at, last_downloaded_at
   )
   WITH counts AS (
     SELECT video_details_id,
            min(pk_id) AS download_id, count(*) AS downloads,
-           count(DISTINCT user_id) AS unique_chats
+           count(DISTINCT user_id) AS unique_chats,
+           min(downloaded_at) FILTER (WHERE downloaded_at >= 946684800 AND downloaded_at <= floor(extract(epoch FROM $4))::bigint) AS first_downloaded_at,
+           max(downloaded_at) FILTER (WHERE downloaded_at >= 946684800 AND downloaded_at <= floor(extract(epoch FROM $4))::bigint) AS last_downloaded_at
     FROM public.videos
     WHERE media_kind = 'video' AND user_id <> 0 AND video_details_id IS NOT NULL%1$s
     GROUP BY video_details_id
@@ -132,13 +137,14 @@ BEGIN
     FROM candidates
   )
   SELECT $1, winners.position, winners.download_id, source.shared_link,
-         winners.downloads, winners.unique_chats, winners.video_details_id, winners.video_id
+         winners.downloads, winners.unique_chats, winners.video_details_id, winners.video_id,
+         winners.first_downloaded_at, winners.last_downloaded_at
   FROM winners JOIN public.videos source ON source.pk_id = winners.download_id;
 
-  $query$, v_period_filter) USING p_range, v_start, v_end;
+  $query$, v_period_filter) USING p_range, v_start, v_end, p_now;
 
   INSERT INTO tt_stats_cache.popular_videos_metadata (range, singleton, refreshed_at, ranking_version)
-  VALUES (p_range, TRUE, p_now, 3)
+  VALUES (p_range, TRUE, p_now, 4)
   ON CONFLICT (range) DO UPDATE SET refreshed_at = excluded.refreshed_at, ranking_version = excluded.ranking_version;
 END;
 $$;
@@ -965,6 +971,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:8';
+  IS 'tt-stats-schema-version:9';
 
 COMMIT;

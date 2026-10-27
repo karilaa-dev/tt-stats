@@ -12,6 +12,7 @@ import { cancelClient } from "@/lib/db/cancellation"
 import { currentDatabaseTask } from "@/lib/tasks/server"
 import { getFakeHistory, isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { parseTelegramId } from "@/lib/stats/validation"
+import { userHistorySql } from "@/lib/stats/history-source"
 
 export async function getHistoryCsvResponse(userId: string): Promise<Response> {
   const parsedId = parseTelegramId(userId)
@@ -32,7 +33,7 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
     if (task) {
       task.report("Counting downloads")
       const count = await getPool().query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM videos WHERE user_id = $1::bigint",
+        `WITH history AS (${userHistorySql}) SELECT count(*)::text AS count FROM history`,
         [parsedId]
       )
       total = Number(count.rows[0]?.count ?? 0)
@@ -41,17 +42,16 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
     client = await connect()
     task?.controller.signal.throwIfAborted()
     const query = new QueryStream(
-      `SELECT downloaded_at, shared_link
-       FROM videos
-       WHERE user_id = $1::bigint
-       ORDER BY downloaded_at DESC NULLS LAST, pk_id DESC`,
+      `WITH history AS (${userHistorySql}) SELECT downloaded_at, shared_link, media_kind
+       FROM history
+       ORDER BY downloaded_at DESC NULLS LAST, event_id DESC, media_kind DESC`,
       [parsedId]
     )
     const source = client.query(query)
     const records = stringify({
       header: true,
       escape_formulas: true,
-      columns: ["Time", "Video"],
+      columns: ["Time", "Video", "Type"],
     })
     let completed = 0
     const rows = Readable.from(
@@ -60,6 +60,7 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
           for await (const row of source as AsyncIterable<{
             downloaded_at: string | number | null
             shared_link: string
+            media_kind: "video" | "images" | "audio"
           }>) {
             yield {
               Time:
@@ -67,6 +68,7 @@ export async function getHistoryCsvResponse(userId: string): Promise<Response> {
                   ? ""
                   : new Date(Number(row.downloaded_at) * 1000).toISOString(),
               Video: row.shared_link,
+              Type: row.media_kind,
             }
             completed++
             if (completed % 100 === 0)

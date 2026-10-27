@@ -87,16 +87,20 @@ export async function getPopularVideosRaw(
     video_id: string | null
     has_saved_media: boolean
     unique_chats: string | null
+    first_downloaded_at: string | null
+    last_downloaded_at: string | null
     refreshed_at: string
   }>(
     pool,
     `SELECT ranking.download_id::text, ranking.shared_link, ranking.video_id,
             ${savedMediaSql("ranking.video_details_id")} AS has_saved_media,
             ranking.unique_chats::text,
+            ranking.first_downloaded_at::text, ranking.last_downloaded_at::text,
             extract(epoch FROM metadata.refreshed_at)::text AS refreshed_at
      FROM tt_stats_cache.popular_videos_metadata metadata
      LEFT JOIN LATERAL (
-       SELECT download_id, shared_link, video_details_id, video_id, unique_chats, position
+       SELECT download_id, shared_link, video_details_id, video_id, unique_chats, position,
+         first_downloaded_at, last_downloaded_at
        FROM tt_stats_cache.popular_videos
        WHERE range = $2 AND position > $1::bigint
        ORDER BY position
@@ -117,6 +121,14 @@ export async function getPopularVideosRaw(
             videoId: row.video_id!,
             hasSavedMedia: row.has_saved_media,
             uniqueChats: row.unique_chats!,
+            firstDownloadedAt:
+              row.first_downloaded_at == null
+                ? null
+                : Number(row.first_downloaded_at),
+            lastDownloadedAt:
+              row.last_downloaded_at == null
+                ? null
+                : Number(row.last_downloaded_at),
           },
         ]
   )

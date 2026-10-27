@@ -54,6 +54,43 @@ const downloads: PaginatedUserDownloads = {
 describe("user downloads table", () => {
   afterEach(cleanup)
 
+  it("labels audio separately and keeps its post link without offering video previews", () => {
+    render(
+      <UserDownloadsTable
+        data={{
+          ...downloads,
+          items: [
+            {
+              ...downloads.items[0]!,
+              id: "audio:2",
+              mediaKind: "audio",
+              videoId: "7539876543210000001",
+              canonicalUrl:
+                "https://www.tiktok.com/@/video/7539876543210000001",
+              videoDetailsId: null,
+              hasSavedMedia: false,
+            },
+          ],
+        }}
+        loading={false}
+        admin
+        onPageChange={vi.fn()}
+        onView={vi.fn()}
+      />
+    )
+    expect(screen.getByText("Audio")).toBeTruthy()
+    expect(screen.queryByText("Video")).toBeNull()
+    expect(
+      screen
+        .getByRole("link", { name: /7539876543210000001/ })
+        .getAttribute("href")
+    ).toContain("tiktok.com")
+    expect(screen.queryByRole("button", { name: "View media" })).toBeNull()
+    expect(
+      screen.queryByRole("button", { name: "Other downloaders" })
+    ).toBeNull()
+  })
+
   it("shows first-downloader status independently of cache and other-chat counts", () => {
     render(
       <UserDownloadsTable

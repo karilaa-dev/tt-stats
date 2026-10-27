@@ -64,7 +64,7 @@ export const loadOtherStats = async () =>
 export const loadPopularVideos = async (page: number, range: StatsRange) =>
   fake()
     ? getFakePopularVideos(page, range)
-    : snapshotRead(`popular-videos:${range}:${page}`, () =>
+    : snapshotRead(`popular-videos:v4:${range}:${page}`, () =>
         getPopularVideosRaw(page, undefined, range)
       )
 

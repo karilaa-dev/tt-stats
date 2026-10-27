@@ -4,7 +4,7 @@ import { getUserActivityRaw } from "./user-activity"
 import { getDownloadersRaw } from "@/lib/media/queries"
 import type { HistoryFilters, UserActivityRange } from "./types"
 export const getCachedUserStats = (userId: string) =>
-  cachedQuery("account-summary", { userId, visibility: "account" }, () =>
+  cachedQuery("account-summary:v2", { userId, visibility: "account" }, () =>
     getUserStatsRaw(userId)
   )
 export const getCachedUserActivity = (
@@ -12,7 +12,7 @@ export const getCachedUserActivity = (
   range: UserActivityRange
 ) =>
   cachedQuery(
-    "account-activity",
+    "account-activity:v2",
     { userId, range, visibility: "account" },
     () => getUserActivityRaw(userId, range)
   )
@@ -24,7 +24,7 @@ export const getCachedUserDownloads = (
   filters: HistoryFilters
 ) =>
   cachedQuery(
-    "account-history:v2",
+    "account-history:v3",
     {
       userId,
       page,

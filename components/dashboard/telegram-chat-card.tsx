@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/controls"
 import { telegramChatQueryOptions } from "@/lib/telegram/query-options"
 import type { TelegramChatProfile } from "@/lib/telegram/types"
+import { ProfileAvatar } from "./profile-avatar"
 
 const chatTypes = {
   private: "Private chat",
@@ -35,10 +36,15 @@ export function TelegramChatCard({ chatId }: { chatId: string }) {
   return (
     <Card aria-label={t("Telegram chat details")} aria-busy={query.isPending}>
       <CardHeader>
-        <CardTitle>{profile?.name ?? t("Telegram chat")}</CardTitle>
-        <CardDescription>
-          <span className="font-mono break-all">{chatId}</span>
-        </CardDescription>
+        <div className="profile-identity">
+          <ProfileAvatar key={chatId} userId={chatId} />
+          <div className="min-w-0">
+            <CardTitle>{profile?.name ?? t("Telegram chat")}</CardTitle>
+            <CardDescription>
+              <span className="font-mono break-all">{chatId}</span>
+            </CardDescription>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-3" aria-live="polite">
         {query.isPending ? (

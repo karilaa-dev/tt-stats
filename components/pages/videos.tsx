@@ -101,6 +101,9 @@ export function VideosPage() {
                 {
                   "Image albums and legacy downloads without a video ID are excluded."
                 }
+              </T>{" "}
+              <T>
+                {"First and last downloads are within the selected period."}
               </T>
             </CardDescription>
           </CardHeader>
@@ -145,8 +148,36 @@ export function VideosPage() {
                           <VideoCameraIcon aria-hidden="true" />
                           <span>{item.videoId}</span>
                         </span>
+                        <dl className="ranking-dates">
+                          {[
+                            ["First download", item.firstDownloadedAt],
+                            ["Last download", item.lastDownloadedAt],
+                          ].map(([label, epoch]) => (
+                            <div key={String(label)}>
+                              <dt>
+                                <T>{String(label)}</T>
+                              </dt>
+                              <dd>
+                                {typeof epoch === "number" ? (
+                                  <time
+                                    dateTime={new Date(
+                                      epoch * 1000
+                                    ).toISOString()}
+                                  >
+                                    {formatTimestamp(epoch, time)}
+                                  </time>
+                                ) : (
+                                  <T>{"Not recorded"}</T>
+                                )}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
                       </TableCell>
-                      <TableCell className="ranking-count">
+                      <TableCell
+                        className="ranking-count"
+                        data-label={t("People downloaded")}
+                      >
                         {BigInt(item.uniqueChats).toLocaleString(locale)}
                       </TableCell>
                       <TableCell className="ranking-action">

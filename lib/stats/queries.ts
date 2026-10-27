@@ -3,6 +3,7 @@ import "@/lib/server-only"
 import type { Pool, QueryResult, QueryResultRow } from "pg"
 
 import { DataAccessError, getPool } from "@/lib/db/pool"
+import { userHistorySql } from "./history-source"
 import type {
   ChatScope,
   OtherStats,
@@ -226,18 +227,21 @@ export async function getUserStatsRaw(
     downloads: string
     images: string
     unique_videos: string
+    audio: string
     first_download_at: string | null
     latest_download_at: string | null
   }>(
     pool,
-    `SELECT u.user_id::text, u.registered_at, u.lang, u.link, u.file_mode,
+    `WITH history AS (${userHistorySql})
+    SELECT u.user_id::text, u.registered_at, u.lang, u.link, u.file_mode,
       count(v.pk_id)::text AS downloads,
       count(v.pk_id) FILTER (WHERE v.media_kind = 'images')::text AS images,
+      count(v.pk_id) FILTER (WHERE v.media_kind = 'audio')::text AS audio,
       count(DISTINCT CASE WHEN v.video_details_id IS NOT NULL THEN 'id:' || v.video_details_id::text ELSE 'link:' || v.shared_link END)
         FILTER (WHERE v.media_kind = 'video')::text AS unique_videos,
       min(v.downloaded_at) FILTER (WHERE v.downloaded_at >= 946684800 AND v.downloaded_at <= extract(epoch FROM now()))::text AS first_download_at,
       max(v.downloaded_at) FILTER (WHERE v.downloaded_at >= 946684800 AND v.downloaded_at <= extract(epoch FROM now()))::text AS latest_download_at
-    FROM public.users u LEFT JOIN public.videos v ON v.user_id = u.user_id
+    FROM public.users u LEFT JOIN history v ON v.user_id = u.user_id
     WHERE u.user_id = $1::bigint GROUP BY u.user_id`,
     [userId]
   )
@@ -246,11 +250,11 @@ export async function getUserStatsRaw(
   const activity = await safeQuery<{ bucket: string; count: string }>(
     pool,
     `
-    WITH days AS (SELECT generate_series(
+    WITH history AS (${userHistorySql}), days AS (SELECT generate_series(
       (floor(extract(epoch FROM now()) / 86400)::bigint - 30) * 86400,
       floor(extract(epoch FROM now()) / 86400)::bigint * 86400, 86400) AS bucket),
     counts AS (SELECT (downloaded_at / 86400) * 86400 AS bucket, count(*) AS count
-      FROM public.videos WHERE user_id = $1::bigint
+      FROM history WHERE user_id = $1::bigint
       AND downloaded_at >= (SELECT min(bucket) FROM days) AND downloaded_at <= extract(epoch FROM now())
       GROUP BY 1)
     SELECT days.bucket::text, coalesce(counts.count, 0)::text AS count
@@ -265,6 +269,7 @@ export async function getUserStatsRaw(
     fileMode: row.file_mode,
     downloads: row.downloads,
     images: row.images,
+    audio: row.audio,
     uniqueVideos: row.unique_videos,
     firstDownloadAt:
       row.first_download_at === null ? null : Number(row.first_download_at),

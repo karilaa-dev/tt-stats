@@ -7,10 +7,14 @@ describe("history CSV", () => {
     expect(utcIsoFromEpoch(0)).toBe("1970-01-01T00:00:00.000Z")
     expect(
       historyCsv([
-        { Time: utcIsoFromEpoch(0), Video: 'https://example.test/a,"b"' },
+        {
+          Time: utcIsoFromEpoch(0),
+          Video: 'https://example.test/a,"b"',
+          Type: "audio",
+        },
       ])
     ).toBe(
-      'Time,Video\n1970-01-01T00:00:00.000Z,"https://example.test/a,""b"""\n'
+      'Time,Video,Type\n1970-01-01T00:00:00.000Z,"https://example.test/a,""b""",audio\n'
     )
   })
 })

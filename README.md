@@ -384,13 +384,13 @@ inline styles remain permitted for the component and chart libraries.
 
 ## Deploying the new rankings
 
-The ranking that excludes entries without video IDs is schema version 8. In
+The ranking with first and last download dates is schema version 9. In
 Operations, **Update database definitions** installs the change and queues both
 rolling and daily rebuilds. A manual installation uses the documented SQL
 procedure. Apply any missing indexes from `database/002_stats_snapshot_indexes.sql`
 outside a transaction. All four ranking periods must reach
-`ranking_version = 3`. The app refuses to show old rankings that include legacy
-links while that refresh is pending. Schedule the update during deployment;
+`ranking_version = 4`. The app waits for rankings with the new date fields
+while that refresh is pending. Schedule the update during deployment;
 Top videos is unavailable until the definitions and rankings are ready.
 
 The source bot tables are not rewritten. Added source indexes support identity
@@ -451,7 +451,9 @@ lookups require admin access. Ranking counts distinct chats, counting each group
 as one chat and excluding placeholder ID zero. It excludes image albums.
 Only events with a stable `video_details_id` and a non-empty platform video ID
 participate. Legacy links are excluded before selecting the top 1,000. The table
-displays the platform video ID instead of the shared URL, and **View media** appears
+displays the platform video ID, first download, and last download within the
+selected period, with dates shown in the browser's time zone. Missing or invalid
+timestamps show **Not recorded**. **View media** appears
 only while the video has saved Telegram file IDs. Availability is checked when
 reading each page, so removed files do not require rebuilding rankings. This is a
 snapshot for each period. The 24-hour ranking updates every five minutes and
@@ -461,6 +463,20 @@ appear only in Total. Page reads use the stored rank index; opening or paging
 this view does not scan download history. The background jobs calculate
 distinct-chat counts across every candidate before selecting the top 1,000 and keep the previous snapshot
 readable until the new one commits.
+
+Personal profiles and admin user lookup show the Telegram profile photo, with a
+user or group icon when unavailable. Photos are proxied through an authenticated
+route so Telegram bot credentials remain on the server.
+
+Account history includes video, image album, and audio events. Audio records use
+the TikTok post ID stored in `music.video_id`; their IDs are prefixed with `audio:`
+to distinguish them from video history entries. The Audio filter, date filters,
+pagination, activity, totals, and CSV export include these events. Audio popularity
+and first-downloader comparisons use other audio events for the same post. Audio
+entries link to the original post and do not offer the source video's saved media
+as an audio preview. CSV exports include a `Type` column (`video`, `images`, or
+`audio`). Install the additional music history and identity indexes from
+`database/002_stats_snapshot_indexes.sql` outside a transaction.
 
 After upgrading, open Operations and use **Update database definitions**, which
 queues both rolling and daily rebuilds. Wait for the selected period to finish.

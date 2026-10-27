@@ -71,45 +71,49 @@ const fakeHistory: HistoryCsvRow[] = [
   {
     Time: "2026-08-10T04:58:00.000Z",
     Video: "https://www.tiktok.com/@demo/video/7539876543210000001",
+    Type: "video",
   },
   {
     Time: "2026-08-09T21:14:12.000Z",
     Video: "https://www.instagram.com/p/DEMO_IMAGE_ALBUM/",
+    Type: "images",
   },
   {
     Time: "2026-08-08T09:02:44.000Z",
     Video: 'https://example.test/video,with-a-comma-and-"quotes"',
+    Type: "video",
   },
 ]
 
 const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
   const images = index % 5 === 2
+  const audio = !images && [3, 11, 15].includes(index)
   return {
     videoId:
-      index % 4 === 3
+      index % 4 === 3 && !audio
         ? null
         : images
           ? `DEMO_ALBUM_${String(index + 1).padStart(2, "0")}`
           : String(7539876543210000001n + BigInt(index)),
     canonicalUrl:
-      index % 4 === 3
+      index % 4 === 3 && !audio
         ? null
         : images
           ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
           : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
     viewsDisplay: index % 4 === 3 ? null : "1.2M",
     likesDisplay: index % 4 === 3 ? null : "0",
-    id: String(10_000 - index),
+    id: `${audio ? "audio:" : ""}${10_000 - index}`,
     downloadedAt: FAKE_NOW_EPOCH - index * 14_417,
     sharedLink: images
       ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
       : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
-    mediaKind: images ? "images" : "video",
+    mediaKind: audio ? "audio" : images ? "images" : "video",
     cacheHit: index % 3 !== 0,
     otherUniqueChats: String(index % 7),
     isFirstDownloader: index % 4 === 0 ? true : index % 4 === 3 ? null : false,
-    videoDetailsId: index % 4 === 3 ? null : String(index + 1),
-    hasSavedMedia: index % 4 !== 3 && index % 6 !== 4,
+    videoDetailsId: audio || index % 4 === 3 ? null : String(index + 1),
+    hasSavedMedia: !audio && index % 4 !== 3 && index % 6 !== 4,
   }
 })
 
@@ -134,6 +138,9 @@ export function getFakePopularVideos(
         source?.sharedLink ?? `https://www.tiktok.com/@demo/video/${videoId}`,
       hasSavedMedia: source?.hasSavedMedia ?? index % 4 !== 3,
       uniqueChats: String(Math.ceil(Math.max(1, 60 - index * 2) * scale)),
+      firstDownloadedAt:
+        FAKE_NOW_EPOCH - Math.floor(86400 * scale) - index * 60,
+      lastDownloadedAt: FAKE_NOW_EPOCH - index * 60,
     }
   })
   return {
@@ -287,6 +294,7 @@ export function getFakeUserStats(userId: string): UserStats | null {
   return user
     ? {
         ...user,
+        audio: "84",
         uniqueVideos: "1280",
         firstDownloadAt: FAKE_NOW_EPOCH - 31_622_400,
         latestDownloadAt: FAKE_NOW_EPOCH - 3600,
@@ -366,7 +374,11 @@ export function getFakeUserDownloads(
           : b.downloadedAt === null
             ? -1
             : direction * (a.downloadedAt - b.downloadedAt)) ||
-        direction * Number(BigInt(a.id) - BigInt(b.id))
+        direction *
+          Number(
+            BigInt(a.id.replace(/^audio:/u, "")) -
+              BigInt(b.id.replace(/^audio:/u, ""))
+          )
     )
   }
   const totalPages = Math.ceil(downloads.length / pageSize)

@@ -1,6 +1,6 @@
 import type { StatsRange } from "@/lib/stats/types"
 
-export const POPULAR_RANKING_VERSION = 3
+export const POPULAR_RANKING_VERSION = 4
 
 export interface DownloadMedia {
   items: { position: number; mediaType: "photo" | "video"; url: string }[]
@@ -26,6 +26,8 @@ export interface PopularVideos {
     videoId: string
     hasSavedMedia: boolean
     uniqueChats: string
+    firstDownloadedAt: number | null
+    lastDownloadedAt: number | null
   }[]
   page: number
   hasMore: boolean

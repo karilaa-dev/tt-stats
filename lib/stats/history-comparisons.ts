@@ -3,10 +3,12 @@ import type { Pool } from "pg"
 import { cacheKey, readCacheBatch, cachedBatch } from "@/lib/db/query-cache"
 import { currentDatabaseTask, reportDatabaseProgress } from "@/lib/tasks/server"
 import { logHistoryCache, withDatabaseStage } from "@/lib/db/diagnostics"
+import { userHistorySql, historyMatches } from "./history-source"
 
 interface Identity {
   content_id: string
-  video_details_id: string
+  video_details_id: string | null
+  audio_video_id: string | null
 }
 interface Comparison {
   other_chats: string
@@ -23,9 +25,10 @@ export async function getHistoryComparisons(
   reportDatabaseProgress("Finding videos in your history")
   const identities = await withDatabaseStage("history.identities", () =>
     pool.query<Identity>(
-      `SELECT min(pk_id)::text AS content_id, video_details_id::text
-    FROM public.videos WHERE (${predicate}) AND video_details_id IS NOT NULL
-    GROUP BY 2 LIMIT 20001`,
+      `WITH history AS (${userHistorySql})
+    SELECT min(pk_id)::text AS content_id, video_details_id::text, audio_video_id
+    FROM history WHERE (${predicate}) AND (video_details_id IS NOT NULL OR audio_video_id IS NOT NULL)
+    GROUP BY 2, 3 LIMIT 20001`,
       values
     )
   )
@@ -36,10 +39,11 @@ export async function getHistoryComparisons(
     return undefined
   }
   const key = (row: Identity) =>
-    cacheKey("history-comparison", {
+    cacheKey("history-comparison:v2", {
       userId,
       visibility: "account",
       videoDetailsId: row.video_details_id,
+      audioVideoId: row.audio_video_id,
     })
   const cache = await readCacheBatch<Comparison>(identities.rows.map(key), pool)
   const results: (Comparison & { content_id: string })[] = []
@@ -70,11 +74,10 @@ export async function getHistoryComparisons(
           () =>
             pool.query<Comparison & { content_id: string }>(
               `WITH identities AS (
-        SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint)
+        SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(content_id bigint, video_details_id bigint, audio_video_id text)
       ), matched AS MATERIALIZED (
-        SELECT i.content_id, v.user_id, v.downloaded_at, v.pk_id FROM identities i
-        JOIN public.videos v ON i.video_details_id IS NOT NULL
-          AND v.video_details_id = i.video_details_id AND v.user_id <> 0
+        SELECT i.content_id, matched.* FROM identities i
+        CROSS JOIN LATERAL (${historyMatches("i")}) matched
       ), compared AS (
         SELECT content_id, count(DISTINCT user_id) FILTER (WHERE user_id <> $2::bigint) AS other_chats,
           bool_or(downloaded_at IS NULL OR downloaded_at < 946684800

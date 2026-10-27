@@ -15,6 +15,17 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_videos_user_history_idx
   ON public.videos (user_id, downloaded_at DESC, pk_id DESC)
   INCLUDE (shared_link, media_kind);
 
+CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_music_user_history_idx
+  ON public.music (user_id, downloaded_at DESC, pk_id DESC) INCLUDE (video_id);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_music_identity_chats_idx
+  ON public.music (video_id, user_id, downloaded_at, pk_id)
+  WHERE user_id <> 0;
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_music_identity_first_idx
+  ON public.music (video_id, downloaded_at, pk_id) INCLUDE (user_id)
+  WHERE user_id <> 0;
+
 -- Identity comparisons serve history badges and scoped popularity filters.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS tt_stats_videos_identity_chats_idx
   ON public.videos (video_details_id, user_id, downloaded_at, pk_id)

@@ -28,6 +28,7 @@ import { HistoryDateFilter } from "@/components/dashboard/history-date-filter"
 import { historyDateRange } from "@/lib/history-date-range"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
 import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
+import { ProfileAvatar } from "@/components/dashboard/profile-avatar"
 import { TimeSeriesChart } from "@/components/dashboard/time-series-chart"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import {
@@ -318,9 +319,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
       ) : (
         <div className="personal-profile">
           <div className="profile-identity">
-            <span className="profile-avatar" aria-hidden="true">
-              <UserIcon />
-            </span>
+            <ProfileAvatar userId={userId} />
             <div>
               <h2 className="text-lg font-semibold">{session.user?.name}</h2>
               <p className="text-sm text-muted-foreground">
@@ -480,6 +479,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                   ["all", "All media"],
                   ["video", "Videos"],
                   ["images", "Albums"],
+                  ["audio", "Audio"],
                 ].map(([value, label]) => (
                   <ToggleGroupItem key={value} value={value}>
                     <T>{label}</T>
@@ -584,9 +584,14 @@ function UserSummary({ user, own }: { user: UserStats; own: boolean }) {
               ["Downloads", user.downloads],
               [
                 "Videos",
-                (BigInt(user.downloads) - BigInt(user.images)).toString(),
+                (
+                  BigInt(user.downloads) -
+                  BigInt(user.images) -
+                  BigInt(user.audio ?? "0")
+                ).toString(),
               ],
               ["Image albums", user.images],
+              ["Audio", user.audio ?? "0"],
               ["Unique videos", user.uniqueVideos ?? "0"],
             ].map(([label, count]) => (
               <div key={label}>

@@ -19,9 +19,11 @@ export function parseDashboardSearch(search: string) {
       : "history") as "history" | "popular",
     sort: (params.get("sort") === "oldest" ? "oldest" : "newest") as
       "newest" | "oldest",
-    mediaKind: (["video", "images"].includes(params.get("mediaKind") ?? "")
+    mediaKind: (["video", "images", "audio"].includes(
+      params.get("mediaKind") ?? ""
+    )
       ? params.get("mediaKind")
-      : "all") as "all" | "video" | "images",
+      : "all") as "all" | "video" | "images" | "audio",
     scope: parseChatScope(params.get("scope")),
     id: params.get("id") ?? "",
     page: Number.isInteger(page) && page > 0 ? Math.min(page, 1_000_000) : 1,
