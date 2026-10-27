@@ -1,7 +1,7 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Clock3Icon } from "lucide-react"
+import { ClockIcon } from "@phosphor-icons/react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -71,7 +71,7 @@ export function OverviewPage() {
                 </TabsTrigger>
               </TabsList>
               <p className="overview-period">
-                <Clock3Icon aria-hidden="true" />
+                <ClockIcon aria-hidden="true" />
                 <T>{" Last 24 hours"}</T>
               </p>
             </div>

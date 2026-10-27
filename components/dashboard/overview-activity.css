@@ -22,15 +22,12 @@
   min-width: 0;
 }
 .overview-mau-number {
-  font-family: var(--font-heading);
   font-size: 1.8rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .overview-mau-number[data-unavailable="true"] {
   font-size: 0.85rem;
-  letter-spacing: 0;
   color: var(--muted-foreground);
 }
 .overview-toolbar {
@@ -78,7 +75,7 @@
 }
 .overview-composition [data-slot="card-title"] {
   font-size: 1rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 .overview-composition [data-slot="card-description"] {
   font-size: 0.75rem;
@@ -109,11 +106,9 @@
   opacity: 0.85;
 }
 .overview-big-number {
-  font-family: var(--font-heading);
   font-size: clamp(2.2rem, 4.5vw, 4rem);
   color: var(--foreground);
   font-weight: 600;
-  letter-spacing: -0.065em;
   line-height: 1.25;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -151,7 +146,6 @@
   flex-shrink: 0;
 }
 .overview-supporting-metrics dd {
-  font-family: var(--font-heading);
   font-size: 1.45rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -177,9 +171,7 @@
   align-items: center;
 }
 .overview-cache-ring strong {
-  font-family: var(--font-heading);
   font-size: 2rem;
-  letter-spacing: -0.055em;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
@@ -289,7 +281,6 @@
 .overview-lifetime-ledger dd {
   font-size: 1rem;
   font-weight: 650;
-  font-family: var(--font-heading);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
@@ -309,7 +300,6 @@
   padding: 1.2rem 1.35rem;
   border: 1px solid var(--border);
   border-radius: 1.2rem;
-  transition: background-color 120ms;
 }
 .overview-shortcuts a:hover {
   background: var(--accent);

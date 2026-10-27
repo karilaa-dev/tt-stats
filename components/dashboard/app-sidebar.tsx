@@ -1,18 +1,18 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import {
-  ActivityIcon,
+  PulseIcon,
   ArrowUpRightIcon,
-  BarChart3Icon,
-  ChartNoAxesCombinedIcon,
-  DatabaseZapIcon,
-  LayoutDashboardIcon,
-  ListFilterIcon,
-  MoreHorizontalIcon,
-  SearchIcon,
-  Share2Icon,
-  UserRoundIcon,
-  VideoIcon,
-} from "lucide-react"
+  ChartBarIcon,
+  ChartLineUpIcon,
+  DatabaseIcon,
+  SquaresFourIcon,
+  FunnelSimpleIcon,
+  DotsThreeIcon,
+  MagnifyingGlassIcon,
+  ShareNetworkIcon,
+  UserIcon,
+  VideoCameraIcon,
+} from "@phosphor-icons/react"
 import { Button } from "@/components/controls"
 import {
   Sheet,
@@ -22,72 +22,71 @@ import {
   SheetDescription,
 } from "@/components/controls"
 import { useRef, useState } from "react"
-import { BounceSidebar } from "@/components/rare-ui/bounce-sidebar"
 import { useDashboardContext } from "@/lib/dashboard-context"
 import { useAdminAccess } from "./admin-access"
 
 const navigation = [
   {
     href: "/dashboard/me",
-    label: "My Profile",
-    short: "My Profile",
-    icon: UserRoundIcon,
+    label: "My profile",
+    short: "My profile",
+    icon: UserIcon,
     description: "Your downloads and statistics",
   },
   {
     href: "/dashboard",
     label: "Overview",
     short: "Home",
-    icon: LayoutDashboardIcon,
+    icon: SquaresFourIcon,
     description: "Bot at a glance",
   },
   {
     href: "/dashboard/analytics",
     label: "Trends",
     short: "Trends",
-    icon: ChartNoAxesCombinedIcon,
+    icon: ChartLineUpIcon,
     description: "Downloads over time",
   },
   {
     href: "/dashboard/detailed",
     label: "Breakdown",
     short: "Breakdown",
-    icon: ListFilterIcon,
+    icon: FunnelSimpleIcon,
     description: "Compare periods and audiences",
   },
   {
     href: "/dashboard/users",
     label: "User lookup",
     short: "Lookup",
-    icon: SearchIcon,
+    icon: MagnifyingGlassIcon,
     description: "Find a chat and its history",
   },
   {
     href: "/dashboard/videos",
     label: "Top videos",
     short: "Videos",
-    icon: VideoIcon,
+    icon: VideoCameraIcon,
     description: "Most downloaded videos",
   },
   {
     href: "/dashboard/referrals",
     label: "Referrals",
     short: "Referrals",
-    icon: Share2Icon,
+    icon: ShareNetworkIcon,
     description: "Where the bot audience comes from",
   },
   {
     href: "/dashboard/other",
     label: "Audience",
     short: "Audience",
-    icon: BarChart3Icon,
+    icon: ChartBarIcon,
     description: "Languages and download leaders",
   },
   {
     href: "/dashboard/jobs",
     label: "Operations",
     short: "Operations",
-    icon: DatabaseZapIcon,
+    icon: DatabaseIcon,
     description: "Updates, health and notifications",
   },
 ]
@@ -118,25 +117,32 @@ export function AppSidebar() {
           className="sidebar-brand"
           aria-label={t("@ttgrab Stats overview")}
         >
-          <img src="/ttgrab-logo.png" alt="" width="56" height="56" />
+          <img src="/ttgrab-logo.png" alt="" width="28" height="28" />
           <strong>
-            <T>{"@ttgrab "}</T>
+            <T>{"@ttgrab"}</T>
             <span>Stats</span>
           </strong>
         </a>
-        <p className="sidebar-caption">
-          <T>{"STATISTICS"}</T>
-        </p>
         <nav aria-label={t("Main navigation")}>
-          <BounceSidebar
-            items={visibleNavigation.map(({ href, label, icon }) => ({
-              href,
-              label: t(label),
-              icon,
-            }))}
-            value={visibleNavigation.findIndex((item) => item.href === current)}
-            dotColor="var(--primary)"
-          />
+          <p className="sidebar-caption">
+            <T>{"Statistics"}</T>
+          </p>
+          <ul className="sidebar-menu">
+            {visibleNavigation.map(({ href, label, icon: Icon }) => (
+              <li key={href}>
+                <a
+                  href={href}
+                  aria-current={current === href ? "page" : undefined}
+                >
+                  <Icon
+                    aria-hidden="true"
+                    weight={current === href ? "fill" : "regular"}
+                  />
+                  <T>{label}</T>
+                </a>
+              </li>
+            ))}
+          </ul>
         </nav>
         <a
           className="sidebar-bot"
@@ -170,18 +176,14 @@ export function AppSidebar() {
           aria-label={t("Open all sections")}
           aria-expanded={openMobile}
         >
-          <MoreHorizontalIcon />
+          <DotsThreeIcon />
           <span>
             <T>{"More"}</T>
           </span>
         </Button>
       </nav>
       <Sheet open={openMobile} onOpenChange={setOpenMobile}>
-        <SheetContent
-          finalFocus={moreButton}
-          side="bottom"
-          className="navigation-sheet"
-        >
+        <SheetContent finalFocus={moreButton} className="navigation-sheet">
           <SheetHeader>
             <SheetTitle>
               <T>{"All sections"}</T>
@@ -215,7 +217,7 @@ export function AppSidebar() {
             )}
           </nav>
           <div className="sheet-workspace">
-            <ActivityIcon aria-hidden="true" />
+            <PulseIcon aria-hidden="true" />
             <T>
               {fakeMode ? "Demo workspace · sample data" : "tt-bot workspace"}
             </T>

@@ -55,10 +55,10 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await page.goto("/dashboard/me")
     await expect(page.getByText("Alex Example", { exact: true })).toBeVisible()
     await expect(
-      page.getByRole("heading", { name: "My Profile", exact: true })
+      page.getByRole("heading", { name: "My profile", exact: true })
     ).toBeVisible()
-    await expect(page.locator(".telegram-login")).toHaveText("My Profile")
-    await expect(page).toHaveTitle("My Profile · @ttgrab Stats")
+    await expect(page.locator(".telegram-login")).toHaveText("My profile")
+    await expect(page).toHaveTitle("My profile · @ttgrab Stats")
     const history = page.getByRole("list", { name: "Download history" })
     await expect(
       page.getByRole("group", { name: "History period", exact: true })
@@ -111,7 +111,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
       await expect(
         page
           .getByRole("navigation", { name: "Quick navigation" })
-          .getByRole("link", { name: "My Profile" })
+          .getByRole("link", { name: "My profile" })
       ).toBeInViewport()
     expect(
       await page.evaluate(
@@ -284,7 +284,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
     ).toHaveCount(0)
     await expect(page.getByText("Alex Example", { exact: true })).toHaveCount(0)
     await expect(
-      page.getByRole("heading", { name: "My Profile", exact: true })
+      page.getByRole("heading", { name: "My profile", exact: true })
     ).toBeVisible()
     for (const login of await page.locator(".telegram-login").all()) {
       await expect(login).toHaveText("Log in with Telegram")
@@ -296,7 +296,7 @@ test("personal statistics, filters, mobile access, and logout", async ({
       await expect(
         page
           .getByRole("navigation", { name: "Quick navigation" })
-          .getByRole("link", { name: "My Profile", exact: true })
+          .getByRole("link", { name: "My profile", exact: true })
       ).toBeInViewport()
       await page.setViewportSize({ width: 320, height: 720 })
       await expect(page.locator(".telegram-login-compact")).toBeInViewport()

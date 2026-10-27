@@ -1,5 +1,5 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react"
 import { safeExternalUrl } from "@/lib/security/links"
 import { useSession } from "./session-access"
 import { useEffect, useRef, useState } from "react"
@@ -214,7 +214,7 @@ function MediaPreview({ id }: { id: string }) {
                 disabled={current === 0}
                 onClick={() => move(-1)}
               >
-                <ChevronLeftIcon />
+                <CaretLeftIcon />
               </Button>
               <Button
                 className="album-arrow album-next"
@@ -224,7 +224,7 @@ function MediaPreview({ id }: { id: string }) {
                 disabled={current >= items.length - 1}
                 onClick={() => move(1)}
               >
-                <ChevronRightIcon />
+                <CaretRightIcon />
               </Button>
             </>
           ) : null}

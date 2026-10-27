@@ -45,7 +45,6 @@ export function StatsFilters({
             onValueChange={(values) =>
               onScopeChange?.((values[0] as ChatScope | undefined) ?? scope)
             }
-            spacing={1}
             aria-label={t("Chat scope")}
           >
             {scopeOptions.map((option) => (
@@ -65,7 +64,6 @@ export function StatsFilters({
           onValueChange={(values) =>
             onRangeChange((values[0] as StatsRange | undefined) ?? range)
           }
-          spacing={1}
           aria-label={t("Statistics period")}
         >
           {rangeOptions.map((option) => (

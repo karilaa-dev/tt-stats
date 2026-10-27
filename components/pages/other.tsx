@@ -5,7 +5,7 @@ import {
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { FilesIcon, LanguagesIcon, TrophyIcon } from "lucide-react"
+import { FilesIcon, TranslateIcon, TrophyIcon } from "@phosphor-icons/react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -69,7 +69,7 @@ export function OtherPage() {
               {
                 label: "Language values",
                 value: stats.languages.length.toLocaleString(locale),
-                icon: LanguagesIcon,
+                icon: TranslateIcon,
               },
               {
                 label: "Most common language",
@@ -97,7 +97,7 @@ export function OtherPage() {
                   <T>{"Bot audience by language."}</T>
                 </CardDescription>
                 <CardAction>
-                  <LanguagesIcon
+                  <TranslateIcon
                     className="size-5 text-muted-foreground"
                     aria-hidden="true"
                   />

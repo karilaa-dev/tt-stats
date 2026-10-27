@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react"
+import type { Icon } from "@phosphor-icons/react"
 import type { ReactNode } from "react"
 import { T } from "@/lib/i18n/provider"
 
@@ -9,7 +9,7 @@ export function SummaryStrip({
   items: {
     label: string
     value: ReactNode
-    icon?: LucideIcon
+    icon?: Icon
     wide?: boolean
   }[]
 }) {

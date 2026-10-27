@@ -2,13 +2,13 @@ import { T, useTranslation } from "@/lib/i18n/provider"
 import { useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
-  CheckCircle2Icon,
+  CheckCircleIcon,
   CircleDashedIcon,
   DatabaseIcon,
-  TriangleAlertIcon,
+  WarningIcon,
   WrenchIcon,
-  ShieldAlertIcon,
-} from "lucide-react"
+  ShieldWarningIcon,
+} from "@phosphor-icons/react"
 import { toast } from "@/components/controls/toast"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
@@ -410,7 +410,7 @@ export function DatabaseSetupCard({
               <>
                 <Alert>
                   <T>
-                    {status.ready ? <CheckCircle2Icon /> : <CircleDashedIcon />}
+                    {status.ready ? <CheckCircleIcon /> : <CircleDashedIcon />}
                   </T>
                   <AlertTitle>
                     <T>
@@ -500,7 +500,7 @@ export function DatabaseSetupCard({
                 <T>
                   {!hasLimitedSetupPrivileges(status) ? (
                     <Alert>
-                      <TriangleAlertIcon />
+                      <WarningIcon />
                       <AlertTitle>
                         <T>{"DB_URL needs additional privileges"}</T>
                       </AlertTitle>
@@ -668,7 +668,7 @@ export function DatabaseSetupCard({
           </>
         ) : (
           <Alert variant="destructive">
-            <TriangleAlertIcon />
+            <WarningIcon />
             <AlertTitle>
               <T>{"Diagnostics could not be loaded"}</T>
             </AlertTitle>
@@ -752,7 +752,7 @@ function PgCronInstallationDialog() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogMedia>
-            <ShieldAlertIcon />
+            <ShieldWarningIcon />
           </AlertDialogMedia>
           <AlertDialogTitle>
             <T>{"pg_cron installation required"}</T>
@@ -798,9 +798,9 @@ function DiagnosticRow({
 }) {
   const Icon =
     state === "good"
-      ? CheckCircle2Icon
+      ? CheckCircleIcon
       : state === "bad"
-        ? TriangleAlertIcon
+        ? WarningIcon
         : CircleDashedIcon
 
   return (

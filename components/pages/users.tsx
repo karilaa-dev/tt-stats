@@ -6,7 +6,7 @@ import { isBackgroundRefresh } from "@/lib/tasks/background"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { actions } from "astro:actions"
-import { UserRoundIcon } from "lucide-react"
+import { UserIcon } from "@phosphor-icons/react"
 import {
   useDashboardContext,
   useDashboardSearch,
@@ -89,7 +89,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
     return (
       <>
         <PageHeading
-          title={t("My Profile")}
+          title={t("My profile")}
           description={t(
             "Your downloads and activity. Results update every five minutes."
           )}
@@ -97,7 +97,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
         <Empty className="mx-auto w-full max-w-xl border-solid bg-card">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <UserRoundIcon />
+              <UserIcon />
             </EmptyMedia>
             <EmptyTitle>
               <T>{"See your download history"}</T>
@@ -134,7 +134,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
         <Empty className="mx-auto w-full max-w-xl border-solid bg-card">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <UserRoundIcon />
+              <UserIcon />
             </EmptyMedia>
             <EmptyTitle>
               <T>{"Admin access required."}</T>
@@ -154,7 +154,7 @@ export function UsersPage({ own = false }: { own?: boolean }) {
   return (
     <>
       <PageHeading
-        title={t(own ? "My Profile" : "User lookup")}
+        title={t(own ? "My profile" : "User lookup")}
         description={t(
           own
             ? "Your downloads and activity. Results update every five minutes; reloading uses the same saved results."
@@ -319,12 +319,10 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
         <div className="personal-profile">
           <div className="profile-identity">
             <span className="profile-avatar" aria-hidden="true">
-              <UserRoundIcon />
+              <UserIcon />
             </span>
             <div>
-              <h2 className="font-heading text-xl font-semibold">
-                {session.user?.name}
-              </h2>
+              <h2 className="text-lg font-semibold">{session.user?.name}</h2>
               <p className="text-sm text-muted-foreground">
                 {session.user?.username ? (
                   `@${session.user.username}`
@@ -477,7 +475,6 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
                       mediaKind: value[0] as HistoryFilters["mediaKind"],
                     })
                 }}
-                spacing={1}
               >
                 {[
                   ["all", "All media"],
@@ -685,8 +682,6 @@ function UserActivityChart({
       onValueChange={(values) =>
         values[0] && setRange(values[0] as UserActivityRange)
       }
-      variant="outline"
-      size="sm"
     >
       <T>
         {[

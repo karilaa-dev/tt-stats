@@ -1,5 +1,5 @@
 import { Select } from "@base-ui/react/select"
-import { CheckIcon, ChevronDownIcon, LanguagesIcon } from "lucide-react"
+import { CheckIcon, CaretDownIcon, TranslateIcon } from "@phosphor-icons/react"
 import {
   createContext,
   useContext,
@@ -89,7 +89,7 @@ export function LanguageSelector() {
         className="language-trigger"
         aria-label={t("Website language")}
       >
-        <LanguagesIcon aria-hidden="true" />
+        <TranslateIcon aria-hidden="true" />
         <Select.Value>
           <span className="language-name" lang={locale}>
             {localeNames[locale]}
@@ -99,7 +99,7 @@ export function LanguageSelector() {
           </span>
         </Select.Value>
         <Select.Icon>
-          <ChevronDownIcon aria-hidden="true" />
+          <CaretDownIcon aria-hidden="true" />
         </Select.Icon>
       </Select.Trigger>
       <Select.Portal>

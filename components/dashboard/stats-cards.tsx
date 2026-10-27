@@ -1,13 +1,13 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { ExactCounter } from "./exact-counter"
 import {
-  DatabaseXIcon,
-  DatabaseZapIcon,
-  DownloadIcon,
+  WarningOctagonIcon,
+  DatabaseIcon,
+  DownloadSimpleIcon,
   ImagesIcon,
-  Music2Icon,
+  MusicNotesIcon,
   UsersIcon,
-} from "lucide-react"
+} from "@phosphor-icons/react"
 
 import {
   Card,
@@ -53,7 +53,7 @@ export function StatsCards({
       label: "Video downloads",
       value: count(stats.downloads.total),
       detail: `${count(stats.downloads.uniqueUsers)} unique chats`,
-      icon: DownloadIcon,
+      icon: DownloadSimpleIcon,
     },
     {
       key: "chats",
@@ -67,7 +67,7 @@ export function StatsCards({
       label: "Music downloads",
       value: count(stats.music.total),
       detail: `${count(stats.music.uniqueUsers)} unique chats`,
-      icon: Music2Icon,
+      icon: MusicNotesIcon,
     },
     {
       key: "images",
@@ -87,7 +87,7 @@ export function StatsCards({
               locale
             ),
             detail: "Downloads served from cache",
-            icon: DatabaseZapIcon,
+            icon: DatabaseIcon,
           },
         ]
       : [
@@ -96,14 +96,14 @@ export function StatsCards({
             label: "Cache hits",
             value: count(stats.downloads.cacheHits),
             detail: `${percentage(stats.downloads.cacheHits, stats.downloads.total, locale)} hit rate`,
-            icon: DatabaseZapIcon,
+            icon: DatabaseIcon,
           },
           {
             key: "cacheMisses",
             label: "Cache misses",
             value: count(cacheMisses),
             detail: `${percentage(cacheMisses, stats.downloads.total, locale)} miss rate`,
-            icon: DatabaseXIcon,
+            icon: WarningOctagonIcon,
           },
         ]),
   ]
@@ -141,7 +141,7 @@ export function StatsCards({
             <CardContent>
               <p
                 className={cn(
-                  "font-heading text-3xl font-semibold tracking-tight break-all tabular-nums",
+                  "text-3xl font-semibold break-all tabular-nums",
                   metric.key === "downloads" && "text-primary"
                 )}
               >
@@ -179,7 +179,7 @@ export function CachePerformanceCard({ stats }: { stats: StatsBreakdown }) {
         </CardDescription>
         <CardAction>
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <DatabaseZapIcon className="size-4.5" aria-hidden="true" />
+            <DatabaseIcon className="size-4.5" aria-hidden="true" />
           </div>
         </CardAction>
       </CardHeader>
@@ -214,7 +214,7 @@ function CacheMetric({
 }) {
   return (
     <div className="flex flex-col justify-center rounded-lg bg-muted/50 p-4">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="text-xs font-medium text-kumo-subtle">
         <T>{label}</T>
       </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums sm:text-3xl">

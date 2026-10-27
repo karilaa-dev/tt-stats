@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Menu } from "@base-ui/react/menu"
-import { RefreshCwIcon } from "lucide-react"
+import { ArrowsClockwiseIcon } from "@phosphor-icons/react"
 import { Button, Spinner } from "@/components/controls"
 import { toast } from "@/components/controls/toast"
 import { T, useTranslation } from "@/lib/i18n/provider"
@@ -22,7 +22,7 @@ export function StatsRefresh({ fakeMode }: { fakeMode: boolean }) {
         aria-label={t("Update now")}
         render={<Button variant="outline" className="stats-refresh-trigger" />}
       >
-        <RefreshCwIcon aria-hidden="true" />
+        <ArrowsClockwiseIcon aria-hidden="true" />
         <span className="stats-refresh-label">{t("Update now")}</span>
       </Menu.Trigger>
       <Menu.Portal keepMounted>

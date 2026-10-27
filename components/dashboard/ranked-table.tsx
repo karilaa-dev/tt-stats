@@ -1,6 +1,6 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useMemo } from "react"
-import { ListFilterIcon } from "lucide-react"
+import { FunnelSimpleIcon } from "@phosphor-icons/react"
 import {
   createColumnHelper,
   createPaginatedRowModel,
@@ -113,7 +113,7 @@ export function RankedTable({
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <ListFilterIcon aria-hidden="true" />
+            <FunnelSimpleIcon aria-hidden="true" />
           </EmptyMedia>
           <EmptyTitle>
             <T>{emptyTitle}</T>

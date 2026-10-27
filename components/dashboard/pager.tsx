@@ -1,4 +1,4 @@
-import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
+import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react"
 import type { ReactNode } from "react"
 import { Button } from "@/components/controls"
 import { T, useTranslation } from "@/lib/i18n/provider"
@@ -44,7 +44,7 @@ export function Pager({
           aria-label={t("Go to previous page")}
           onClick={() => onPageChange(page - 1)}
         >
-          <ChevronLeftIcon data-icon="inline-start" />
+          <CaretLeftIcon data-icon="inline-start" />
           <span className="dashboard-pager-text">
             <T>{"Previous"}</T>
           </span>
@@ -66,7 +66,7 @@ export function Pager({
           <span className="dashboard-pager-text">
             <T>{"Next"}</T>
           </span>
-          <ChevronRightIcon data-icon="inline-end" />
+          <CaretRightIcon data-icon="inline-end" />
         </Button>
       </div>
     </nav>

@@ -6,7 +6,11 @@ import {
   useDashboardNavigate,
   useHydrated,
 } from "@/lib/dashboard-context"
-import { ArrowUpRightIcon, SearchIcon, XIcon } from "lucide-react"
+import {
+  ArrowUpRightIcon,
+  MagnifyingGlassIcon,
+  XIcon,
+} from "@phosphor-icons/react"
 
 import { Button } from "@/components/controls"
 import {
@@ -136,7 +140,7 @@ export function UserLookupForm({
                       autoCapitalize="none"
                       spellCheck={false}
                       pattern="-?[0-9]+"
-                      className="h-12 min-w-0 flex-1"
+                      className="min-w-0 flex-1"
                       aria-invalid={!field.state.meta.isValid}
                       aria-describedby={
                         field.state.meta.isValid
@@ -149,7 +153,7 @@ export function UserLookupForm({
                         type="button"
                         variant="outline"
                         size="icon"
-                        className="size-12"
+                        className="size-9"
                         disabled={!hydrated}
                         onClick={() => {
                           field.handleChange("")
@@ -180,7 +184,7 @@ export function UserLookupForm({
                   </FieldDescription>
                   <Button
                     type="submit"
-                    className="mt-1 h-11 w-full"
+                    className="mt-1 w-full"
                     disabled={
                       !hydrated ||
                       searching ||
@@ -192,7 +196,7 @@ export function UserLookupForm({
                       {searching ? (
                         <Spinner data-icon="inline-start" />
                       ) : (
-                        <SearchIcon data-icon="inline-start" />
+                        <MagnifyingGlassIcon data-icon="inline-start" />
                       )}
                     </T>
                     <T>{searching ? "Finding chat…" : "Search"}</T>

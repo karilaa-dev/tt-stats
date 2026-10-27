@@ -1,7 +1,7 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { PlayIcon, VideoIcon } from "lucide-react"
+import { PlayIcon, VideoCameraIcon } from "@phosphor-icons/react"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
@@ -142,7 +142,7 @@ export function VideosPage() {
                       </TableCell>
                       <TableCell>
                         <span className="ranking-video-id" title={item.videoId}>
-                          <VideoIcon aria-hidden="true" />
+                          <VideoCameraIcon aria-hidden="true" />
                           <span>{item.videoId}</span>
                         </span>
                       </TableCell>
@@ -178,7 +178,7 @@ export function VideosPage() {
               <Empty>
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <VideoIcon />
+                    <VideoCameraIcon />
                   </EmptyMedia>
                   <EmptyTitle>
                     <T>{"No videos found"}</T>

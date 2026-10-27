@@ -13,7 +13,7 @@ import { sessionRequest, clearCooldowns } from "@/lib/http-client"
 import { buttonVariants } from "@/components/controls"
 import { cn } from "@/lib/utils"
 import { toast } from "@/components/controls/toast"
-import { UserRoundIcon } from "lucide-react"
+import { UserIcon } from "@phosphor-icons/react"
 import { queryKeys } from "@/lib/stats/query-keys"
 
 const SessionContext = createContext<
@@ -137,8 +137,8 @@ export function TelegramLoginButton({
         compact && "telegram-login-compact"
       )}
     >
-      <UserRoundIcon aria-hidden="true" data-icon="inline-start" />
-      <T>{user ? "My Profile" : "Log in with Telegram"}</T>
+      <UserIcon aria-hidden="true" data-icon="inline-start" />
+      <T>{user ? "My profile" : "Log in with Telegram"}</T>
     </a>
   )
 }

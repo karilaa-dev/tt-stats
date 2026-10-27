@@ -1,48 +1,38 @@
 import { useTranslation } from "@/lib/i18n/provider"
-import { Toast } from "@base-ui/react/toast"
-const manager = Toast.createToastManager()
-export const toast = {
-  success: (title: string) => manager.add({ title, type: "success" }),
-  error: (title: string) =>
-    manager.add({ title, type: "error", timeout: 8000 }),
-  warning: (title: string) => manager.add({ title, type: "warning" }),
-  info: (title: string) => manager.add({ title, type: "info" }),
-}
-function Messages() {
-  const { t } = useTranslation()
+import {
+  Toasty,
+  createKumoToastManager,
+} from "@cloudflare/kumo/components/toast"
+import { useEffect, useState } from "react"
 
-  const { toasts } = Toast.useToastManager()
-  return (
-    <Toast.Portal>
-      <Toast.Viewport className="control-toast-viewport">
-        {toasts.map((item) => (
-          <Toast.Root
-            key={item.id}
-            toast={item}
-            className="control-toast"
-            data-type={item.type}
-          >
-            <Toast.Content>
-              <Toast.Title>
-                {typeof item.title === "string" ? t(item.title) : item.title}
-              </Toast.Title>
-              <Toast.Description>
-                {typeof item.description === "string"
-                  ? t(item.description)
-                  : item.description}
-              </Toast.Description>
-            </Toast.Content>
-            <Toast.Close aria-label={t("Dismiss notification")}>×</Toast.Close>
-          </Toast.Root>
-        ))}
-      </Toast.Viewport>
-    </Toast.Portal>
-  )
+const manager = createKumoToastManager()
+// Toasts are raised outside React, so the mounted Toaster lends its translator.
+let translate = (text: string) => text
+const add = (
+  title: string,
+  variant: "success" | "error" | "warning" | "info",
+  timeout?: number
+) => manager.add({ title: translate(title), variant, timeout })
+export const toast = {
+  success: (title: string) => add(title, "success"),
+  error: (title: string) => add(title, "error", 8000),
+  warning: (title: string) => add(title, "warning"),
+  info: (title: string) => add(title, "info"),
 }
 export function Toaster() {
+  const { t } = useTranslation()
+  useEffect(() => {
+    translate = t
+  }, [t])
+  // Kumo's viewport sits at z-index 1; this layer lifts it above the shell.
+  const [layer, setLayer] = useState<HTMLDivElement | null>(null)
   return (
-    <Toast.Provider toastManager={manager}>
-      <Messages />
-    </Toast.Provider>
+    <div ref={setLayer} className="toast-layer">
+      {layer && (
+        <Toasty toastManager={manager} container={layer}>
+          {null}
+        </Toasty>
+      )}
+    </div>
   )
 }

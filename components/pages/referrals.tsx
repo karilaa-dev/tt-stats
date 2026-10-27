@@ -1,6 +1,6 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useQuery } from "@tanstack/react-query"
-import { Share2Icon, UsersIcon } from "lucide-react"
+import { ShareNetworkIcon, UsersIcon } from "@phosphor-icons/react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -48,7 +48,7 @@ export function ReferralsPage() {
               {
                 label: "Ranked sources",
                 value: rows.length.toLocaleString(locale),
-                icon: Share2Icon,
+                icon: ShareNetworkIcon,
               },
               {
                 label: "Leading referral",

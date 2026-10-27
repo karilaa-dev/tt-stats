@@ -3,13 +3,13 @@ import { T, useTranslation } from "@/lib/i18n/provider"
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  CirclePauseIcon,
-  CirclePlayIcon,
-  Clock3Icon,
+  PauseCircleIcon,
+  PlayCircleIcon,
+  ClockIcon,
   PlayIcon,
-  SaveIcon,
-  TriangleAlertIcon,
-} from "lucide-react"
+  FloppyDiskIcon,
+  WarningIcon,
+} from "@phosphor-icons/react"
 import { toast } from "@/components/controls/toast"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
@@ -192,7 +192,7 @@ export function StatsJobCard({
       <CardContent className="flex min-w-0 flex-col gap-5">
         {!job.schedule ? (
           <Alert variant="destructive">
-            <TriangleAlertIcon />
+            <WarningIcon />
             <AlertTitle>
               <T>{"Job is not installed"}</T>
             </AlertTitle>
@@ -207,7 +207,7 @@ export function StatsJobCard({
         ) : null}
         {!isRecommended && job.schedule ? (
           <Alert>
-            <TriangleAlertIcon />
+            <WarningIcon />
             <AlertTitle>
               <T>{"Custom cadence"}</T>
             </AlertTitle>
@@ -263,7 +263,7 @@ export function StatsJobCard({
                 {manual.status === "queued" || manual.status === "running" ? (
                   <Spinner />
                 ) : (
-                  <Clock3Icon />
+                  <ClockIcon />
                 )}
               </T>
               <AlertTitle>
@@ -285,7 +285,7 @@ export function StatsJobCard({
         <T>
           {manualQuery.isError ? (
             <Alert variant="destructive">
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Refresh status could not be checked"}</T>
               </AlertTitle>
@@ -331,7 +331,7 @@ export function StatsJobCard({
                   {scheduleMutation.isPending ? (
                     <Spinner data-icon="inline-start" />
                   ) : (
-                    <SaveIcon data-icon="inline-start" />
+                    <FloppyDiskIcon data-icon="inline-start" />
                   )}
                 </T>
                 <T>{"Save"}</T>
@@ -395,9 +395,9 @@ export function StatsJobCard({
               {activeMutation.isPending ? (
                 <Spinner data-icon="inline-start" />
               ) : job.active ? (
-                <CirclePauseIcon data-icon="inline-start" />
+                <PauseCircleIcon data-icon="inline-start" />
               ) : (
-                <CirclePlayIcon data-icon="inline-start" />
+                <PlayCircleIcon data-icon="inline-start" />
               )}
             </T>
             <T>{job.active ? "Pause" : "Resume"}</T>
@@ -496,7 +496,7 @@ export function StatsJobCard({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogMedia>
-              <TriangleAlertIcon />
+              <WarningIcon />
             </AlertDialogMedia>
             <AlertDialogTitle>
               <T>

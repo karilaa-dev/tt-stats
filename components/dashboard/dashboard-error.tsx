@@ -1,6 +1,10 @@
 import { T } from "@/lib/i18n/provider"
 import { useAdminAccess } from "./admin-access"
-import { DatabaseZapIcon, RotateCwIcon, TriangleAlertIcon } from "lucide-react"
+import {
+  DatabaseIcon,
+  ArrowClockwiseIcon,
+  WarningIcon,
+} from "@phosphor-icons/react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
 import { Button, buttonVariants } from "@/components/controls"
@@ -47,7 +51,7 @@ export function DashboardError({
       variant={presentation.kind === "cancelled" ? "default" : "destructive"}
       className="dashboard-error"
     >
-      <TriangleAlertIcon />
+      <WarningIcon />
       <AlertTitle>
         <T>{presentation.title}</T>
       </AlertTitle>
@@ -62,7 +66,7 @@ export function DashboardError({
         ) : null}
         <div className="dashboard-error-actions">
           <Button variant="outline" size="sm" onClick={reset}>
-            <RotateCwIcon data-icon="inline-start" />
+            <ArrowClockwiseIcon data-icon="inline-start" />
             <T>{"Try again"}</T>
           </Button>
           {showOperations ? (
@@ -70,7 +74,7 @@ export function DashboardError({
               href="/dashboard/jobs"
               className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
-              <DatabaseZapIcon data-icon="inline-start" />
+              <DatabaseIcon data-icon="inline-start" />
               <T>{"Open Operations"}</T>
             </a>
           ) : null}

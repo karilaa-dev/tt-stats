@@ -4,7 +4,7 @@ import {
   useDashboardNavigate,
 } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { ArrowUpRightIcon } from "lucide-react"
+import { ArrowUpRightIcon } from "@phosphor-icons/react"
 
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"

@@ -4,14 +4,14 @@ import { useId } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
   ArrowUpRightIcon,
-  AudioLinesIcon,
-  ChartNoAxesCombinedIcon,
-  DownloadIcon,
+  WaveformIcon,
+  ChartLineUpIcon,
+  DownloadSimpleIcon,
   ImageIcon,
-  SearchIcon,
+  MagnifyingGlassIcon,
   UsersIcon,
-  VideoIcon,
-} from "lucide-react"
+  VideoCameraIcon,
+} from "@phosphor-icons/react"
 
 import { Button } from "@/components/controls"
 import {
@@ -56,7 +56,7 @@ export function OverviewActivity({
     {
       label: "Music downloads",
       value: recent.music.total,
-      icon: AudioLinesIcon,
+      icon: WaveformIcon,
     },
     { label: "Image albums", value: recent.downloads.images, icon: ImageIcon },
   ]
@@ -95,7 +95,7 @@ export function OverviewActivity({
                   <T>{" unique chats"}</T>
                 </p>
               </div>
-              <DownloadIcon
+              <DownloadSimpleIcon
                 className="overview-download-mark"
                 aria-hidden="true"
               />
@@ -239,7 +239,7 @@ export function OverviewActivity({
         aria-label={t("Explore bot statistics")}
       >
         <a href="/dashboard/analytics">
-          <ChartNoAxesCombinedIcon aria-hidden="true" />
+          <ChartLineUpIcon aria-hidden="true" />
           <span>
             <strong>
               <T>{"Find the pattern"}</T>
@@ -252,7 +252,7 @@ export function OverviewActivity({
         </a>
         {authenticated ? (
           <a href="/dashboard/users">
-            <SearchIcon aria-hidden="true" />
+            <MagnifyingGlassIcon aria-hidden="true" />
             <span>
               <strong>
                 <T>{"Look up a chat"}</T>
@@ -265,7 +265,7 @@ export function OverviewActivity({
           </a>
         ) : (
           <a href="/dashboard/videos">
-            <VideoIcon aria-hidden="true" />
+            <VideoCameraIcon aria-hidden="true" />
             <span>
               <strong>
                 <T>{"See what is popular"}</T>

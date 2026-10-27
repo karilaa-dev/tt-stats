@@ -9,11 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react"
-import {
-  BarChart3Icon,
-  ChartSplineIcon,
-  ChartNoAxesColumnIcon,
-} from "lucide-react"
+import { ChartBarIcon, ChartLineIcon } from "@phosphor-icons/react"
 
 import {
   Card,
@@ -142,19 +138,16 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
             onValueChange={(values) =>
               values[0] && setView(values[0] as "line" | "bars")
             }
-            variant="outline"
-            size="sm"
-            spacing={0}
             aria-label={t(`${title} chart style`)}
           >
             <ToggleGroupItem value="line" aria-label={t("Line and area chart")}>
-              <ChartSplineIcon data-icon="inline-start" />
+              <ChartLineIcon data-icon="inline-start" />
               <span className="hidden sm:inline">
                 <T>{"Line"}</T>
               </span>
             </ToggleGroupItem>
             <ToggleGroupItem value="bars" aria-label={t("Bar chart")}>
-              <ChartNoAxesColumnIcon data-icon="inline-start" />
+              <ChartBarIcon data-icon="inline-start" />
               <span className="hidden sm:inline">
                 <T>{"Bars"}</T>
               </span>
@@ -222,7 +215,7 @@ export const TimeSeriesChart = memo(function TimeSeriesChart({
             <Empty style={{ height: compact ? 200 : 300 }}>
               <EmptyHeader>
                 <EmptyMedia variant="icon">
-                  <BarChart3Icon />
+                  <ChartBarIcon />
                 </EmptyMedia>
                 <EmptyTitle>
                   <T>{"No activity in this period"}</T>
@@ -268,7 +261,7 @@ function ChartSummary({
 
   return (
     <div className="rounded-lg bg-muted/50 px-3 py-2">
-      <p className="text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="text-xs font-medium text-kumo-subtle">
         <T>{name}</T>
       </p>
       <p className="mt-0.5 text-base font-semibold tabular-nums">

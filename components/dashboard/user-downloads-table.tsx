@@ -1,6 +1,11 @@
 import { otherDownloaders } from "@/lib/i18n/format"
 import { T, useTranslation } from "@/lib/i18n/provider"
-import { EyeIcon, HeartIcon, ImagesIcon, VideoIcon } from "lucide-react"
+import {
+  EyeIcon,
+  HeartIcon,
+  ImagesIcon,
+  VideoCameraIcon,
+} from "@phosphor-icons/react"
 import { Badge } from "@/components/controls"
 import { Button } from "@/components/controls"
 import {
@@ -118,7 +123,7 @@ export function UserDownloadsTable({
                       {download.mediaKind === "images" ? (
                         <ImagesIcon />
                       ) : (
-                        <VideoIcon />
+                        <VideoCameraIcon />
                       )}
                     </T>
                   </span>

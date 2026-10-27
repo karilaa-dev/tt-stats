@@ -1,7 +1,7 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { useDashboardContext } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
-import { DatabaseZapIcon } from "lucide-react"
+import { DatabaseIcon } from "@phosphor-icons/react"
 
 import { DatabaseSetupCard } from "@/components/dashboard/database-setup-card"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
@@ -55,7 +55,7 @@ export function DatabaseJobsPage() {
       <T>
         {fakeMode ? (
           <Alert className="mb-6">
-            <DatabaseZapIcon />
+            <DatabaseIcon />
             <AlertTitle>
               <T>{"Controls disabled in fake-data mode"}</T>
             </AlertTitle>
@@ -75,10 +75,7 @@ export function DatabaseJobsPage() {
           className="grid items-start gap-5 xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-8"
         >
           <div>
-            <h2
-              id="database-health-heading"
-              className="font-heading text-lg font-semibold tracking-tight"
-            >
+            <h2 id="database-health-heading" className="text-lg font-semibold">
               <T>{"Database health"}</T>
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -112,7 +109,7 @@ export function DatabaseJobsPage() {
           <div>
             <h2
               id="refresh-schedules-heading"
-              className="font-heading text-lg font-semibold tracking-tight"
+              className="text-lg font-semibold"
             >
               <T>{"Refresh schedules"}</T>
             </h2>
@@ -162,10 +159,7 @@ export function DatabaseJobsPage() {
           className="grid items-start gap-5 border-t pt-8 xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-8"
         >
           <div>
-            <h2
-              id="delivery-monitor-heading"
-              className="font-heading text-lg font-semibold tracking-tight"
-            >
+            <h2 id="delivery-monitor-heading" className="text-lg font-semibold">
               <T>{"Delivery alerts"}</T>
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">

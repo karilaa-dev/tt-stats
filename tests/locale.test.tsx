@@ -26,17 +26,17 @@ it("has nonempty Russian and Ukrainian translations for every typed English key"
       expect(translations[locale].trim(), key).not.toBe("")
       expect(translate(key, locale), key).toBe(translations[locale])
     }
-  expect(translate("My Profile · @ttgrab Stats", "uk")).toBe(
+  expect(translate("My profile · @ttgrab Stats", "uk")).toBe(
     "Мій профіль · @ttgrab Stats"
   )
 })
 it("hydrates the server locale without a language mismatch and remembers an explicit selection", async () => {
-  document.documentElement.dataset.pageTitle = "My Profile · @ttgrab Stats"
+  document.documentElement.dataset.pageTitle = "My profile · @ttgrab Stats"
   const app = (
     <LocaleProvider initialLocale="uk">
       <LanguageSelector />
       <h1>
-        <T>My Profile</T>
+        <T>My profile</T>
       </h1>
       <ExactCounter value="9007199254740993123456" />
     </LocaleProvider>

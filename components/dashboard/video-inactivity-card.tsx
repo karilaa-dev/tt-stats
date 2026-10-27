@@ -1,12 +1,12 @@
 import { T } from "@/lib/i18n/provider"
 import { useMutation } from "@tanstack/react-query"
 import {
-  BellRingIcon,
-  CheckCircle2Icon,
+  BellRingingIcon,
+  CheckCircleIcon,
   CircleDashedIcon,
-  SendIcon,
-  TriangleAlertIcon,
-} from "lucide-react"
+  PaperPlaneTiltIcon,
+  WarningIcon,
+} from "@phosphor-icons/react"
 import { toast } from "@/components/controls/toast"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/controls"
@@ -73,7 +73,7 @@ export function VideoInactivityCard({
         <T>
           {status.configurationError ? (
             <Alert variant="destructive">
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Invalid notification configuration"}</T>
               </AlertTitle>
@@ -87,7 +87,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured && fakeMode ? (
             <Alert>
-              <BellRingIcon />
+              <BellRingingIcon />
               <AlertTitle>
                 <T>{"Monitor paused in fake-data mode"}</T>
               </AlertTitle>
@@ -115,7 +115,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured && monitorDatabaseStatus === "unavailable" ? (
             <Alert variant="destructive">
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Monitor status unavailable"}</T>
               </AlertTitle>
@@ -129,7 +129,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured && monitorDatabaseStatus === "install" ? (
             <Alert>
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Database setup required"}</T>
               </AlertTitle>
@@ -143,7 +143,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured && monitorDatabaseStatus === "definitions" ? (
             <Alert>
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Database update required"}</T>
               </AlertTitle>
@@ -157,7 +157,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured && monitorDatabaseStatus === "permissions" ? (
             <Alert variant="destructive">
-              <TriangleAlertIcon />
+              <WarningIcon />
               <AlertTitle>
                 <T>{"Monitor database grants required"}</T>
               </AlertTitle>
@@ -171,7 +171,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : status.configured ? (
             <Alert>
-              <CheckCircle2Icon />
+              <CheckCircleIcon />
               <AlertTitle>
                 <T>{"Monitor active"}</T>
               </AlertTitle>
@@ -185,7 +185,7 @@ export function VideoInactivityCard({
             </Alert>
           ) : (
             <Alert>
-              <BellRingIcon />
+              <BellRingingIcon />
               <AlertTitle>
                 <T>{"No destination configured"}</T>
               </AlertTitle>
@@ -211,7 +211,7 @@ export function VideoInactivityCard({
             {mutation.isPending ? (
               <Spinner data-icon="inline-start" />
             ) : (
-              <SendIcon data-icon="inline-start" />
+              <PaperPlaneTiltIcon data-icon="inline-start" />
             )}
           </T>
           <T>
