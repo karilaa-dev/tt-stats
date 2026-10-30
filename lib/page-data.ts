@@ -94,8 +94,8 @@ function pageLoads(
     case "/dashboard/videos":
       return [
         [
-          queryKeys.popularVideos(range, page),
-          () => loadPopularVideos(page, range),
+          queryKeys.popularVideos(range, page, platform),
+          () => loadPopularVideos(page, range, platform),
         ],
       ]
     case "/dashboard/referrals":

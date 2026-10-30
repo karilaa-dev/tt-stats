@@ -82,16 +82,20 @@ test("personal statistics, filters, mobile access, and logout", async ({
     await savedOnly.click()
     await expect(savedOnly).toBeChecked()
     await expect(page).toHaveURL(/savedMediaOnly=true/)
-    await expect(history.getByRole("listitem")).toHaveCount(17)
+    // Saved sounds count as previews for audio downloads.
+    await expect(history.getByRole("listitem")).toHaveCount(19)
     await expect(
       history.getByRole("button", { name: "View media" })
     ).toHaveCount(17)
+    await expect(
+      history.getByRole("button", { name: "Play audio" })
+    ).toHaveCount(2)
     await expect
       .poll(() => historyRequests.at(-1))
       .toMatchObject({ savedMediaOnly: true, page: 1 })
     await page.reload()
     await expect(savedOnly).toBeChecked()
-    await expect(history.getByRole("listitem")).toHaveCount(17)
+    await expect(history.getByRole("listitem")).toHaveCount(19)
     await page.goBack()
     await expect(savedOnly).not.toBeChecked()
     await expect(history.getByRole("listitem")).toHaveCount(20)

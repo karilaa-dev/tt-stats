@@ -164,6 +164,7 @@ const historyFilters = {
   from: z.number().int().min(0).max(253402300800).optional(),
   until: z.number().int().min(0).max(253402300800).optional(),
   mediaKind: z.enum(["all", "video", "images", "audio"]).default("all"),
+  platform: z.enum(DOWNLOAD_PLATFORMS).default("all"),
   discovery: z.enum(["all", "others", "first"]).default("all"),
   category: z.enum(["history", "popular"]).default("history"),
   sort: z.enum(["newest", "oldest", "popular"]).default("newest"),

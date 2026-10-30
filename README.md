@@ -326,7 +326,8 @@ Only records with a stable `video_details_id` participate in these comparisons.
 Legacy downloads remain in history, but do not receive other-downloader or
 first-downloader badges and do not match either discovery filter. Saved URLs are
 not used to infer that two legacy downloads refer to the same video.
-Repeated downloads remain separate history events. Popularity comparisons run
+Repeated downloads remain separate history events, except in Popular downloads,
+which lists each post once. Popularity comparisons run
 once per distinct candidate post and use the indexes in
 `database/002_stats_snapshot_indexes.sql`; ordinary history only compares posts
 on the requested page. CSV export continues to include the full history.
@@ -384,6 +385,16 @@ inline styles remain permitted for the component and chart libraries.
 
 ## Deploying the new rankings
 
+Top videos now ranks **All platforms**, **TikTok**, and **Instagram** separately
+for every period. Each platform keeps its own top 1,000, so Instagram is not
+limited to the videos that also reach the combined ranking. This is snapshot
+definitions version 11 (`ranking_version = 5`). After deploying, use
+**Operations → Update database definitions** and let both rolling and daily
+rebuilds complete; Top videos shows its unavailable state until then. The update
+adds a `platform` column to `tt_stats_cache.popular_videos`, keeps existing rows
+as All platforms, and changes its primary key to `(range, platform, position)`.
+No grants or source indexes change.
+
 Breakdown now supports **All platforms**, **TikTok**, and **Instagram**, together
 with the existing audience and period filters. Platform selection is saved in
 the URL. Install snapshot definitions version 10 using **Operations → Update
@@ -402,7 +413,8 @@ Operations, **Update database definitions** installs the change and queues both
 rolling and daily rebuilds. A manual installation uses the documented SQL
 procedure. Apply any missing indexes from `database/002_stats_snapshot_indexes.sql`
 outside a transaction. All four ranking periods must reach
-`ranking_version = 4`. The app waits for rankings with the new date fields
+`ranking_version = 5` (version 11 definitions, above). The app waits for
+rankings with the new date fields
 while that refresh is pending. Schedule the update during deployment;
 Top videos is unavailable until the definitions and rankings are ready.
 
@@ -444,6 +456,12 @@ without linked or saved media show an unavailable message and retain the origina
 post link. Cache entries may change after a download; previews are not an archive
 of the exact file originally delivered.
 
+Some saved videos are H.265 (HEVC). Browsers without an HEVC decoder play those
+files as sound only, with no picture. The preview detects a video whose picture
+has no dimensions after its metadata loads, explains that only the sound can
+play, and offers **Download video** and the original post. Failed previews also
+offer the download.
+
 Set `BOT_TOKEN` to the same bot that owns the saved files. Previewing media does
 not require `TELEGRAM_API_ID` or `TELEGRAM_API_HASH`. The app checks the stored
 `telegram_bot_id` before retrieving files. Media streams through an authenticated
@@ -461,7 +479,10 @@ separate first-downloader badge regardless of cache status.
 period: 24 hours, 7 days, 31 days, and Total. Published Top videos previews are
 public, other previews require ownership or admin access, and arbitrary user
 lookups require admin access. Ranking counts distinct chats, counting each group
-as one chat and excluding placeholder ID zero. It excludes image albums.
+as one chat and excluding placeholder ID zero. Only video downloads count: audio
+(`music`) and image albums are excluded. A **Platform** filter selects All
+platforms, TikTok, or Instagram and is saved in the URL; each row shows the
+video's platform logo.
 Only events with a stable `video_details_id` and a non-empty platform video ID
 participate. Legacy links are excluded before selecting the top 1,000. The table
 displays the platform video ID, first download, and last download within the
@@ -485,9 +506,16 @@ Account history includes video, image album, and audio events. Audio records use
 the TikTok post ID stored in `music.video_id`; their IDs are prefixed with `audio:`
 to distinguish them from video history entries. The Audio filter, date filters,
 pagination, activity, totals, and CSV export include these events. Audio popularity
-and first-downloader comparisons use other audio events for the same post. Audio
-entries link to the original post and do not offer the source video's saved media
-as an audio preview. CSV exports include a `Type` column (`video`, `images`, or
+and first-downloader comparisons use other audio events for the same post.
+The bot does not store the audio files it sends, so **Play audio** opens an audio
+player for the sound track of the post's saved video. It is offered when that
+post's first saved file is a video; TikTok slideshows have no saved sound. The
+dialog notes that this can differ slightly from the delivered audio file. Audio
+media uses the history ID (`audio:` and the `music.pk_id`) on the same
+authenticated media routes, is never public, and requires ownership or admin
+access. **Show only records with media preview** includes audio with a saved
+sound. The player has play/pause, 10-second skips, seeking, playback speed,
+mute, and volume; closing it stops the stream. CSV exports include a `Type` column (`video`, `images`, or
 `audio`). Install the additional music history and identity indexes from
 `database/002_stats_snapshot_indexes.sql` outside a transaction.
 
@@ -656,9 +684,16 @@ legacy entries retain their original URL. Stored `views_display` and
 as nullable strings. Zero and abbreviated values are preserved. The expanded
 history response uses a new cache version; no schema migration is needed.
 
-Download history and Popular downloads are separate categories. Both support
-Newest/Oldest ordering; Popular first ranks by other downloaders, then applies
-the chosen chronological order and event-ID tie-breaker. Unknown timestamps sort
+Download history and Popular downloads are separate categories. Download history
+lists every event; Popular downloads lists each post once (by stable video or
+audio identity), shows how many times the account downloaded it, and uses the
+newest or oldest of those downloads to match the chosen order. Legacy links
+without an ID are never merged. Both support Newest/Oldest ordering; Popular
+first ranks by other downloaders, then applies the chosen chronological order
+and event-ID tie-breaker. A **Platform** filter (All platforms, TikTok,
+Instagram) applies to both categories and is saved in the URL. Audio is TikTok
+only; downloads without video details appear only under All platforms. Each row
+shows its platform. Unknown timestamps sort
 last. Legacy `sort=popular` URLs select Popular + Newest. Filters reset pagination.
 Albums support previous/next buttons, horizontal swipes, and keyboard arrows,
 without automatic advancement or wrapping.

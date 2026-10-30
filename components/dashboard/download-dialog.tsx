@@ -1,5 +1,10 @@
 import { T, useTranslation } from "@/lib/i18n/provider"
-import { CaretLeftIcon, CaretRightIcon } from "@phosphor-icons/react"
+import {
+  CaretLeftIcon,
+  CaretRightIcon,
+  DownloadSimpleIcon,
+  SpeakerHighIcon,
+} from "@phosphor-icons/react"
 import { safeExternalUrl } from "@/lib/security/links"
 import { useSession } from "./session-access"
 import { useEffect, useRef, useState } from "react"
@@ -12,6 +17,7 @@ import {
   DialogDescription,
 } from "@/components/controls"
 import { Button, buttonVariants } from "@/components/controls"
+import { cn } from "@/lib/utils"
 import { Alert, AlertDescription } from "@/components/controls"
 import { Spinner } from "@/components/controls"
 import {
@@ -34,12 +40,17 @@ import {
 } from "@/lib/media/query-options"
 import { formatTimestamp, useBrowserTime } from "@/lib/browser-time"
 import { useAdminAccess } from "./admin-access"
+import { AudioPlayer } from "./audio-player"
 import { Pager } from "./pager"
+import { PlatformMark, type VideoPlatform } from "./platform-filter"
 
 export interface SelectedDownload {
   id: string
   sharedLink: string
-  mode: "media" | "downloaders"
+  /** Audio plays the sound of the post's saved video in an audio player. */
+  mode: "media" | "audio" | "downloaders"
+  videoId?: string | null
+  platform?: VideoPlatform | null
 }
 export function DownloadDialog({
   selection,
@@ -58,7 +69,7 @@ export function DownloadDialog({
       onClose()
     }
   }, [user?.id, authenticated, onClose])
-  const allowed = selection?.mode === "media" || authenticated
+  const allowed = selection?.mode !== "downloaders" || authenticated
   const original = safeExternalUrl(selection?.sharedLink)
   return (
     <Dialog
@@ -67,29 +78,38 @@ export function DownloadDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        className={cn(
+          "max-h-[90dvh] overflow-y-auto",
+          selection?.mode === "audio" ? "sm:max-w-lg" : "sm:max-w-3xl"
+        )}
+      >
         <DialogHeader>
           <DialogTitle>
             <T>
               {selection?.mode === "downloaders"
                 ? "Other downloaders"
-                : "Saved media"}
+                : selection?.mode === "audio"
+                  ? "Saved audio"
+                  : "Saved media"}
             </T>
           </DialogTitle>
           <DialogDescription>
             <T>
               {selection?.mode === "downloaders"
                 ? "Other users and groups that downloaded this post. Counts include cache hits and misses."
-                : "View the video or images saved for this post."}
+                : selection?.mode === "audio"
+                  ? "The sound plays from the video saved for this post, so it can differ slightly from the audio file the bot sent."
+                  : "View the video or images saved for this post."}
             </T>
           </DialogDescription>
         </DialogHeader>
         {selection && allowed ? (
           <>
-            {selection.mode === "media" ? (
-              <MediaPreview key={selection.id} id={selection.id} />
-            ) : (
+            {selection.mode === "downloaders" ? (
               <DownloadersList key={selection.id} id={selection.id} />
+            ) : (
+              <MediaPreview key={selection.id} selection={selection} />
             )}
             {original ? (
               <a
@@ -111,8 +131,9 @@ export function DownloadDialog({
   )
 }
 
-function MediaPreview({ id }: { id: string }) {
+function MediaPreview({ selection }: { selection: SelectedDownload }) {
   const { t } = useTranslation()
+  const { id } = selection
 
   const query = useQuery(mediaQueryOptions(id))
   const [index, setIndex] = useState(0)
@@ -152,6 +173,28 @@ function MediaPreview({ id }: { id: string }) {
           <T>{"No saved media is available for this post."}</T>
         </AlertDescription>
       </Alert>
+    )
+  if (item.mediaType === "audio")
+    return (
+      <AudioPlayer
+        key={`${id}:${item.position}`}
+        url={item.url}
+        title={
+          selection.platform === "instagram"
+            ? "Instagram sound"
+            : "TikTok sound"
+        }
+        details={
+          <>
+            {selection.platform ? (
+              <PlatformMark platform={selection.platform} compact />
+            ) : null}
+            {selection.videoId ? (
+              <span className="font-mono">{selection.videoId}</span>
+            ) : null}
+          </>
+        }
+      />
     )
   return (
     <div
@@ -202,7 +245,13 @@ function MediaPreview({ id }: { id: string }) {
           gesture.current = null
         }}
       >
-        <MediaItem key={`${id}:${item.position}`} {...item} />
+        <MediaItem
+          key={`${id}:${item.position}`}
+          url={item.url}
+          mediaType={item.mediaType}
+          position={item.position}
+          downloadName={`ttgrab-${selection.videoId ?? id}${items.length > 1 ? `-${item.position + 1}` : ""}`}
+        />
         <T>
           {items.length > 1 ? (
             <>
@@ -255,16 +304,34 @@ function MediaItem({
   url,
   mediaType,
   position,
+  downloadName,
 }: {
   url: string
   mediaType: "photo" | "video"
   position: number
+  downloadName: string
 }) {
   const { t } = useTranslation()
 
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [attempt, setAttempt] = useState(0)
+  // Browsers without an H.265 (HEVC) decoder play such videos as sound only:
+  // metadata loads and time advances, but the picture has no dimensions.
+  const [soundOnly, setSoundOnly] = useState(false)
+  const checkPicture = (element: HTMLVideoElement) => {
+    if (element.readyState >= 1 && element.videoWidth === 0) setSoundOnly(true)
+  }
+  const download = (
+    <a
+      href={url}
+      download={`${downloadName}.${mediaType === "video" ? "mp4" : "jpg"}`}
+      className={buttonVariants({ variant: "outline" })}
+    >
+      <DownloadSimpleIcon data-icon="inline-start" />
+      <T>{mediaType === "video" ? "Download video" : "Download image"}</T>
+    </a>
+  )
   const video = useRef<HTMLVideoElement>(null)
   const photo = useRef<HTMLImageElement>(null)
   useEffect(() => {
@@ -290,16 +357,20 @@ function MediaItem({
               }
             </T>
           </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setFailed(false)
-              setLoading(true)
-              setAttempt(attempt + 1)
-            }}
-          >
-            <T>{"Retry preview"}</T>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setFailed(false)
+                setLoading(true)
+                setSoundOnly(false)
+                setAttempt(attempt + 1)
+              }}
+            >
+              <T>{"Retry preview"}</T>
+            </Button>
+            {download}
+          </div>
         </AlertDescription>
       </Alert>
     )
@@ -322,9 +393,15 @@ function MediaItem({
             preload="metadata"
             src={url}
             aria-label={t(`Saved video ${position + 1}`)}
-            onLoadedMetadata={() => setLoading(false)}
+            onLoadedMetadata={(event) => {
+              setLoading(false)
+              checkPicture(event.currentTarget)
+            }}
             onCanPlay={() => setLoading(false)}
-            onPlaying={() => setLoading(false)}
+            onPlaying={(event) => {
+              setLoading(false)
+              checkPicture(event.currentTarget)
+            }}
             onWaiting={() => setLoading(true)}
             onError={() => {
               setFailed(true)
@@ -346,6 +423,24 @@ function MediaItem({
           />
         )}
       </T>
+      {soundOnly ? (
+        <div className="media-sound-only" role="status">
+          <SpeakerHighIcon aria-hidden="true" />
+          <div className="media-sound-only-text">
+            <p className="font-medium">
+              <T>{"Only the sound can play in this browser"}</T>
+            </p>
+            <p>
+              <T>
+                {
+                  "This video is probably encoded with H.265 (HEVC), which this browser can't display. Download it to watch in a video player, or open the original post."
+                }
+              </T>
+            </p>
+          </div>
+          {download}
+        </div>
+      ) : null}
     </div>
   )
 }

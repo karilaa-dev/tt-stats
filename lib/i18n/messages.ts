@@ -2784,10 +2784,11 @@ export const messages = {
     ru: "Лидеры по скачиваниям появятся после следующего ежедневного обновления.",
     uk: "Лідери за завантаженнями з'являться після наступного щоденного оновлення.",
   },
-  "Image albums and legacy downloads without a video ID are excluded.": {
-    ru: "Альбомы изображений и старые скачивания без ID видео не учитываются.",
-    uk: "Альбоми зображень і старі завантаження без ID відео не враховуються.",
-  },
+  "Only video downloads count: audio, image albums, and legacy downloads without a video ID are excluded.":
+    {
+      ru: "Учитываются только скачивания видео: аудио, альбомы изображений и старые скачивания без ID видео не учитываются.",
+      uk: "Враховуються лише завантаження відео: аудіо, альбоми зображень і старі завантаження без ID відео не враховуються.",
+    },
   "All recorded downloads for this chat.": {
     ru: "Все записанные скачивания этого чата.",
     uk: "Усі записані завантаження цього чату.",
@@ -2809,5 +2810,79 @@ export const messages = {
     ru: "Рейтинг обновляется",
     uk: "Рейтинг оновлюється",
   },
+  "Top 1,000 TikTok videos": {
+    ru: "Топ-1000 видео из TikTok",
+    uk: "Топ-1000 відео з TikTok",
+  },
+  "Top 1,000 Instagram videos": {
+    ru: "Топ-1000 видео из Instagram",
+    uk: "Топ-1000 відео з Instagram",
+  },
+  "Downloaded TikTok videos will appear here.": {
+    ru: "Здесь появятся скачанные видео из TikTok.",
+    uk: "Тут з'являться завантажені відео з TikTok.",
+  },
+  "Downloaded Instagram videos will appear here.": {
+    ru: "Здесь появятся скачанные видео из Instagram.",
+    uk: "Тут з'являться завантажені відео з Instagram.",
+  },
+  "Older downloads without platform information appear only under All platforms.":
+    {
+      ru: "Старые скачивания без сведений о платформе показаны только в разделе «Все платформы».",
+      uk: "Старі завантаження без відомостей про платформу показано лише в розділі «Усі платформи».",
+    },
+  "Older downloads without platform information appear only under All platforms. Audio downloads are recorded for TikTok only.":
+    {
+      ru: "Старые скачивания без сведений о платформе показаны только в разделе «Все платформы». Скачивания аудио записываются только для TikTok.",
+      uk: "Старі завантаження без відомостей про платформу показано лише в розділі «Усі платформи». Завантаження аудіо записуються лише для TikTok.",
+    },
+  "Play audio": { ru: "Слушать аудио", uk: "Слухати аудіо" },
+  "Saved audio": { ru: "Сохранённое аудио", uk: "Збережене аудіо" },
+  "The sound plays from the video saved for this post, so it can differ slightly from the audio file the bot sent.":
+    {
+      ru: "Звук воспроизводится из видео, сохранённого для этой публикации, поэтому он может немного отличаться от аудиофайла, который отправил бот.",
+      uk: "Звук відтворюється з відео, збереженого для цієї публікації, тому він може трохи відрізнятися від аудіофайлу, який надіслав бот.",
+    },
+  "TikTok sound": { ru: "Звук из TikTok", uk: "Звук з TikTok" },
+  "Instagram sound": { ru: "Звук из Instagram", uk: "Звук з Instagram" },
+  "No saved sound is available for this download.": {
+    ru: "Для этого скачивания нет сохранённого звука.",
+    uk: "Для цього завантаження немає збереженого звуку.",
+  },
+  "This saved sound could not be played. It may exceed the 20 MB preview limit or use an unsupported format.":
+    {
+      ru: "Не удалось воспроизвести сохранённый звук. Возможно, файл больше лимита предпросмотра 20 МБ или использует неподдерживаемый формат.",
+      uk: "Не вдалося відтворити збережений звук. Можливо, файл перевищує ліміт попереднього перегляду 20 МБ або має непідтримуваний формат.",
+    },
+  "Audio player": { ru: "Аудиоплеер", uk: "Аудіоплеєр" },
+  "Saved sound": { ru: "Сохранённый звук", uk: "Збережений звук" },
+  Seek: { ru: "Перемотка", uk: "Перемотування" },
+  "Elapsed {0} of {1}": { ru: "Прошло {0} из {1}", uk: "Минуло {0} з {1}" },
+  "Back 10 seconds": { ru: "Назад на 10 секунд", uk: "Назад на 10 секунд" },
+  "Forward 10 seconds": {
+    ru: "Вперёд на 10 секунд",
+    uk: "Уперед на 10 секунд",
+  },
+  Play: { ru: "Воспроизвести", uk: "Відтворити" },
+  "Loading sound": { ru: "Загрузка звука", uk: "Завантаження звуку" },
+  "Loading sound…": { ru: "Загрузка звука…", uk: "Завантаження звуку…" },
+  "Playback speed {0}×": {
+    ru: "Скорость воспроизведения {0}×",
+    uk: "Швидкість відтворення {0}×",
+  },
+  Mute: { ru: "Выключить звук", uk: "Вимкнути звук" },
+  Unmute: { ru: "Включить звук", uk: "Увімкнути звук" },
+  Volume: { ru: "Громкость", uk: "Гучність" },
+  "Download video": { ru: "Скачать видео", uk: "Завантажити відео" },
+  "Download image": { ru: "Скачать изображение", uk: "Завантажити зображення" },
+  "Only the sound can play in this browser": {
+    ru: "В этом браузере воспроизводится только звук",
+    uk: "У цьому браузері відтворюється лише звук",
+  },
+  "This video is probably encoded with H.265 (HEVC), which this browser can't display. Download it to watch in a video player, or open the original post.":
+    {
+      ru: "Скорее всего, видео закодировано в H.265 (HEVC), а этот браузер не может его показать. Скачайте видео, чтобы посмотреть его в видеоплеере, или откройте исходную публикацию.",
+      uk: "Імовірно, відео закодовано в H.265 (HEVC), а цей браузер не може його показати. Завантажте відео, щоб переглянути його у відеоплеєрі, або відкрийте оригінальну публікацію.",
+    },
 } as const satisfies Record<string, { ru: string; uk: string }>
 export type MessageKey = keyof typeof messages

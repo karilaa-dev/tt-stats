@@ -16,6 +16,7 @@ const downloads: PaginatedUserDownloads = {
   items: [
     {
       id: "2",
+      platform: null,
       videoId: null,
       canonicalUrl: null,
       viewsDisplay: null,
@@ -31,6 +32,7 @@ const downloads: PaginatedUserDownloads = {
     },
     {
       id: "1",
+      platform: null,
       videoId: null,
       canonicalUrl: null,
       viewsDisplay: null,
@@ -153,7 +155,89 @@ describe("user downloads table", () => {
       id: "1",
       sharedLink: downloads.items[1]!.sharedLink,
       mode: "media",
+      videoId: null,
+      platform: null,
     })
+  })
+
+  it("plays saved sounds for audio downloads in the audio player", () => {
+    const onView = vi.fn()
+    render(
+      <UserDownloadsTable
+        data={{
+          ...downloads,
+          items: [
+            {
+              ...downloads.items[0]!,
+              id: "audio:7",
+              mediaKind: "audio",
+              platform: "tiktok",
+              videoId: "7539876543210000001",
+              videoDetailsId: null,
+              hasSavedMedia: true,
+            },
+          ],
+        }}
+        loading={false}
+        onPageChange={vi.fn()}
+        onView={onView}
+      />
+    )
+    expect(screen.queryByRole("button", { name: "View media" })).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Play audio" }))
+    expect(onView).toHaveBeenCalledWith({
+      id: "audio:7",
+      sharedLink: downloads.items[0]!.sharedLink,
+      mode: "audio",
+      videoId: "7539876543210000001",
+      platform: "tiktok",
+    })
+  })
+
+  it("names each post's platform and counts merged repeat downloads", () => {
+    const { rerender } = render(
+      <UserDownloadsTable
+        data={{
+          ...downloads,
+          items: [
+            {
+              ...downloads.items[0]!,
+              platform: "tiktok",
+              timesDownloaded: "3",
+            },
+            {
+              ...downloads.items[1]!,
+              platform: "instagram",
+              timesDownloaded: "1",
+            },
+          ],
+        }}
+        own
+        category="popular"
+        loading={false}
+        onPageChange={vi.fn()}
+      />
+    )
+    const rows = screen.getAllByRole("listitem")
+    expect(within(rows[0]!).getByText("TikTok")).toBeTruthy()
+    expect(
+      within(rows[0]!).getByText("You downloaded this 3 times")
+    ).toBeTruthy()
+    expect(within(rows[1]!).getByText("Instagram")).toBeTruthy()
+    expect(rows[1]!.textContent).not.toContain("You downloaded this")
+    rerender(
+      <UserDownloadsTable
+        data={{
+          ...downloads,
+          items: [{ ...downloads.items[0]!, timesDownloaded: "2" }],
+        }}
+        category="popular"
+        loading={false}
+        onPageChange={vi.fn()}
+      />
+    )
+    expect(screen.getByText("Downloaded 2 times by this chat")).toBeTruthy()
+    expect(screen.queryByText("TikTok")).toBeNull()
   })
 
   it("prevents navigating before the first page and allows the next page", () => {

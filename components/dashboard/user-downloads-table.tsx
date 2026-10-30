@@ -1,10 +1,11 @@
-import { otherDownloaders } from "@/lib/i18n/format"
+import { otherDownloaders, timesDownloaded } from "@/lib/i18n/format"
 import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   EyeIcon,
   HeartIcon,
   ImagesIcon,
   MusicNotesIcon,
+  PlayIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react"
 import { Badge } from "@/components/controls"
@@ -31,6 +32,7 @@ import { fullPostUrl, isSharingUrl } from "@/lib/media/post-links"
 import { safeExternalUrl } from "@/lib/security/links"
 import type { PaginatedUserDownloads } from "@/lib/stats/types"
 import type { SelectedDownload } from "./download-dialog"
+import { PlatformMark } from "./platform-filter"
 
 export function UserDownloadsTable({
   data,
@@ -117,6 +119,8 @@ export function UserDownloadsTable({
                 download.otherUniqueChats == null
                   ? null
                   : BigInt(download.otherUniqueChats)
+              const repeats = BigInt(download.timesDownloaded ?? "1")
+              const audio = download.mediaKind === "audio"
               return (
                 <li key={download.id} className="download-entry">
                   <span className="download-kind" aria-hidden="true">
@@ -131,7 +135,10 @@ export function UserDownloadsTable({
                     </T>
                   </span>
                   <div className="download-description">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="download-meta">
+                      {download.platform ? (
+                        <PlatformMark platform={download.platform} />
+                      ) : null}
                       <span className="text-xs font-medium text-muted-foreground">
                         <T>
                           {download.mediaKind === "audio"
@@ -235,6 +242,11 @@ export function UserDownloadsTable({
                           </span>
                         ) : null}
                       </T>
+                      {repeats > 1n ? (
+                        <span className="download-repeats">
+                          {timesDownloaded(repeats, locale, own)}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   {onView &&
@@ -249,11 +261,14 @@ export function UserDownloadsTable({
                             onView({
                               id: download.id,
                               sharedLink: download.sharedLink,
-                              mode: "media",
+                              mode: audio ? "audio" : "media",
+                              videoId: download.videoId,
+                              platform: download.platform,
                             })
                           }
                         >
-                          <T>{"View media"}</T>
+                          {audio ? <PlayIcon data-icon="inline-start" /> : null}
+                          <T>{audio ? "Play audio" : "View media"}</T>
                         </Button>
                       ) : null}
                       {admin && download.videoDetailsId ? (

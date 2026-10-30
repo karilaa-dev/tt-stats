@@ -8,6 +8,7 @@ import { Loader } from "@cloudflare/kumo/components/loader"
 import { Table as KumoTable } from "@cloudflare/kumo/components/table"
 import { Button as BaseButton } from "@base-ui/react/button"
 import { Dialog as BaseDialog } from "@base-ui/react/dialog"
+import { Slider as BaseSlider } from "@base-ui/react/slider"
 import { Switch as BaseSwitch } from "@base-ui/react/switch"
 import { ToggleGroup as BaseToggleGroup } from "@base-ui/react/toggle-group"
 import { Toggle as BaseToggle } from "@base-ui/react/toggle"
@@ -444,6 +445,42 @@ export function Switch({
         )}
       />
     </BaseSwitch.Root>
+  )
+}
+
+// Kumo's slider always shows its value bubble and range labels; media seek
+// and volume bars need a slim track with the value described in text instead.
+export function Slider({
+  className,
+  label,
+  valueText,
+  ...props
+}: Omit<BaseSlider.Root.Props<number>, "children"> & {
+  label: string
+  valueText?: (value: number) => string
+}) {
+  return (
+    <BaseSlider.Root
+      {...props}
+      thumbAlignment="center"
+      className={cn(
+        "control-slider relative flex h-6 w-full touch-none items-center select-none data-disabled:opacity-50",
+        className
+      )}
+    >
+      <BaseSlider.Control className="flex h-full w-full cursor-pointer items-center">
+        <BaseSlider.Track className="relative h-1.5 w-full rounded-full bg-kumo-recessed ring ring-kumo-hairline">
+          <BaseSlider.Indicator className="control-slider-indicator rounded-full bg-kumo-brand" />
+          <BaseSlider.Thumb
+            aria-label={label}
+            getAriaValueText={
+              valueText ? (_formatted, value) => valueText(value) : undefined
+            }
+            className="control-slider-thumb size-3.5 rounded-full bg-kumo-contrast shadow-sm ring ring-kumo-line outline-none has-focus-visible:ring-2 has-focus-visible:ring-kumo-brand"
+          />
+        </BaseSlider.Track>
+      </BaseSlider.Control>
+    </BaseSlider.Root>
   )
 }
 

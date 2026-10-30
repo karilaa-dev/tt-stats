@@ -3,12 +3,14 @@ import { getPrincipal } from "@/lib/auth/session"
 import { canReadMedia } from "@/lib/media/access"
 import { getStoredMedia } from "@/lib/media/queries"
 import { describeMedia } from "@/lib/media/telegram"
+import { parseMediaIdParam } from "@/lib/media/ids"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { getSafeDatabaseError } from "@/lib/db/errors"
 export const GET: APIRoute = async ({ params, cookies }) => {
-  const id = params.downloadId ?? ""
+  const media = parseMediaIdParam(params.downloadId)
+  const id = media ? `${media.kind === "audio" ? "audio:" : ""}${media.id}` : ""
   const headers = { "Cache-Control": "private, no-store" }
-  if (!/^[1-9]\d{0,18}$/u.test(id) || BigInt(id) > 9223372036854775807n)
+  if (!media)
     return Response.json(
       { message: "Invalid media request." },
       { status: 400, headers }

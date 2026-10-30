@@ -25,6 +25,7 @@ import {
 } from "@/components/dashboard/download-dialog"
 import { UserDownloadsTable } from "@/components/dashboard/user-downloads-table"
 import { HistoryDateFilter } from "@/components/dashboard/history-date-filter"
+import { PlatformToggle } from "@/components/dashboard/platform-filter"
 import { historyDateRange } from "@/lib/history-date-range"
 import { UserLookupForm } from "@/components/dashboard/user-lookup-form"
 import { TelegramChatCard } from "@/components/dashboard/telegram-chat-card"
@@ -215,6 +216,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     sort,
     category,
     savedMediaOnly,
+    platform,
   } = useDashboardSearch()
   const hydrated = useHydrated()
   const navigate = useDashboardNavigate()
@@ -224,6 +226,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     from: dateRange.from,
     until: dateRange.until,
     mediaKind,
+    platform,
     discovery,
     sort,
     category,
@@ -233,6 +236,7 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
     fromDate,
     throughDate,
     mediaKind,
+    platform,
     discovery,
     sort,
     category,
@@ -462,6 +466,18 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
               </select>
             </label>
             <div className="history-select-field">
+              <span id="history-platform-label">
+                <T>{"Platform"}</T>
+              </span>
+              <PlatformToggle
+                aria-labelledby="history-platform-label"
+                value={platform}
+                onValueChange={(nextPlatform) =>
+                  changeFilters({ platform: nextPlatform })
+                }
+              />
+            </div>
+            <div className="history-select-field">
               <span id="history-media-label">
                 <T>{"Media type"}</T>
               </span>
@@ -506,6 +522,15 @@ function UserWorkspace({ userId, own }: { userId: string; own: boolean }) {
             throughDate={throughDate}
             onApply={changeFilters}
           />
+          {platform !== "all" ? (
+            <p className="history-filter-note">
+              <T>
+                {platform === "instagram"
+                  ? "Older downloads without platform information appear only under All platforms. Audio downloads are recorded for TikTok only."
+                  : "Older downloads without platform information appear only under All platforms."}
+              </T>
+            </p>
+          ) : null}
           {discovery === "first" ? (
             <p className="history-filter-note">
               <T>

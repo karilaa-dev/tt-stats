@@ -33,3 +33,28 @@ export function formatDuration(ms: number, locale: Locale) {
     ? part(seconds, "second")
     : `${part(Math.floor(seconds / 60), "minute")} ${part(seconds % 60, "second")}`
 }
+/** How often one account downloaded a post, shown when Popular merges repeats. */
+export function timesDownloaded(
+  count: bigint,
+  locale: Locale,
+  own: boolean
+): string {
+  const formatted = count.toLocaleString(locale)
+  if (locale === "en")
+    return own
+      ? `You downloaded this ${formatted} ${count === 1n ? "time" : "times"}`
+      : `Downloaded ${formatted} ${count === 1n ? "time" : "times"} by this chat`
+  const rule = new Intl.PluralRules(locale).select(Number(count % 100n))
+  const times =
+    locale === "ru"
+      ? { one: "раз", few: "раза", many: "раз", other: "раза" }
+      : { one: "раз", few: "рази", many: "разів", other: "рази" }
+  const word = times[rule as keyof typeof times] ?? times.other
+  if (locale === "ru")
+    return own
+      ? `Вы скачали это ${formatted} ${word}`
+      : `Этот чат скачал это ${formatted} ${word}`
+  return own
+    ? `Ви завантажили це ${formatted} ${word}`
+    : `Цей чат завантажив це ${formatted} ${word}`
+}

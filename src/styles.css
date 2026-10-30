@@ -1467,3 +1467,234 @@ a:focus-visible {
   color: var(--muted-foreground);
   font-size: 0.85rem;
 }
+
+/* Platform logos beside post IDs; the name stays readable in history rows. */
+.platform-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.platform-mark svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.download-meta > .platform-mark + span::before {
+  content: "·";
+  margin-right: 0.5rem;
+  color: var(--muted-foreground);
+}
+.download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.download-repeats {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
+}
+.ranking-video-id > .platform-mark svg {
+  width: 1rem;
+  height: 1rem;
+}
+.ranking-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 2rem;
+  min-width: 0;
+}
+@media (max-width: 639px) {
+  .ranking-filters,
+  .ranking-filters > .stats-filters {
+    width: 100%;
+  }
+}
+@media (max-width: 399px) {
+  /* Three labelled segments fit on narrow phones once the logos drop out. */
+  .ranking-filters .platform-toggle .control-toggle svg,
+  .history-filters .platform-toggle .control-toggle svg {
+    display: none;
+  }
+}
+
+/* Shown over the empty picture when a browser can decode only the sound. */
+.media-sound-only {
+  position: absolute;
+  inset: 1rem 1rem auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 0.5rem 0.75rem;
+  max-width: 34rem;
+  margin-inline: auto;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: var(--popover);
+  box-shadow:
+    0 0 0 1px var(--border),
+    0 8px 24px rgb(0 0 0 / 0.35);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.media-sound-only > svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.1rem;
+  color: var(--primary);
+}
+.media-sound-only-text {
+  display: grid;
+  gap: 0.2rem;
+}
+.media-sound-only-text p:last-child {
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+.media-sound-only > a {
+  grid-column: 2;
+  justify-self: start;
+}
+
+/* Saved audio: a recessed panel with transport, seek, speed, and volume. */
+.audio-player {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1rem 1.25rem 1.1rem;
+  border-radius: 0.75rem;
+  background: var(--color-kumo-recessed);
+  outline: 1px solid var(--color-kumo-hairline);
+}
+.audio-player-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+.audio-player-art {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.75rem;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+.audio-player[data-playing="true"] .audio-player-art {
+  background: var(--secondary);
+  color: var(--primary);
+}
+.audio-player-art svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.audio-player-title {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  font-size: 0.875rem;
+}
+.audio-player-title > p {
+  font-weight: 500;
+}
+.audio-player-details {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+}
+.audio-player-details .font-mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audio-player-timeline {
+  display: grid;
+  gap: 0.15rem;
+}
+.audio-player-times {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.audio-player-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  grid-template-areas: "speed transport volume";
+  align-items: center;
+  gap: 0.5rem;
+}
+.audio-player-speed {
+  grid-area: speed;
+  justify-self: start;
+  min-width: 3rem;
+  font-variant-numeric: tabular-nums;
+}
+.audio-player-transport {
+  grid-area: transport;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.audio-player-skip {
+  gap: 0.2rem;
+  font-variant-numeric: tabular-nums;
+}
+.audio-player-play {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+}
+.audio-player-play svg {
+  width: 1.25rem !important;
+  height: 1.25rem !important;
+}
+.audio-player-volume-group {
+  grid-area: volume;
+  justify-self: end;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.audio-player-volume {
+  width: 4.5rem;
+  flex: none;
+}
+.audio-player-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+}
+@media (max-width: 559px) {
+  .audio-player {
+    padding: 0.9rem 1rem 1rem;
+  }
+  /* Transport gets its own row; speed and mute share the row below. */
+  .audio-player-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "transport transport"
+      "speed volume";
+    row-gap: 0.75rem;
+  }
+  .audio-player-transport {
+    justify-self: center;
+  }
+  /* Phones control volume with their own buttons. */
+  .audio-player-volume {
+    display: none;
+  }
+}

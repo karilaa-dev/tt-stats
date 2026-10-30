@@ -12,7 +12,6 @@ import {
   InfoIcon,
   InstagramLogoIcon,
   MusicNotesIcon,
-  StackIcon,
   TiktokLogoIcon,
   WarningOctagonIcon,
 } from "@phosphor-icons/react"
@@ -23,6 +22,11 @@ import { ExactCounter } from "@/components/dashboard/exact-counter"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { StatsCards } from "@/components/dashboard/stats-cards"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
+import {
+  PlatformToggle,
+  platformOptions,
+  type VideoPlatform,
+} from "@/components/dashboard/platform-filter"
 import {
   Button,
   Card,
@@ -37,8 +41,6 @@ import {
   EmptyTitle,
   Field,
   FieldLabel,
-  ToggleGroup,
-  ToggleGroupItem,
 } from "@/components/controls"
 import { statsBreakdownQueryOptions } from "@/lib/stats/query-options"
 import type { StatsBreakdown } from "@/lib/stats/types"
@@ -46,18 +48,7 @@ import { cn } from "@/lib/utils"
 
 import "./detailed.css"
 
-type Platform = ReturnType<typeof useDashboardSearch>["platform"]
-type NamedPlatform = Exclude<Platform, "all">
-
-const platformOptions = [
-  { value: "all", label: "All platforms", icon: StackIcon },
-  { value: "tiktok", label: "TikTok", icon: TiktokLogoIcon },
-  { value: "instagram", label: "Instagram", icon: InstagramLogoIcon },
-] as const satisfies ReadonlyArray<{
-  value: Platform
-  label: string
-  icon: unknown
-}>
+type NamedPlatform = VideoPlatform
 
 export function DetailedPage() {
   const { t } = useTranslation()
@@ -97,31 +88,19 @@ export function DetailedPage() {
             <FieldLabel>
               <T>{"Platform"}</T>
             </FieldLabel>
-            <ToggleGroup
+            <PlatformToggle
               className="breakdown-platform-toggle"
-              value={[platform]}
-              onValueChange={(values) => {
-                const nextPlatform =
-                  (values[0] as Platform | undefined) ?? platform
+              value={platform}
+              onValueChange={(nextPlatform) =>
                 navigate({
                   search: (previous) => ({
                     ...previous,
                     platform: nextPlatform,
                   }),
                 })
-              }}
+              }
               aria-label={t("Download platform")}
-            >
-              {platformOptions.map((option) => {
-                const Icon = option.icon
-                return (
-                  <ToggleGroupItem key={option.value} value={option.value}>
-                    <Icon aria-hidden="true" />
-                    <T>{option.label}</T>
-                  </ToggleGroupItem>
-                )
-              })}
-            </ToggleGroup>
+            />
           </Field>
         </div>
         <StatsFilters

@@ -78,10 +78,12 @@ integration("PostgreSQL statistics queries", () => {
       ).toHaveLength(3)
       const audio = history.items.find((item) => item.id === "audio:998090")!
       expect(audio).toMatchObject({
+        platform: "tiktok",
         videoId: "7539876543210000090",
         canonicalUrl:
           "https://www.tiktok.com/@audio_creator/video/7539876543210000090",
-        hasSavedMedia: false,
+        // The post's saved video provides the sound for the audio player.
+        hasSavedMedia: true,
         videoDetailsId: null,
         otherUniqueChats: "1",
         isFirstDownloader: true,
@@ -89,6 +91,7 @@ integration("PostgreSQL statistics queries", () => {
       const unknown = history.items.at(-1)!
       expect(unknown).toMatchObject({
         id: "audio:998093",
+        platform: "tiktok",
         downloadedAt: null,
         videoId: "7539876543210000091",
         canonicalUrl: "https://www.tiktok.com/@/video/7539876543210000091",
@@ -123,7 +126,56 @@ integration("PostgreSQL statistics queries", () => {
             savedMediaOnly: true,
           })
         ).items.map((item) => item.id)
-      ).toEqual(["998090"])
+      ).toEqual(["audio:998091", "998090", "audio:998090"])
+      // Music records are TikTok sounds; none of them are Instagram downloads.
+      for (const [platform, total] of [
+        ["tiktok", "4"],
+        ["instagram", "0"],
+        ["all", "4"],
+      ] as const)
+        expect(
+          (
+            await getUserDownloadsRaw("998090", 1, 20, db, {
+              ...base,
+              platform,
+            })
+          ).total
+        ).toBe(total)
+      // Popular lists the repeated sound once, keeping the newest event.
+      const popularAudio = await getUserDownloadsRaw("998090", 1, 20, db, {
+        ...base,
+        mediaKind: "audio",
+        category: "popular",
+      })
+      expect(
+        popularAudio.items.map((item) => [item.id, item.timesDownloaded])
+      ).toEqual([
+        ["audio:998091", "2"],
+        ["audio:998093", "1"],
+      ])
+      const sound = await getStoredMedia("audio:998090", db)
+      expect(sound?.telegram_files?.[0]?.media_type).toBe("video")
+      expect(
+        (await getStoredMedia("audio:998093", db))?.telegram_files
+      ).toBeNull()
+      const owner = {
+        admin: false,
+        user: { id: "998090", name: "Owner", username: null },
+      }
+      const listener = {
+        admin: false,
+        user: { id: "998091", name: "Listener", username: null },
+      }
+      // The same sound downloaded by another chat stays private to that chat.
+      expect(await canReadMedia(owner, "audio:998090", db)).toBe(true)
+      expect(await canReadMedia(listener, "audio:998090", db)).toBe(false)
+      expect(await canReadMedia(listener, "audio:998092", db)).toBe(true)
+      expect(
+        await canReadMedia({ admin: false, user: null }, "audio:998090", db)
+      ).toBe(false)
+      expect(
+        await canReadMedia({ admin: true, user: null }, "audio:998090", db)
+      ).toBe(true)
       for (const discovery of ["all", "others", "first"] as const) {
         const ranked = await getUserDownloadsRaw("998090", 1, 20, db, {
           ...base,
@@ -306,12 +358,25 @@ integration("PostgreSQL statistics queries", () => {
           sort,
           savedMediaOnly: true,
         }
+        // Popular merges the two downloads of the same saved video.
+        const popular = sort === "popular"
         const first = await getUserDownloadsRaw("998051", 1, 2, db, filters)
         const last = await getUserDownloadsRaw("998051", 99, 2, db, filters)
-        expect(first).toMatchObject({ total: "3", totalPages: 2, page: 1 })
+        expect(first).toMatchObject({
+          total: popular ? "2" : "3",
+          totalPages: popular ? 1 : 2,
+          page: 1,
+        })
         expect(first.items).toHaveLength(2)
-        expect(last).toMatchObject({ total: "3", page: 2 })
-        expect(last.items).toHaveLength(1)
+        expect(last).toMatchObject({
+          total: popular ? "2" : "3",
+          page: popular ? 1 : 2,
+        })
+        expect(last.items).toHaveLength(popular ? 2 : 1)
+        if (popular)
+          expect(
+            first.items.find((item) => item.videoDetailsId === "998051")
+          ).toMatchObject({ timesDownloaded: "2", downloadedAt: 1700000001 })
         expect(
           [...first.items, ...last.items].every((item) => item.hasSavedMedia)
         ).toBe(true)
@@ -339,7 +404,31 @@ integration("PostgreSQL statistics queries", () => {
         })
         expect(album.total).toBe("1")
         expect(album.items[0]?.mediaKind).toBe("images")
+        const instagram = await getUserDownloadsRaw("998051", 1, 20, db, {
+          ...filters,
+          platform: "instagram",
+        })
+        expect(instagram.items.map((item) => item.platform)).toEqual([
+          "instagram",
+        ])
+        expect(instagram.items[0]?.mediaKind).toBe("images")
       }
+      // Legacy downloads without video details belong to All platforms only.
+      for (const [platform, total] of [
+        ["all", "5"],
+        ["tiktok", "3"],
+        ["instagram", "1"],
+      ] as const)
+        expect(
+          (
+            await getUserDownloadsRaw("998051", 1, 20, db, {
+              mediaKind: "all",
+              discovery: "all",
+              sort: "newest",
+              platform,
+            })
+          ).total
+        ).toBe(total)
       await client.query(
         "UPDATE video_details SET telegram_files = NULL, telegram_bot_id = NULL WHERE pk_id IN (998051, 998052)"
       )
@@ -520,7 +609,12 @@ integration("PostgreSQL statistics queries", () => {
         sort: "popular",
       } as const
       const all = await getUserDownloadsRaw("998001", 1, 20, adapter, filters)
-      expect(all.total).toBe("2")
+      // Both downloads are one post in Popular, shown at the newest download.
+      expect(all.total).toBe("1")
+      expect(all.items[0]).toMatchObject({
+        downloadedAt: 1700000100,
+        timesDownloaded: "2",
+      })
       const filtered = await getUserDownloadsRaw("998001", 1, 20, adapter, {
         ...filters,
         from: 1700000050,
@@ -1267,16 +1361,49 @@ integration("PostgreSQL statistics queries", () => {
       await client.query(`INSERT INTO videos (user_id, video_details_id, shared_link, media_kind, delivery_surface)
         SELECT user_id, 701102, 'https://example.test/missing-video-id', 'video', 'chat'
         FROM users WHERE user_id <> 0`)
+      // A less popular Instagram video misses the combined top 1,000 but
+      // leads the Instagram ranking.
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id)
+        VALUES (701103, 'instagram', 'instagram-reel')`)
+      await client.query(`INSERT INTO videos (user_id, video_details_id, shared_link, media_kind, delivery_surface)
+        VALUES (1, 701103, 'https://www.instagram.com/reel/instagram-reel/', 'video', 'chat')`)
       await client.query(
         "SELECT tt_stats_cache._refresh_popular_videos(to_timestamp($1))",
         [now]
       )
       const count = await client.query(
-        "SELECT count(*)::int AS count FROM tt_stats_cache.popular_videos WHERE range = 'all'"
+        "SELECT platform, count(*)::int AS count FROM tt_stats_cache.popular_videos WHERE range = 'all' GROUP BY platform ORDER BY platform"
       )
-      expect(count.rows[0].count).toBe(1000)
+      expect(count.rows).toEqual([
+        { platform: "all", count: 1000 },
+        { platform: "instagram", count: 1 },
+        { platform: "tiktok", count: 1000 },
+      ])
       const winner = (await getPopularVideosRaw(1, db)).items[0]!
       expect(winner.videoId).toBe("ranking-1101")
+      expect(winner.platform).toBe("tiktok")
+      expect(
+        (await getPopularVideosRaw(1, db, "all", "tiktok")).items[0]?.videoId
+      ).toBe("ranking-1101")
+      const instagram = await getPopularVideosRaw(1, db, "all", "instagram")
+      expect(instagram).toMatchObject({ platform: "instagram", hasMore: false })
+      expect(instagram.items).toEqual([
+        expect.objectContaining({
+          videoId: "instagram-reel",
+          platform: "instagram",
+          uniqueChats: "1",
+        }),
+      ])
+      expect(
+        (await getPopularVideosRaw(50, db, "all", "instagram")).items
+      ).toEqual([])
+      expect(
+        await canReadMedia(
+          { admin: false, user: null },
+          instagram.items[0]!.downloadId,
+          db
+        )
+      ).toBe(true)
       const lastPage = await getPopularVideosRaw(50, db)
       expect(lastPage.items).toHaveLength(20)
       expect(lastPage.hasMore).toBe(false)
@@ -1311,7 +1438,7 @@ integration("PostgreSQL statistics queries", () => {
       })
       await client.query("DELETE FROM tt_stats_cache.popular_videos")
       await client.query(
-        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 4)",
+        "INSERT INTO tt_stats_cache.popular_videos_metadata (singleton, refreshed_at, ranking_version) VALUES (TRUE, to_timestamp($1), 5)",
         [now]
       )
       expect(await getPopularVideosRaw(1, db)).toEqual({
@@ -1320,6 +1447,7 @@ integration("PostgreSQL statistics queries", () => {
         hasMore: false,
         refreshedAt: now,
         range: "all",
+        platform: "all",
       })
     } finally {
       await client.query("ROLLBACK")

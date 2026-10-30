@@ -5,6 +5,8 @@ import {
   streamTelegramFile,
 } from "@/lib/media/telegram"
 import type { StoredMedia } from "@/lib/media/queries"
+import { parseMediaId, parseMediaIdParam } from "@/lib/media/ids"
+import { formatPlaybackTime } from "@/components/dashboard/audio-player"
 
 const token = "123:secret"
 const media: StoredMedia = {
@@ -38,6 +40,67 @@ describe("saved media", () => {
     })
     expect(JSON.stringify(result)).not.toContain("private-")
     expect(JSON.stringify(result)).not.toContain(token)
+  })
+
+  it("describes an audio download as the sound of the post's saved video", () => {
+    vi.stubEnv("BOT_TOKEN", token)
+    expect(describeMedia("audio:42", media)).toEqual({
+      unavailableReason: null,
+      items: [
+        { position: 0, mediaType: "audio", url: "/api/media/audio:42/0" },
+      ],
+    })
+    // A slideshow has photos only, so there is no sound to play.
+    const slideshow: StoredMedia = {
+      telegram_bot_id: "123",
+      telegram_files: [
+        { position: 0, media_type: "photo", file_id: "private-photo-id" },
+      ],
+    }
+    for (const stored of [slideshow, null])
+      expect(describeMedia("audio:42", stored)).toEqual({
+        unavailableReason: "No saved sound is available for this download.",
+        items: [],
+      })
+    expect(describeMedia("audio:42", media).items).toHaveLength(1)
+    expect(JSON.stringify(describeMedia("audio:42", media))).not.toContain(
+      "private-"
+    )
+  })
+
+  it("accepts video and audio media IDs within the PostgreSQL bigint range", () => {
+    expect(parseMediaId("9007199254740993")).toEqual({
+      kind: "download",
+      id: "9007199254740993",
+    })
+    expect(parseMediaId("audio:42")).toEqual({ kind: "audio", id: "42" })
+    for (const invalid of [
+      "",
+      "0",
+      "abc",
+      "audio:",
+      "audio:0",
+      "audio:-1",
+      "Audio:1",
+      "music:1",
+      "audio:9223372036854775808",
+      "9223372036854775808",
+      " 1",
+    ])
+      expect(parseMediaId(invalid), invalid).toBeNull()
+    // Astro leaves an encoded colon in route parameters.
+    expect(parseMediaIdParam("audio%3A42")).toEqual({ kind: "audio", id: "42" })
+    expect(parseMediaIdParam("audio:42")).toEqual({ kind: "audio", id: "42" })
+    for (const invalid of [undefined, "%E0%A4%A", "audio%3A0", "%20 1"])
+      expect(parseMediaIdParam(invalid), invalid).toBeNull()
+  })
+
+  it("formats playback positions for short and long sounds", () => {
+    expect(formatPlaybackTime(0)).toBe("0:00")
+    expect(formatPlaybackTime(65.9)).toBe("1:05")
+    expect(formatPlaybackTime(3725)).toBe("1:02:05")
+    expect(formatPlaybackTime(Number.NaN)).toBe("--:--")
+    expect(formatPlaybackTime(Number.POSITIVE_INFINITY)).toBe("--:--")
   })
 
   it("handles missing files, missing configuration, and IDs owned by another bot", () => {

@@ -4,7 +4,7 @@ import { trackDatabaseRequest } from "@/lib/tasks/client"
 import { noteCooldown, requestWithCooldown } from "@/lib/http-client"
 import type { DownloadMedia } from "./types"
 import { queryOptions, keepPreviousData } from "@tanstack/react-query"
-import type { StatsRange } from "@/lib/stats/types"
+import type { DownloadPlatform, StatsRange } from "@/lib/stats/types"
 import { queryKeys } from "@/lib/stats/query-keys"
 import { actions } from "astro:actions"
 
@@ -55,20 +55,30 @@ export const downloadersQueryOptions = (downloadId: string, page: number) =>
     staleTime: 300_000,
     refetchInterval: databaseRefreshInterval(300_000),
   })
-export const popularVideosQueryOptions = (page: number, range: StatsRange) =>
+export const popularVideosQueryOptions = (
+  page: number,
+  range: StatsRange,
+  platform: DownloadPlatform = "all"
+) =>
   queryOptions({
-    queryKey: queryKeys.popularVideos(range, page),
+    queryKey: queryKeys.popularVideos(range, page, platform),
     queryFn: ({ signal }) =>
       requestWithCooldown("read", () =>
-        databaseAction(actions.getPopularVideos, { page, range }, signal, {
-          quiet: true,
-        })
+        databaseAction(
+          actions.getPopularVideos,
+          { page, range, platform },
+          signal,
+          { quiet: true }
+        )
       ),
     retry: false,
     refetchInterval: databaseRefreshInterval(
       range === "24h" ? 300_000 : 86_400_000
     ),
     staleTime: range === "24h" ? 300_000 : 86_400_000,
+    // Keep the current list while paging, never another period or platform.
     placeholderData: (previous) =>
-      previous?.range === range ? keepPreviousData(previous) : undefined,
+      previous?.range === range && previous.platform === platform
+        ? keepPreviousData(previous)
+        : undefined,
   })

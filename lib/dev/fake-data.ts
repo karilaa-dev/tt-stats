@@ -89,66 +89,104 @@ const fakeHistory: HistoryCsvRow[] = [
 const fakeDownloads: UserDownload[] = Array.from({ length: 27 }, (_, index) => {
   const images = index % 5 === 2
   const audio = !images && [3, 11, 15].includes(index)
+  const legacy = index % 4 === 3 && !audio
+  const reel = [9, 21].includes(index)
+  const instagramId = `DEMO_${reel ? "REEL" : "ALBUM"}_${String(index + 1).padStart(2, "0")}`
+  const instagramUrl = `https://www.instagram.com/${reel ? "reel" : "p"}/${instagramId}/`
+  const tiktokUrl = `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`
   return {
-    videoId:
-      index % 4 === 3 && !audio
-        ? null
-        : images
-          ? `DEMO_ALBUM_${String(index + 1).padStart(2, "0")}`
-          : String(7539876543210000001n + BigInt(index)),
-    canonicalUrl:
-      index % 4 === 3 && !audio
-        ? null
-        : images
-          ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
-          : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
+    platform: legacy ? null : images || reel ? "instagram" : "tiktok",
+    videoId: legacy
+      ? null
+      : images || reel
+        ? instagramId
+        : String(7539876543210000001n + BigInt(index)),
+    canonicalUrl: legacy ? null : images || reel ? instagramUrl : tiktokUrl,
     viewsDisplay: index % 4 === 3 ? null : "1.2M",
     likesDisplay: index % 4 === 3 ? null : "0",
     id: `${audio ? "audio:" : ""}${10_000 - index}`,
     downloadedAt: FAKE_NOW_EPOCH - index * 14_417,
-    sharedLink: images
-      ? `https://www.instagram.com/p/DEMO_ALBUM_${String(index + 1).padStart(2, "0")}/`
-      : `https://www.tiktok.com/@demo/video/${7539876543210000001n + BigInt(index)}`,
+    sharedLink: images || reel ? instagramUrl : tiktokUrl,
     mediaKind: audio ? "audio" : images ? "images" : "video",
     cacheHit: index % 3 !== 0,
     otherUniqueChats: String(index % 7),
     isFirstDownloader: index % 4 === 0 ? true : index % 4 === 3 ? null : false,
     videoDetailsId: audio || index % 4 === 3 ? null : String(index + 1),
-    hasSavedMedia: !audio && index % 4 !== 3 && index % 6 !== 4,
+    // Audio plays the sound of the post's saved video when one exists.
+    hasSavedMedia: audio ? index === 3 : index % 4 !== 3 && index % 6 !== 4,
   }
 })
+// Repeat downloads of the same post: two more of the second video, one more
+// of the first audio. They stay separate in history and merge in Popular.
+// Each pair already shares its discovery and first-downloader status.
+for (const [repeat, original] of [
+  [13, 1],
+  [25, 1],
+  [15, 3],
+] as const) {
+  const { id, downloadedAt, cacheHit } = fakeDownloads[repeat]!
+  fakeDownloads[repeat] = {
+    ...fakeDownloads[original]!,
+    id: fakeDownloads[original]!.id.startsWith("audio:")
+      ? `audio:${id.replace(/^audio:/u, "")}`
+      : id,
+    downloadedAt,
+    cacheHit,
+  }
+}
+const fakePost = (item: UserDownload) =>
+  item.mediaKind === "audio"
+    ? `audio:${item.videoId}`
+    : item.videoDetailsId
+      ? `video:${item.videoDetailsId}`
+      : `event:${item.id}`
 
 export function getFakePopularVideos(
   page: number,
   range: StatsRange,
-  pageSize = 20
+  pageSize = 20,
+  platform: DownloadPlatform = "all"
 ): PopularVideos {
+  // Rankings count each post once, so repeat downloads are not separate rows.
   const linked = fakeDownloads.filter(
-    (item) => item.mediaKind === "video" && item.videoDetailsId !== null
+    (item, index) =>
+      item.mediaKind === "video" &&
+      item.platform === "tiktok" &&
+      item.videoDetailsId !== null &&
+      fakeDownloads.findIndex((other) => fakePost(other) === fakePost(item)) ===
+        index
   )
   const scale = { "24h": 0.1, "7d": 0.3, "31d": 0.6, all: 1 }[range]
   const items = Array.from({ length: 25 }, (_, index) => {
     const source = linked[index]
-    const videoId = String(
-      7539876543210000000n + BigInt(source?.videoDetailsId ?? 1000 + index)
-    )
+    // Every fifth video is an Instagram reel so each platform has a ranking.
+    const instagram = index % 5 === 4
+    const videoId = instagram
+      ? `DEMO_TOP_REEL_${String(index + 1).padStart(2, "0")}`
+      : String(
+          7539876543210000000n + BigInt(source?.videoDetailsId ?? 1000 + index)
+        )
     return {
       downloadId: source?.id ?? String(20_000 + index),
       videoId,
-      sharedLink:
-        source?.sharedLink ?? `https://www.tiktok.com/@demo/video/${videoId}`,
+      platform: instagram ? ("instagram" as const) : ("tiktok" as const),
+      sharedLink: instagram
+        ? `https://www.instagram.com/reel/${videoId}/`
+        : (source?.sharedLink ??
+          `https://www.tiktok.com/@demo/video/${videoId}`),
       hasSavedMedia: source?.hasSavedMedia ?? index % 4 !== 3,
       uniqueChats: String(Math.ceil(Math.max(1, 60 - index * 2) * scale)),
       firstDownloadedAt:
         FAKE_NOW_EPOCH - Math.floor(86400 * scale) - index * 60,
       lastDownloadedAt: FAKE_NOW_EPOCH - index * 60,
     }
-  })
+  }).filter((item) => platform === "all" || item.platform === platform)
   return {
     items: items.slice((page - 1) * pageSize, page * pageSize),
     page,
     hasMore: items.length > page * pageSize,
     range,
+    platform,
     refreshedAt: 1_800_000_000,
   }
 }
@@ -356,6 +394,9 @@ export function getFakeUserDownloads(
     return (
       (!filters.savedMediaOnly || item.hasSavedMedia) &&
       (filters.mediaKind === "all" || filters.mediaKind === item.mediaKind) &&
+      (!filters.platform ||
+        filters.platform === "all" ||
+        filters.platform === item.platform) &&
       (filters.from === undefined ||
         (item.downloadedAt !== null && item.downloadedAt >= filters.from)) &&
       (filters.until === undefined ||
@@ -389,15 +430,32 @@ export function getFakeUserDownloads(
           )
     )
   }
-  const totalPages = Math.ceil(downloads.length / pageSize)
+  let listed = downloads
+  if (filters.category === "popular" || filters.sort === "popular") {
+    // Popular lists each post once, keeping the first event in the sort order.
+    const counts = new Map<string, number>()
+    for (const item of downloads)
+      counts.set(fakePost(item), (counts.get(fakePost(item)) ?? 0) + 1)
+    listed = downloads
+      .filter(
+        (item, index) =>
+          downloads.findIndex((other) => fakePost(other) === fakePost(item)) ===
+          index
+      )
+      .map((item) => ({
+        ...item,
+        timesDownloaded: String(counts.get(fakePost(item))),
+      }))
+  }
+  const totalPages = Math.ceil(listed.length / pageSize)
   const page = totalPages ? Math.min(requestedPage, totalPages) : 1
   const offset = (page - 1) * pageSize
 
   return {
-    items: downloads.slice(offset, offset + pageSize),
+    items: listed.slice(offset, offset + pageSize),
     page,
     pageSize,
-    total: String(downloads.length),
+    total: String(listed.length),
     totalPages,
   }
 }

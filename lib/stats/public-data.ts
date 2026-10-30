@@ -70,11 +70,15 @@ export const loadReferralStats = async () =>
 export const loadOtherStats = async () =>
   fake() ? getFakeOtherStats() : snapshotRead("other", () => getOtherStatsRaw())
 
-export const loadPopularVideos = async (page: number, range: StatsRange) =>
+export const loadPopularVideos = async (
+  page: number,
+  range: StatsRange,
+  platform: DownloadPlatform = "all"
+) =>
   fake()
-    ? getFakePopularVideos(page, range)
-    : snapshotRead(`popular-videos:v4:${range}:${page}`, () =>
-        getPopularVideosRaw(page, undefined, range)
+    ? getFakePopularVideos(page, range, 20, platform)
+    : snapshotRead(`popular-videos:v5:${range}:${platform}:${page}`, () =>
+        getPopularVideosRaw(page, undefined, range, platform)
       )
 
 export const loadTelegramMau = async (): Promise<TelegramMau> =>

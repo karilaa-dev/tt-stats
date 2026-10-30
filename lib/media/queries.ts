@@ -1,7 +1,9 @@
 import "@/lib/server-only"
 import type { Pool, QueryResultRow } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
-import type { StatsRange } from "@/lib/stats/types"
+import type { DownloadPlatform, StatsRange } from "@/lib/stats/types"
+import { parseVideoPlatform } from "@/lib/stats/validation"
+import { parseMediaId } from "./ids"
 import type { Downloaders, PopularVideos } from "./types"
 import { POPULAR_RANKING_VERSION } from "./types"
 import { savedMediaSql } from "./saved"
@@ -25,17 +27,26 @@ export interface StoredMedia {
     | null
 }
 
+/** Audio IDs resolve to the saved files of the TikTok post the sound came from. */
 export async function getStoredMedia(
   downloadId: string,
   pool = getPool()
 ): Promise<StoredMedia | null> {
+  const media = parseMediaId(downloadId)
+  if (!media) return null
   const rows = await read<StoredMedia>(
     pool,
-    `SELECT d.telegram_bot_id::text, d.telegram_files
-     FROM public.videos v
-     LEFT JOIN public.video_details d ON d.pk_id = v.video_details_id
-     WHERE v.pk_id = $1::bigint`,
-    [downloadId]
+    media.kind === "audio"
+      ? `SELECT d.telegram_bot_id::text, d.telegram_files
+         FROM public.music m
+         LEFT JOIN public.video_details d
+           ON d.platform = 'tiktok' AND d.platform_video_id = m.video_id::text
+         WHERE m.pk_id = $1::bigint`
+      : `SELECT d.telegram_bot_id::text, d.telegram_files
+         FROM public.videos v
+         LEFT JOIN public.video_details d ON d.pk_id = v.video_details_id
+         WHERE v.pk_id = $1::bigint`,
+    [media.id]
   )
   return rows[0] ?? null
 }
@@ -79,12 +90,14 @@ export async function getDownloadersRaw(
 export async function getPopularVideosRaw(
   page: number,
   pool = getPool(),
-  range: StatsRange = "all"
+  range: StatsRange = "all",
+  platform: DownloadPlatform = "all"
 ): Promise<PopularVideos> {
   const rows = await read<{
     download_id: string | null
     shared_link: string | null
     video_id: string | null
+    video_platform: string | null
     has_saved_media: boolean
     unique_chats: string | null
     first_downloaded_at: string | null
@@ -93,6 +106,7 @@ export async function getPopularVideosRaw(
   }>(
     pool,
     `SELECT ranking.download_id::text, ranking.shared_link, ranking.video_id,
+            details.platform AS video_platform,
             ${savedMediaSql("ranking.video_details_id")} AS has_saved_media,
             ranking.unique_chats::text,
             ranking.first_downloaded_at::text, ranking.last_downloaded_at::text,
@@ -102,13 +116,14 @@ export async function getPopularVideosRaw(
        SELECT download_id, shared_link, video_details_id, video_id, unique_chats, position,
          first_downloaded_at, last_downloaded_at
        FROM tt_stats_cache.popular_videos
-       WHERE range = $2 AND position > $1::bigint
+       WHERE range = $2 AND platform = $4 AND position > $1::bigint
        ORDER BY position
        LIMIT 21
      ) ranking ON true
+     LEFT JOIN public.video_details details ON details.pk_id = ranking.video_details_id
      WHERE metadata.singleton AND metadata.range = $2 AND metadata.ranking_version = $3
      ORDER BY ranking.position`,
-    [(page - 1) * 20, range, POPULAR_RANKING_VERSION]
+    [(page - 1) * 20, range, POPULAR_RANKING_VERSION, platform]
   )
   if (!rows.length) throw new DataAccessError(undefined, "snapshotsMissing")
   const items = rows.flatMap((row) =>
@@ -119,6 +134,7 @@ export async function getPopularVideosRaw(
             downloadId: row.download_id,
             sharedLink: row.shared_link!,
             videoId: row.video_id!,
+            platform: parseVideoPlatform(row.video_platform),
             hasSavedMedia: row.has_saved_media,
             uniqueChats: row.unique_chats!,
             firstDownloadedAt:
@@ -138,5 +154,6 @@ export async function getPopularVideosRaw(
     hasMore: items.length > 20,
     refreshedAt: Number(rows[0]!.refreshed_at),
     range,
+    platform,
   }
 }

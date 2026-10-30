@@ -116,7 +116,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              obj_description(
                to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
                'pg_proc'
-             ) = 'tt-stats-schema-version:10',
+             ) = 'tt-stats-schema-version:11',
              false
            ) AS definitions_current,
            coalesce(

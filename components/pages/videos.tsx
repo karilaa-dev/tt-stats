@@ -3,6 +3,11 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { PlayIcon, VideoCameraIcon } from "@phosphor-icons/react"
 import { StatsFilters } from "@/components/dashboard/stats-filters"
+import {
+  PlatformMark,
+  PlatformToggle,
+  platformOptions,
+} from "@/components/dashboard/platform-filter"
 import { PageHeading } from "@/components/dashboard/page-heading"
 import { DashboardError } from "@/components/dashboard/dashboard-error"
 import { DashboardLoading } from "@/components/dashboard/dashboard-loading"
@@ -25,6 +30,8 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
+  Field,
+  FieldLabel,
   Spinner,
   Table,
   TableBody,
@@ -45,12 +52,19 @@ const MAX_PAGES = 50
 
 export function VideosPage() {
   const { t, locale } = useTranslation()
-  const { page, range } = useDashboardSearch()
+  const { page, range, platform } = useDashboardSearch()
   const time = useBrowserTime()
   const navigate = useDashboardNavigate()
-  const query = useQuery(popularVideosQueryOptions(page, range))
+  const query = useQuery(popularVideosQueryOptions(page, range, platform))
   const [selection, setSelection] = useState<SelectedDownload | null>(null)
-  const data = query.data?.range === range ? query.data : undefined
+  // Never show another period's or platform's ranks under the current filters.
+  const data =
+    query.data?.range === range && query.data.platform === platform
+      ? query.data
+      : undefined
+  const platformLabel = platformOptions.find(
+    (option) => option.value === platform
+  )!.label
   const refreshing = query.isFetching && Boolean(data)
   return (
     <>
@@ -60,14 +74,31 @@ export function VideosPage() {
           "Ranked by people who downloaded each video. Each user or group counts once in the selected period."
         )}
       />
-      <StatsFilters
-        range={range}
-        showScope={false}
-        onRangeChange={(nextRange) => {
-          setSelection(null)
-          void navigate({ search: { range: nextRange } })
-        }}
-      />
+      <div className="ranking-filters">
+        <div className="stats-filters">
+          <Field className="stats-filter">
+            <FieldLabel>
+              <T>{"Platform"}</T>
+            </FieldLabel>
+            <PlatformToggle
+              value={platform}
+              onValueChange={(nextPlatform) => {
+                setSelection(null)
+                void navigate({ search: { range, platform: nextPlatform } })
+              }}
+              aria-label={t("Download platform")}
+            />
+          </Field>
+        </div>
+        <StatsFilters
+          range={range}
+          showScope={false}
+          onRangeChange={(nextRange) => {
+            setSelection(null)
+            void navigate({ search: { range: nextRange, platform } })
+          }}
+        />
+      </div>
       <DownloadDialog
         selection={selection}
         onClose={() => setSelection(null)}
@@ -86,7 +117,11 @@ export function VideosPage() {
         <Card aria-busy={query.isFetching}>
           <CardHeader>
             <CardTitle>
-              <T>{"Top 1,000 videos"}</T>
+              <T>
+                {platform === "all"
+                  ? "Top 1,000 videos"
+                  : `Top 1,000 ${platformLabel} videos`}
+              </T>
             </CardTitle>
             <CardDescription>
               <T>
@@ -99,7 +134,7 @@ export function VideosPage() {
               <T>{`Last updated ${formatTimestamp(data.refreshedAt, time)}.`}</T>{" "}
               <T>
                 {
-                  "Image albums and legacy downloads without a video ID are excluded."
+                  "Only video downloads count: audio, image albums, and legacy downloads without a video ID are excluded."
                 }
               </T>{" "}
               <T>
@@ -144,9 +179,13 @@ export function VideosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <span className="ranking-video-id" title={item.videoId}>
-                          <VideoCameraIcon aria-hidden="true" />
-                          <span>{item.videoId}</span>
+                        <span className="ranking-video-id">
+                          {item.platform ? (
+                            <PlatformMark platform={item.platform} compact />
+                          ) : (
+                            <VideoCameraIcon aria-hidden="true" />
+                          )}
+                          <span title={item.videoId}>{item.videoId}</span>
                         </span>
                         <dl className="ranking-dates">
                           {[
@@ -191,6 +230,8 @@ export function VideosPage() {
                                 id: item.downloadId,
                                 sharedLink: item.sharedLink,
                                 mode: "media",
+                                videoId: item.videoId,
+                                platform: item.platform,
                               })
                             }
                           >
@@ -218,7 +259,11 @@ export function VideosPage() {
                     <T>
                       {page > 1
                         ? "There are no more videos on this page. Return to the previous page."
-                        : "Downloaded videos will appear here."}
+                        : platform === "instagram"
+                          ? "Downloaded Instagram videos will appear here."
+                          : platform === "tiktok"
+                            ? "Downloaded TikTok videos will appear here."
+                            : "Downloaded videos will appear here."}
                     </T>
                   </EmptyDescription>
                 </EmptyHeader>
@@ -243,7 +288,9 @@ export function VideosPage() {
                 }
                 onPageChange={(nextPage) => {
                   setSelection(null)
-                  void navigate({ search: { range, page: nextPage } })
+                  void navigate({
+                    search: { range, platform, page: nextPage },
+                  })
                 }}
               />
             </CardFooter>

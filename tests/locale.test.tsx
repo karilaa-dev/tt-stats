@@ -8,7 +8,7 @@ import { locales, resolveLocale } from "@/lib/i18n/locale"
 import { LocaleProvider, LanguageSelector, T } from "@/lib/i18n/provider"
 import { translate } from "@/lib/i18n/translate"
 import { messages } from "@/lib/i18n/messages"
-import { otherDownloaders } from "@/lib/i18n/format"
+import { otherDownloaders, timesDownloaded } from "@/lib/i18n/format"
 import { CardTitle } from "@/components/controls"
 import { ExactCounter } from "@/components/dashboard/exact-counter"
 afterEach(cleanup)
@@ -73,6 +73,20 @@ it("uses plural forms without rounding large counts", () => {
   expect(otherDownloaders(21n, "uk")).toContain("користувач завантажив")
   expect(otherDownloaders(900719925474099321n, "uk")).toContain(
     "користувач завантажив"
+  )
+})
+
+it("counts an account's repeat downloads with plural forms", () => {
+  expect(timesDownloaded(2n, "en", true)).toBe("You downloaded this 2 times")
+  expect(timesDownloaded(2n, "en", false)).toBe(
+    "Downloaded 2 times by this chat"
+  )
+  expect(timesDownloaded(2n, "ru", true)).toBe("Вы скачали это 2 раза")
+  expect(timesDownloaded(5n, "ru", true)).toBe("Вы скачали это 5 раз")
+  expect(timesDownloaded(21n, "ru", false)).toBe("Этот чат скачал это 21 раз")
+  expect(timesDownloaded(3n, "uk", true)).toBe("Ви завантажили це 3 рази")
+  expect(timesDownloaded(11n, "uk", false)).toBe(
+    "Цей чат завантажив це 11 разів"
   )
 })
 

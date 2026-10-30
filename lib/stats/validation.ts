@@ -31,6 +31,13 @@ export function parseDownloadPlatform(value: unknown): DownloadPlatform {
   return parseOption(value, DOWNLOAD_PLATFORMS, "all")
 }
 
+/** A stored video_details.platform; anything unrecognised has no platform. */
+export function parseVideoPlatform(
+  value: unknown
+): Exclude<DownloadPlatform, "all"> | null {
+  return value === "tiktok" || value === "instagram" ? value : null
+}
+
 export function parseSeriesMetric(value: unknown): SeriesMetric {
   return parseOption(value, SERIES_METRICS, "users")
 }

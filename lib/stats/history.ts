@@ -4,8 +4,9 @@ import type { Pool } from "pg"
 import { DataAccessError, getPool } from "@/lib/db/pool"
 import { withDatabaseStage } from "@/lib/db/diagnostics"
 import { getHistoryComparisons } from "./history-comparisons"
-import { savedMediaSql } from "@/lib/media/saved"
+import { savedHistoryMediaSql } from "@/lib/media/saved"
 import { userHistorySql, historyMatches } from "./history-source"
+import { parseVideoPlatform } from "./validation"
 import type { HistoryFilters, PaginatedUserDownloads } from "./types"
 
 function comparisons(source: string) {
@@ -27,7 +28,7 @@ const fields = `page.pk_id::text AS id, page.event_id, page.downloaded_at, page.
   coalesce(details.platform_video_id, page.audio_video_id) AS platform_video_id,
   details.creator_username, details.canonical_link,
   details.views_display, details.likes_display,
-  (page.media_kind <> 'audio' AND ${savedMediaSql("page.video_details_id")}) AS has_saved_media`
+  ${savedHistoryMediaSql("page")} AS has_saved_media`
 interface HistoryRow {
   id: string | null
   platform: string | null
@@ -45,6 +46,7 @@ interface HistoryRow {
   other_chats: string
   first_user: string | null
   uncertain: boolean
+  times_downloaded?: string
   total?: string
 }
 
@@ -64,12 +66,19 @@ export async function getUserDownloadsRaw(
     filters.from ?? null,
     filters.until ?? null,
     filters.mediaKind === "all" ? null : filters.mediaKind,
+    !filters.platform || filters.platform === "all" ? null : filters.platform,
   ]
+  // Music events store TikTok post IDs only. Downloads without video details
+  // have no platform and appear only under All platforms.
   const predicate = `user_id = $1::bigint
     AND ($2::bigint IS NULL OR downloaded_at >= $2::bigint)
     AND ($3::bigint IS NULL OR downloaded_at < $3::bigint)
     AND ($4::text IS NULL OR media_kind = $4)
-    ${filters.savedMediaOnly ? `AND media_kind <> 'audio' AND ${savedMediaSql("history.video_details_id")}` : ""}`
+    AND ($5::text IS NULL OR CASE WHEN media_kind = 'audio' THEN $5::text = 'tiktok'
+      ELSE EXISTS (SELECT 1 FROM public.video_details platform_details
+        WHERE platform_details.pk_id = history.video_details_id
+          AND platform_details.platform = $5::text) END)
+    ${filters.savedMediaOnly ? `AND ${savedHistoryMediaSql("history")}` : ""}`
   const direction = filters.sort === "oldest" ? "ASC" : "DESC"
   const popular = filters.category === "popular" || filters.sort === "popular"
   const chronological = `page.downloaded_at ${direction} NULLS LAST, page.event_id ${direction}, page.media_kind ${direction}`
@@ -94,7 +103,7 @@ export async function getUserDownloadsRaw(
         pool.query<HistoryRow>(
           `WITH history AS (${userHistorySql}), page AS (
           SELECT * FROM history WHERE ${predicate}
-          ORDER BY downloaded_at ${direction} NULLS LAST, event_id ${direction}, media_kind ${direction} LIMIT $5 OFFSET $6
+          ORDER BY downloaded_at ${direction} NULLS LAST, event_id ${direction}, media_kind ${direction} LIMIT $6 OFFSET $7
         ) SELECT ${fields}, comparison.other_chats::text, comparison.uncertain,
           first_download.user_id::text AS first_user
         FROM page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ${comparisons("page")} ORDER BY ${chronological}`,
@@ -104,7 +113,8 @@ export async function getUserDownloadsRaw(
       rows = result.rows
     } else {
       // Evaluate each distinct candidate post once, then filter/rank all matches
-      // before pagination. Repeated downloads stay as separate history events.
+      // before pagination. Repeated downloads stay as separate history events
+      // everywhere except Popular downloads.
       const discovery =
         filters.discovery === "all"
           ? "true"
@@ -114,6 +124,17 @@ export async function getUserDownloadsRaw(
       const order = popular
         ? `page.other_chats DESC, ${chronological}`
         : chronological
+      // Popular downloads list each post once. Repeats collapse into the event
+      // matching the chosen order; legacy links without an ID stay separate.
+      const popularPosts = `SELECT DISTINCT ON (post) posts.*,
+          count(*) OVER (PARTITION BY post) AS times_downloaded
+        FROM (
+          SELECT qualified.*, coalesce('audio:' || audio_video_id,
+            'video:' || video_details_id::text, 'event:' || pk_id::text) AS post
+          FROM qualified
+        ) posts
+        ORDER BY post, downloaded_at ${direction} NULLS LAST, event_id ${direction}, media_kind ${direction}`
+      const listed = popular ? "grouped" : "qualified"
       const cached = await getHistoryComparisons(
         pool,
         userId,
@@ -122,7 +143,7 @@ export async function getUserDownloadsRaw(
       )
       const comparisonCtes = cached
         ? `compared AS (
-        SELECT * FROM jsonb_to_recordset($7::jsonb)
+        SELECT * FROM jsonb_to_recordset($8::jsonb)
           AS c(content_id bigint, other_chats bigint, uncertain boolean, first_user bigint)
       ), first_downloads AS (SELECT content_id, first_user FROM compared)`
         : `matched AS MATERIALIZED (
@@ -155,12 +176,14 @@ export async function getUserDownloadsRaw(
           LEFT JOIN compared USING (content_id) LEFT JOIN first_downloads USING (content_id)
         ), qualified AS MATERIALIZED (
           SELECT * FROM annotated WHERE ${discovery}
-        ), totals AS (SELECT count(*) AS total FROM qualified)
+        )${popular ? `, grouped AS MATERIALIZED (${popularPosts})` : ""},
+        totals AS (SELECT count(*) AS total FROM ${listed})
         SELECT totals.total::text, selected.* FROM totals
         LEFT JOIN LATERAL (
           SELECT ${fields}, page.other_chats::text, page.uncertain, page.first_user::text
-          FROM qualified page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ORDER BY ${order}
-          LIMIT $5 OFFSET (least($6::bigint, greatest(1, ceil(totals.total::numeric / $5)::bigint)) - 1) * $5
+            ${popular ? ", page.times_downloaded::text" : ""}
+          FROM ${listed} page LEFT JOIN public.video_details details ON details.pk_id = page.video_details_id ORDER BY ${order}
+          LIMIT $6 OFFSET (least($7::bigint, greatest(1, ceil(totals.total::numeric / $6)::bigint)) - 1) * $6
         ) selected ON true
         ORDER BY ${popular ? "selected.other_chats::bigint DESC," : ""}
           selected.downloaded_at ${direction} NULLS LAST, selected.event_id ${direction}, selected.media_kind ${direction}`,
@@ -182,6 +205,7 @@ export async function getUserDownloadsRaw(
     return {
       items: rows.map((row) => ({
         id: row.media_kind === "audio" ? `audio:${-BigInt(row.id!)}` : row.id!,
+        platform: parseVideoPlatform(row.platform),
         videoId: row.platform_video_id?.trim() || null,
         canonicalUrl: canonicalPostUrl({
           platform: row.platform,
@@ -202,6 +226,9 @@ export async function getUserDownloadsRaw(
         hasSavedMedia: row.has_saved_media,
         otherUniqueChats: row.other_chats,
         isFirstDownloader: row.uncertain ? null : row.first_user === userId,
+        ...(row.times_downloaded
+          ? { timesDownloaded: row.times_downloaded }
+          : {}),
       })),
       page,
       pageSize,

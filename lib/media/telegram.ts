@@ -1,4 +1,5 @@
 import "@/lib/server-only"
+import { parseMediaId } from "./ids"
 import type { StoredMedia } from "./queries"
 import type { DownloadMedia } from "./types"
 
@@ -15,10 +16,38 @@ export function mediaUnavailableReason(
   return null
 }
 
+/**
+ * The bot does not store the audio files it sends, so audio plays the sound
+ * track of the post's saved video. Slideshows (photos only) have no sound.
+ */
+export function savedSoundFile(media: StoredMedia | null) {
+  const file = media?.telegram_files?.[0]
+  return file?.media_type === "video" ? file : null
+}
+
 export function describeMedia(
   downloadId: string,
   media: StoredMedia | null
 ): DownloadMedia {
+  if (parseMediaId(downloadId)?.kind === "audio") {
+    const sound = savedSoundFile(media)
+    const unavailableReason = sound
+      ? mediaUnavailableReason(media)
+      : "No saved sound is available for this download."
+    return {
+      unavailableReason,
+      items:
+        unavailableReason || !sound
+          ? []
+          : [
+              {
+                position: sound.position,
+                mediaType: "audio",
+                url: `/api/media/${downloadId}/${sound.position}`,
+              },
+            ],
+    }
+  }
   const unavailableReason = mediaUnavailableReason(media)
   return {
     unavailableReason,

@@ -73,8 +73,12 @@ CREATE TABLE IF NOT EXISTS tt_stats_cache.popular_videos_metadata (
 ALTER TABLE tt_stats_cache.popular_videos
   ADD COLUMN IF NOT EXISTS range TEXT NOT NULL DEFAULT 'all'
   CHECK (range IN ('24h', '7d', '31d', 'all'));
+-- Each period keeps separate all-platform, TikTok, and Instagram rankings.
+ALTER TABLE tt_stats_cache.popular_videos
+  ADD COLUMN IF NOT EXISTS platform TEXT NOT NULL DEFAULT 'all'
+  CHECK (platform IN ('all', 'tiktok', 'instagram'));
 ALTER TABLE tt_stats_cache.popular_videos DROP CONSTRAINT IF EXISTS popular_videos_pkey;
-ALTER TABLE tt_stats_cache.popular_videos ADD PRIMARY KEY (range, position);
+ALTER TABLE tt_stats_cache.popular_videos ADD PRIMARY KEY (range, platform, position);
 ALTER TABLE tt_stats_cache.popular_videos_metadata
   ADD COLUMN IF NOT EXISTS range TEXT NOT NULL DEFAULT 'all'
   CHECK (range IN ('24h', '7d', '31d', 'all'));
@@ -122,7 +126,7 @@ BEGIN
   -- that could scan all 50 million events for a short-window ranking.
   EXECUTE format($query$
   INSERT INTO tt_stats_cache.popular_videos (
-    range, position, download_id, shared_link, downloads, unique_chats, video_details_id, video_id,
+    range, platform, position, download_id, shared_link, downloads, unique_chats, video_details_id, video_id,
     first_downloaded_at, last_downloaded_at
   )
   WITH counts AS (
@@ -134,17 +138,28 @@ BEGIN
     FROM public.videos
     WHERE media_kind = 'video' AND user_id <> 0 AND video_details_id IS NOT NULL%1$s
     GROUP BY video_details_id
-  ), candidates AS (
-    SELECT counts.*, details.platform_video_id AS video_id
+  ), candidates AS MATERIALIZED (
+    SELECT counts.*, details.platform AS video_platform, details.platform_video_id AS video_id
     FROM counts JOIN public.video_details details ON details.pk_id = counts.video_details_id
     WHERE NULLIF(btrim(details.platform_video_id), '') IS NOT NULL
-    ORDER BY unique_chats DESC, download_id
-    LIMIT 1000
+  ), ranked AS (
+    -- Each platform ranks its own top 1,000 instead of filtering the combined
+    -- list, so a smaller platform still fills its ranking.
+    (SELECT 'all'::text AS platform, candidates.* FROM candidates
+     ORDER BY unique_chats DESC, download_id LIMIT 1000)
+    UNION ALL
+    (SELECT 'tiktok', candidates.* FROM candidates WHERE video_platform = 'tiktok'
+     ORDER BY unique_chats DESC, download_id LIMIT 1000)
+    UNION ALL
+    (SELECT 'instagram', candidates.* FROM candidates WHERE video_platform = 'instagram'
+     ORDER BY unique_chats DESC, download_id LIMIT 1000)
   ), winners AS (
-    SELECT row_number() OVER (ORDER BY unique_chats DESC, download_id) AS position, candidates.*
-    FROM candidates
+    SELECT row_number() OVER (
+      PARTITION BY platform ORDER BY unique_chats DESC, download_id
+    ) AS position, ranked.*
+    FROM ranked
   )
-  SELECT $1, winners.position, winners.download_id, source.shared_link,
+  SELECT $1, winners.platform, winners.position, winners.download_id, source.shared_link,
          winners.downloads, winners.unique_chats, winners.video_details_id, winners.video_id,
          winners.first_downloaded_at, winners.last_downloaded_at
   FROM winners JOIN public.videos source ON source.pk_id = winners.download_id;
@@ -152,7 +167,7 @@ BEGIN
   $query$, v_period_filter) USING p_range, v_start, v_end, p_now;
 
   INSERT INTO tt_stats_cache.popular_videos_metadata (range, singleton, refreshed_at, ranking_version)
-  VALUES (p_range, TRUE, p_now, 4)
+  VALUES (p_range, TRUE, p_now, 5)
   ON CONFLICT (range) DO UPDATE SET refreshed_at = excluded.refreshed_at, ranking_version = excluded.ranking_version;
 END;
 $$;
@@ -1020,6 +1035,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:10';
+  IS 'tt-stats-schema-version:11';
 
 COMMIT;

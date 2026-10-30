@@ -7,16 +7,16 @@ import { isFakeDataEnabled, getFakeUserDownloads } from "@/lib/dev/fake-data"
 import { getStoredMedia } from "@/lib/media/queries"
 import { loadPopularVideos } from "@/lib/stats/public-data"
 import { describeMedia } from "@/lib/media/telegram"
-import { STATS_RANGES } from "@/lib/stats/types"
+import { DOWNLOAD_PLATFORMS, STATS_RANGES } from "@/lib/stats/types"
+import { parseMediaId } from "@/lib/media/ids"
 import { getSafeDatabaseError } from "@/lib/db/errors"
 
 const downloadId = z
   .string()
   .regex(/^[1-9]\d{0,18}$/u)
-  .refine(
-    (value) =>
-      /^[1-9]\d{0,18}$/u.test(value) && BigInt(value) <= 9223372036854775807n
-  )
+  .refine((value) => parseMediaId(value) !== null)
+// Saved media also accepts audio history IDs ("audio:" and the music ID).
+const mediaId = z.string().refine((value) => parseMediaId(value) !== null)
 const page = z.number().int().min(1).max(1_000_000)
 function safe<Input, Output>(handler: (input: Input) => Promise<Output>) {
   return async (input: Input) => {
@@ -33,7 +33,7 @@ function safe<Input, Output>(handler: (input: Input) => Promise<Output>) {
 }
 
 export const getDownloadMedia = defineAction({
-  input: z.object({ downloadId }),
+  input: z.object({ downloadId: mediaId }),
   handler: async ({ downloadId }, context) => {
     try {
       if (
@@ -89,6 +89,12 @@ export const getDownloaders = defineAction({
 })
 
 export const getPopularVideos = defineAction({
-  input: z.object({ page, range: z.enum(STATS_RANGES).default("all") }),
-  handler: safe(({ page, range }) => loadPopularVideos(page, range)),
+  input: z.object({
+    page,
+    range: z.enum(STATS_RANGES).default("all"),
+    platform: z.enum(DOWNLOAD_PLATFORMS).default("all"),
+  }),
+  handler: safe(({ page, range, platform }) =>
+    loadPopularVideos(page, range, platform)
+  ),
 })

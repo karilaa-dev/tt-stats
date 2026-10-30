@@ -24,12 +24,14 @@ export const getCachedUserDownloads = (
   filters: HistoryFilters
 ) =>
   cachedQuery(
-    "account-history:v3",
+    // v4: platform attribution, platform filter, and one row per popular post.
+    "account-history:v4",
     {
       userId,
       page,
       pageSize,
       ...filters,
+      platform: filters.platform ?? "all",
       category:
         filters.sort === "popular"
           ? "popular"

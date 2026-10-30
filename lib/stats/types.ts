@@ -103,6 +103,8 @@ export interface UserStats {
 
 export interface HistoryFilters {
   savedMediaOnly?: boolean
+  /** Audio is TikTok-only; legacy downloads without details match All only. */
+  platform?: DownloadPlatform
   from?: number
   until?: number
   mediaKind: "all" | "video" | "images" | "audio"
@@ -113,6 +115,7 @@ export interface HistoryFilters {
 }
 
 export interface UserDownload {
+  platform: Exclude<DownloadPlatform, "all"> | null
   videoId: string | null
   canonicalUrl: string | null
   viewsDisplay: string | null
@@ -126,6 +129,8 @@ export interface UserDownload {
   hasSavedMedia: boolean
   otherUniqueChats?: string
   isFirstDownloader?: boolean | null
+  /** Popular downloads list each post once; this counts the account's repeats. */
+  timesDownloaded?: string
 }
 
 export interface PaginatedUserDownloads {

@@ -10,8 +10,10 @@ import { getStoredMedia } from "@/lib/media/queries"
 import {
   MediaError,
   mediaUnavailableReason,
+  savedSoundFile,
   streamTelegramFile,
 } from "@/lib/media/telegram"
+import { parseMediaIdParam } from "@/lib/media/ids"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 
 // Astro otherwise invokes GET for HEAD and discards its streaming body without
@@ -37,13 +39,11 @@ export const GET: APIRoute = async ({
       }
     )
   const principal = await getPrincipal(cookies)
-  const { downloadId = "", position = "" } = params
-  if (
-    !/^[1-9]\d{0,18}$/u.test(downloadId) ||
-    BigInt(downloadId) > 9223372036854775807n ||
-    !/^\d{1,4}$/u.test(position)
-  )
+  const { position = "" } = params
+  const media = parseMediaIdParam(params.downloadId)
+  if (!media || !/^\d{1,4}$/u.test(position))
     return fail("Invalid media request.", 400)
+  const downloadId = `${media.kind === "audio" ? "audio:" : ""}${media.id}`
   if (isFakeDataEnabled())
     return fail("Saved media is unavailable in demo mode.", 404)
   let release: (() => void) | undefined
@@ -62,15 +62,18 @@ export const GET: APIRoute = async ({
           }
         )
     }
-    const media = await getStoredMedia(downloadId)
-    const reason = mediaUnavailableReason(media)
+    const stored = await getStoredMedia(downloadId)
+    const reason = mediaUnavailableReason(stored)
     if (reason) {
       release?.()
       return fail(reason, 404)
     }
-    const file = media?.telegram_files?.find(
-      (item) => item.position === Number(position)
-    )
+    // Audio exposes only the saved video's sound file, never album photos.
+    const file = (
+      media.kind === "audio"
+        ? [savedSoundFile(stored)]
+        : (stored?.telegram_files ?? [])
+    ).find((item) => item?.position === Number(position))
     if (!file) {
       release?.()
       return fail("Media item not found.", 404)

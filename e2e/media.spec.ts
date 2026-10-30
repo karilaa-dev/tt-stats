@@ -24,9 +24,13 @@ test("history opens media and links cache-hit downloads to other chats", async (
   await page
     .getByRole("switch", { name: "Show only records with media preview" })
     .click()
-  await expect(history.getByRole("listitem")).toHaveCount(17)
+  // Two audio downloads have a saved sound and offer the audio player.
+  await expect(history.getByRole("listitem")).toHaveCount(19)
   await expect(history.getByRole("button", { name: "View media" })).toHaveCount(
     17
+  )
+  await expect(history.getByRole("button", { name: "Play audio" })).toHaveCount(
+    2
   )
   await page.goBack()
   await expect(history.getByRole("listitem")).toHaveCount(20)
@@ -106,7 +110,14 @@ test("media endpoints reject invalid IDs and pages", async ({
   page,
   baseURL,
 }) => {
-  for (const downloadId of ["abc", "0", "9223372036854775808"]) {
+  for (const downloadId of [
+    "abc",
+    "0",
+    "9223372036854775808",
+    "audio:0",
+    "audio:abc",
+    "music:1",
+  ]) {
     const response = await page.request.post("/_actions/getDownloadMedia", {
       data: { downloadId },
       headers: { origin: baseURL! },

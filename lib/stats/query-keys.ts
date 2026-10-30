@@ -19,8 +19,11 @@ export const queryKeys = {
     ["stats", "time-series", metric, range] as const,
   referrals: () => ["stats", "referrals"] as const,
   otherStats: () => ["stats", "other"] as const,
-  popularVideos: (range: StatsRange, page: number) =>
-    ["stats", "popular-videos", range, page] as const,
+  popularVideos: (
+    range: StatsRange,
+    page: number,
+    platform: DownloadPlatform = "all"
+  ) => ["stats", "popular-videos", range, platform, page] as const,
   telegramMau: () => ["telegram-mau"] as const,
   /** Personal statistics for the signed-in account, or an admin lookup. */
   userStats: (own: boolean, userId: string) =>
