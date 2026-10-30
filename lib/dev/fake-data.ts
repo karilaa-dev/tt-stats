@@ -5,6 +5,7 @@ import { bucketSecondsForRange } from "@/lib/stats/time-series"
 import type {
   HistoryFilters,
   ChatScope,
+  DownloadPlatform,
   OtherStats,
   OverviewStats,
   PaginatedUserDownloads,
@@ -172,20 +173,27 @@ function scaledCount(
 
 export function getFakeStatsBreakdown(
   scope: ChatScope,
-  range: StatsRange
+  range: StatsRange,
+  platform: DownloadPlatform = "all"
 ): StatsBreakdown {
+  const share = { all: 1, tiktok: 0.72, instagram: 0.23 }[platform]
+  const count = (base: number) => scaledCount(base * share, scope, range)
   return {
     chats: scaledCount(92_480, scope, range),
     music: {
-      total: scaledCount(468_240, scope, range),
-      uniqueUsers: scaledCount(38_920, scope, range),
+      total: scaledCount(platform === "instagram" ? 0 : 468_240, scope, range),
+      uniqueUsers: scaledCount(
+        platform === "instagram" ? 0 : 38_920,
+        scope,
+        range
+      ),
     },
     downloads: {
-      total: scaledCount(1_384_760, scope, range),
-      uniqueUsers: scaledCount(81_340, scope, range),
-      images: scaledCount(216_890, scope, range),
-      uniqueImageUsers: scaledCount(43_680, scope, range),
-      cacheHits: scaledCount(932_410, scope, range),
+      total: count(1_384_760),
+      uniqueUsers: count(81_340),
+      images: count(216_890),
+      uniqueImageUsers: count(43_680),
+      cacheHits: count(932_410),
     },
   }
 }

@@ -1,5 +1,60 @@
 // English source messages are the shared, typed dictionary keys.
 export const messages = {
+  Platform: { ru: "Платформа", uk: "Платформа" },
+  "Download platform": {
+    ru: "Платформа скачиваний",
+    uk: "Платформа завантажень",
+  },
+  "All platforms": { ru: "Все платформы", uk: "Усі платформи" },
+  TikTok: { ru: "TikTok", uk: "TikTok" },
+  Instagram: { ru: "Instagram", uk: "Instagram" },
+  "TikTok downloads": {
+    ru: "Скачивания из TikTok",
+    uk: "Завантаження з TikTok",
+  },
+  "Instagram downloads": {
+    ru: "Скачивания из Instagram",
+    uk: "Завантаження з Instagram",
+  },
+  "No TikTok downloads in this period": {
+    ru: "Нет скачиваний из TikTok за этот период",
+    uk: "Немає завантажень з TikTok за цей період",
+  },
+  "No Instagram downloads in this period": {
+    ru: "Нет скачиваний из Instagram за этот период",
+    uk: "Немає завантажень з Instagram за цей період",
+  },
+  "Explore downloads by platform, audience, and reporting period.": {
+    ru: "Просматривайте скачивания по платформам, аудитории и отчётным периодам.",
+    uk: "Переглядайте завантаження за платформами, аудиторією та звітними періодами.",
+  },
+  "Compare platforms, periods, and audiences": {
+    ru: "Сравнение платформ, периодов и аудиторий",
+    uk: "Порівняння платформ, періодів і аудиторій",
+  },
+  "View all-platform trends": {
+    ru: "Динамика всех платформ",
+    uk: "Динаміка всіх платформ",
+  },
+  "Try a longer period or another audience. Downloads without platform information appear only under All platforms.":
+    {
+      ru: "Выберите более длительный период или другую аудиторию. Скачивания без сведений о платформе показаны только в разделе «Все платформы».",
+      uk: "Виберіть довший період або іншу аудиторію. Завантаження без відомостей про платформу показано лише в розділі «Усі платформи».",
+    },
+  "Downloads include videos and image albums. Older downloads without platform information appear only under All platforms.":
+    {
+      ru: "Скачивания включают видео и альбомы изображений. Старые скачивания без сведений о платформе показаны только в разделе «Все платформы».",
+      uk: "Завантаження включають відео та альбоми зображень. Старі завантаження без відомостей про платформу показано лише в розділі «Усі платформи».",
+    },
+  "Registered chats are shared across platforms and appear only under All platforms.":
+    {
+      ru: "Зарегистрированные чаты общие для всех платформ и показаны только в разделе «Все платформы».",
+      uk: "Зареєстровані чати спільні для всіх платформ і показані лише в розділі «Усі платформи».",
+    },
+  "Music downloads are available for TikTok only.": {
+    ru: "Скачивания музыки доступны только для TikTok.",
+    uk: "Завантаження музики доступні лише для TikTok.",
+  },
   Audio: { ru: "Аудио", uk: "Аудіо" },
   "Last download": { ru: "Последнее скачивание", uk: "Останнє завантаження" },
   "First and last downloads are within the selected period.": {

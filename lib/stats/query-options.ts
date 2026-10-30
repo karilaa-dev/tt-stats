@@ -16,6 +16,7 @@ import { isBackgroundRefresh } from "@/lib/tasks/background"
 import { queryKeys } from "@/lib/stats/query-keys"
 import type {
   ChatScope,
+  DownloadPlatform,
   SeriesMetric,
   StatsDataset,
   StatsRange,
@@ -49,13 +50,16 @@ export function overviewQueryOptions() {
 
 export function statsBreakdownQueryOptions(
   scope: ChatScope,
-  range: StatsRange
+  range: StatsRange,
+  platform: DownloadPlatform = "all"
 ) {
   return queryOptions({
-    queryKey: queryKeys.breakdown(scope, range),
+    queryKey: queryKeys.breakdown(scope, range, platform),
     queryFn: ({ signal }) =>
-      getStatsBreakdown({ signal, data: { scope, range } }),
+      getStatsBreakdown({ signal, data: { scope, range, platform } }),
     ...(range === "24h" ? rollingRefreshOptions : dailyRefreshOptions),
+    // A changed platform must never show the preceding platform's counts.
+    placeholderData: undefined,
   })
 }
 

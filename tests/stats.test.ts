@@ -9,6 +9,7 @@ import {
 } from "@/lib/stats/time-series"
 import {
   parseChatScope,
+  parseDownloadPlatform,
   parseSeriesMetric,
   parseStatsRange,
   parseTelegramId,
@@ -20,6 +21,10 @@ describe("statistics validation", () => {
     expect(parseChatScope("unknown")).toBe("all")
     expect(parseStatsRange("31d")).toBe("31d")
     expect(parseStatsRange("yesterday")).toBe("24h")
+    for (const platform of ["all", "tiktok", "instagram"] as const)
+      expect(parseDownloadPlatform(platform)).toBe(platform)
+    for (const value of [null, undefined, "youtube", "TikTok", {}, ["tiktok"]])
+      expect(parseDownloadPlatform(value)).toBe("all")
     for (const value of ["users", "groups", "all"] as const)
       expect(parseChatScope(value)).toBe(value)
     for (const value of ["24h", "7d", "31d", "all"] as const)

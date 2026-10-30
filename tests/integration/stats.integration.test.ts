@@ -22,6 +22,7 @@ import {
   getReferralStatsRaw,
   getManualRefreshRequestRaw,
   getStatsBreakdownRaw,
+  getPlatformStatsBreakdownRaw,
   getStatsJobsRaw,
   getTimeSeriesRaw,
   getUserDownloadsRaw,
@@ -782,6 +783,146 @@ integration("PostgreSQL statistics queries", () => {
     const allChats = await getStatsBreakdownRaw("all", "24h", pool)
     expect(allChats.chats).toBe("3")
     expect(allChats.downloads.cacheHits).toBe("1")
+  })
+
+  it("distinguishes an empty platform snapshot from a snapshot awaiting its first refresh", async () => {
+    const empty = await getPlatformStatsBreakdownRaw(
+      "all",
+      "24h",
+      "instagram",
+      pool
+    )
+    expect(empty.downloads).toEqual({
+      total: "0",
+      uniqueUsers: "0",
+      images: "0",
+      uniqueImageUsers: "0",
+      cacheHits: "0",
+    })
+    const client = await pool.connect()
+    try {
+      await client.query("BEGIN")
+      await client.query(
+        "DELETE FROM tt_stats_cache.platform_breakdown WHERE platform = 'instagram' AND scope = 'all' AND range = '24h'"
+      )
+      await expect(
+        getPlatformStatsBreakdownRaw(
+          "all",
+          "24h",
+          "instagram",
+          client as unknown as Pool
+        )
+      ).rejects.toMatchObject({ kind: "snapshotsMissing" })
+      expect(
+        (await getStatsBreakdownRaw("all", "24h", client as unknown as Pool))
+          .downloads.total
+      ).not.toBe("0")
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
+  })
+
+  it("snapshots platforms across periods and audiences without guessing legacy identities", async () => {
+    const client = await pool.connect()
+    const db = client as unknown as Pool
+    const end = Math.floor(now / 86400) * 86400
+    try {
+      await client.query("BEGIN")
+      await client.query(
+        "INSERT INTO users(user_id) VALUES (998100), (-998100)"
+      )
+      await client.query(`INSERT INTO video_details(pk_id, platform, platform_video_id) VALUES
+        (998100, 'tiktok', 'platform-tiktok'), (998101, 'instagram', 'platform-instagram')`)
+      await client.query(
+        `INSERT INTO videos(user_id, video_details_id, downloaded_at, shared_link, media_kind, delivery_surface, cache_hit) VALUES
+        (998100, 998100, $1 - 10, 'https://example.test/tiktok-video', 'video', 'chat', TRUE),
+        (998100, 998100, $1 - 20, 'https://example.test/tiktok-album', 'images', 'chat', FALSE),
+        (-998100, 998100, $1 - 86400, 'https://example.test/tiktok-boundary', 'video', 'chat', FALSE),
+        (998100, 998100, $1 - 86401, 'https://example.test/tiktok-older', 'video', 'chat', FALSE),
+        (998100, 998101, $1 - 30, 'https://example.test/instagram-video', 'video', 'chat', TRUE),
+        (-998100, 998101, $1 - 40, 'https://example.test/instagram-album', 'images', 'chat', TRUE),
+        (998100, NULL, $1 - 50, 'https://www.tiktok.com/@legacy/video/123', 'video', 'chat', TRUE),
+        (0, 998100, $1 - 60, 'https://example.test/zero-chat', 'video', 'chat', TRUE),
+        (998100, 998101, $1, 'https://example.test/unfinished', 'video', 'chat', TRUE)`,
+        [end]
+      )
+      await client.query(
+        "CALL tt_stats_cache.refresh_rolling_24h(to_timestamp($1))",
+        [end]
+      )
+      const verify = async (range: "24h" | "7d" | "31d" | "all") => {
+        const tiktok = await getPlatformStatsBreakdownRaw(
+          "all",
+          range,
+          "tiktok",
+          db
+        )
+        expect(tiktok.downloads).toEqual({
+          total: range === "24h" ? "3" : "4",
+          uniqueUsers: "2",
+          images: "1",
+          uniqueImageUsers: "1",
+          cacheHits: "1",
+        })
+        const instagram = await getPlatformStatsBreakdownRaw(
+          "all",
+          range,
+          "instagram",
+          db
+        )
+        expect(instagram.downloads).toEqual({
+          total: "2",
+          uniqueUsers: "2",
+          images: "1",
+          uniqueImageUsers: "1",
+          cacheHits: "2",
+        })
+        expect(instagram.music).toEqual({ total: "0", uniqueUsers: "0" })
+        const aggregate = await getStatsBreakdownRaw("all", range, db)
+        expect(tiktok.music).toEqual(aggregate.music)
+        expect(BigInt(aggregate.downloads.total)).toBeGreaterThan(
+          BigInt(tiktok.downloads.total) + BigInt(instagram.downloads.total)
+        )
+        const privateUsers = await getPlatformStatsBreakdownRaw(
+          "users",
+          range,
+          "tiktok",
+          db
+        )
+        expect(privateUsers.downloads.uniqueUsers).toBe("1")
+        expect(privateUsers.downloads.total).toBe(range === "24h" ? "2" : "3")
+        const groups = await getPlatformStatsBreakdownRaw(
+          "groups",
+          range,
+          "instagram",
+          db
+        )
+        expect(groups.downloads).toMatchObject({
+          total: "1",
+          images: "1",
+          uniqueUsers: "1",
+          cacheHits: "1",
+        })
+      }
+      await verify("24h")
+      // Job stages are normally removed on commit; release them before the other job.
+      await client.query(
+        "DROP TABLE tt_stats_breakdown_stage, tt_stats_series_stage"
+      )
+      await client.query(
+        "CALL tt_stats_cache.refresh_daily(to_timestamp($1))",
+        [end]
+      )
+      for (const range of ["7d", "31d", "all"] as const) await verify(range)
+      await client.query(
+        "LOCK TABLE public.videos, public.video_details IN ACCESS EXCLUSIVE MODE"
+      )
+      await getPlatformStatsBreakdownRaw("all", "7d", "instagram", pool)
+    } finally {
+      await client.query("ROLLBACK")
+      client.release()
+    }
   })
 
   it("allows owners to preview their media independently of ranking schema availability", async () => {

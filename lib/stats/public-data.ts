@@ -17,10 +17,16 @@ import {
   getOverviewRaw,
   getReferralStatsRaw,
   getStatsBreakdownRaw,
+  getPlatformStatsBreakdownRaw,
   getTimeSeriesRaw,
 } from "./queries"
 import { getSnapshotMetadataCached, snapshotRead } from "./snapshot-cache"
-import type { ChatScope, SeriesMetric, StatsRange } from "./types"
+import type {
+  ChatScope,
+  DownloadPlatform,
+  SeriesMetric,
+  StatsRange,
+} from "./types"
 
 // Public statistics shared by Astro actions and server-rendered pages. Every
 // visitor sees the same snapshot, so reads are cached per snapshot version.
@@ -34,12 +40,15 @@ export const loadOverview = async () =>
 
 export const loadStatsBreakdown = async (
   scope: ChatScope,
-  range: StatsRange
+  range: StatsRange,
+  platform: DownloadPlatform = "all"
 ) =>
   fake()
-    ? getFakeStatsBreakdown(scope, range)
-    : snapshotRead(`breakdown:${scope}:${range}`, () =>
-        getStatsBreakdownRaw(scope, range)
+    ? getFakeStatsBreakdown(scope, range, platform)
+    : snapshotRead(`breakdown:${scope}:${range}:${platform}`, () =>
+        platform === "all"
+          ? getStatsBreakdownRaw(scope, range)
+          : getPlatformStatsBreakdownRaw(scope, range, platform)
       )
 
 export const loadTimeSeries = async (

@@ -49,7 +49,7 @@ function pageLoads(
   search: string,
   principal: Principal
 ): Load[] {
-  const { range, scope, page, id } = parseDashboardSearch(search)
+  const { range, scope, platform, page, id } = parseDashboardSearch(search)
   const admin = principal.admin
   switch (pathname) {
     case "/dashboard/me": {
@@ -87,8 +87,8 @@ function pageLoads(
     case "/dashboard/detailed":
       return [
         [
-          queryKeys.breakdown(scope, range),
-          () => loadStatsBreakdown(scope, range),
+          queryKeys.breakdown(scope, range, platform),
+          () => loadStatsBreakdown(scope, range, platform),
         ],
       ]
     case "/dashboard/videos":

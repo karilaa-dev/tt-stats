@@ -1,4 +1,8 @@
-import { parseChatScope, parseStatsRange } from "@/lib/stats/validation"
+import {
+  parseChatScope,
+  parseDownloadPlatform,
+  parseStatsRange,
+} from "@/lib/stats/validation"
 
 // Shared by server rendering and the browser so both derive identical filters
 // and query keys from a URL.
@@ -25,6 +29,7 @@ export function parseDashboardSearch(search: string) {
       ? params.get("mediaKind")
       : "all") as "all" | "video" | "images" | "audio",
     scope: parseChatScope(params.get("scope")),
+    platform: parseDownloadPlatform(params.get("platform")),
     id: params.get("id") ?? "",
     page: Number.isInteger(page) && page > 0 ? Math.min(page, 1_000_000) : 1,
   }
@@ -38,6 +43,7 @@ const defaults: Partial<Record<keyof DashboardSearch, string>> = {
   category: "history",
   sort: "newest",
   mediaKind: "all",
+  platform: "all",
   page: "1",
 }
 

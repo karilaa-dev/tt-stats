@@ -41,6 +41,7 @@ import {
 import { invalidateSnapshotMetadata } from "@/lib/stats/snapshot-cache"
 import {
   CHAT_SCOPES,
+  DOWNLOAD_PLATFORMS,
   SERIES_METRICS,
   STATS_DATASETS,
   STATS_RANGES,
@@ -127,8 +128,14 @@ export const getOverview = defineAction({
 })
 
 export const getStatsBreakdown = defineAction({
-  input: z.object({ scope: chatScope, range: statsRange }),
-  handler: safeHandler((data) => loadStatsBreakdown(data.scope, data.range)),
+  input: z.object({
+    scope: chatScope,
+    range: statsRange,
+    platform: z.enum(DOWNLOAD_PLATFORMS).default("all"),
+  }),
+  handler: safeHandler((data) =>
+    loadStatsBreakdown(data.scope, data.range, data.platform)
+  ),
 })
 
 export const getTimeSeries = defineAction({

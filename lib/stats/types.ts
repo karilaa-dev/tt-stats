@@ -1,10 +1,12 @@
 export const CHAT_SCOPES = ["users", "groups", "all"] as const
 export const STATS_RANGES = ["24h", "7d", "31d", "all"] as const
+export const DOWNLOAD_PLATFORMS = ["all", "tiktok", "instagram"] as const
 export const SERIES_METRICS = ["users", "videos", "music"] as const
 export const STATS_DATASETS = ["rolling_24h", "daily"] as const
 
 export type ChatScope = (typeof CHAT_SCOPES)[number]
 export type StatsRange = (typeof STATS_RANGES)[number]
+export type DownloadPlatform = (typeof DOWNLOAD_PLATFORMS)[number]
 export const USER_ACTIVITY_RANGES = ["31d", "90d", "1y", "all"] as const
 export type UserActivityRange = (typeof USER_ACTIVITY_RANGES)[number]
 export interface UserActivity {

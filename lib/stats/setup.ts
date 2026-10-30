@@ -103,6 +103,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
            to_regnamespace('tt_stats_cache') IS NOT NULL AS schema_installed,
            to_regclass('tt_stats_cache.refresh_metadata') IS NOT NULL
              AND to_regclass('tt_stats_cache.breakdown') IS NOT NULL
+             AND to_regclass('tt_stats_cache.platform_breakdown') IS NOT NULL
              AND to_regclass('tt_stats_cache.time_series') IS NOT NULL
              AND to_regclass('tt_stats_cache.rankings') IS NOT NULL
              AND to_regclass('tt_stats_cache.popular_videos') IS NOT NULL
@@ -115,7 +116,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
              obj_description(
                to_regprocedure('tt_stats_cache.refresh_rolling_24h(timestamptz)'),
                'pg_proc'
-             ) = 'tt-stats-schema-version:9',
+             ) = 'tt-stats-schema-version:10',
              false
            ) AS definitions_current,
            coalesce(
@@ -129,6 +130,7 @@ async function inspectApp(pool: Pool): Promise<AppCapabilities> {
            coalesce(has_schema_privilege(current_user, to_regnamespace('tt_stats_cache'), 'USAGE'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.refresh_metadata'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.breakdown'), 'SELECT'), false)
+             AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.platform_breakdown'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.time_series'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.rankings'), 'SELECT'), false)
              AND coalesce(has_table_privilege(current_user, to_regclass('tt_stats_cache.popular_videos'), 'SELECT'), false)
@@ -365,6 +367,7 @@ export async function configureDatabaseJobsRaw(input: {
         GRANT USAGE ON SCHEMA tt_stats_cache TO ${role};
         GRANT SELECT ON tt_stats_cache.refresh_metadata,
                         tt_stats_cache.breakdown,
+                        tt_stats_cache.platform_breakdown,
                         tt_stats_cache.time_series,
                         tt_stats_cache.rankings,
                         tt_stats_cache.popular_videos,

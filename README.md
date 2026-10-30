@@ -384,6 +384,19 @@ inline styles remain permitted for the component and chart libraries.
 
 ## Deploying the new rankings
 
+Breakdown now supports **All platforms**, **TikTok**, and **Instagram**, together
+with the existing audience and period filters. Platform selection is saved in
+the URL. Install snapshot definitions version 10 using **Operations → Update
+database definitions** and let both rolling and daily rebuilds complete. Separate
+runtime roles also need the updated `003_stats_snapshot_grants.sql` grants.
+Platform views show an unavailable state until their snapshots are ready.
+
+Platform attribution comes from `video_details.platform`; older downloads without
+that identity remain in All platforms only. Download totals include videos and
+image albums; music is counted separately and belongs to TikTok. Registered chats
+are global and appear only in All platforms. Page reads use indexed snapshot rows
+and do not scan source download history.
+
 The ranking with first and last download dates is schema version 9. In
 Operations, **Update database definitions** installs the change and queues both
 rolling and daily rebuilds. A manual installation uses the documented SQL

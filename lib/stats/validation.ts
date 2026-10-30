@@ -1,8 +1,10 @@
 import {
   CHAT_SCOPES,
+  DOWNLOAD_PLATFORMS,
   SERIES_METRICS,
   STATS_RANGES,
   type ChatScope,
+  type DownloadPlatform,
   type SeriesMetric,
   type StatsRange,
 } from "@/lib/stats/types"
@@ -23,6 +25,10 @@ export function parseChatScope(value: unknown): ChatScope {
 
 export function parseStatsRange(value: unknown): StatsRange {
   return parseOption(value, STATS_RANGES, "24h")
+}
+
+export function parseDownloadPlatform(value: unknown): DownloadPlatform {
+  return parseOption(value, DOWNLOAD_PLATFORMS, "all")
 }
 
 export function parseSeriesMetric(value: unknown): SeriesMetric {

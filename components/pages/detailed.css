@@ -1,0 +1,49 @@
+/* Platform sits beside the shared audience and period filters as one row. */
+.breakdown-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 2rem;
+  min-width: 0;
+}
+.breakdown-heading-separator {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+.breakdown-platform {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.breakdown-platform-notes {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 72ch;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.breakdown-platform-notes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.breakdown-platform-notes svg {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin-top: 0.15rem;
+}
+@media (max-width: 639px) {
+  .breakdown-filters,
+  .breakdown-filters > .stats-filters {
+    width: 100%;
+  }
+}
+@media (max-width: 399px) {
+  /* Three labelled segments fit on narrow phones once the logos drop out. */
+  .breakdown-platform-toggle .control-toggle svg {
+    display: none;
+  }
+}

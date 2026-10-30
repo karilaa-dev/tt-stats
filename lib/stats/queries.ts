@@ -6,6 +6,7 @@ import { DataAccessError, getPool } from "@/lib/db/pool"
 import { userHistorySql } from "./history-source"
 import type {
   ChatScope,
+  DownloadPlatform,
   OtherStats,
   OverviewStats,
   RankedValue,
@@ -115,6 +116,25 @@ export async function getStatsBreakdownRaw(
      FROM tt_stats_cache.breakdown
      WHERE scope = $1 AND range = $2`,
     [scope, range]
+  )
+  const row = result.rows[0]
+  return row ? mapBreakdown(row) : missingSnapshot()
+}
+
+export async function getPlatformStatsBreakdownRaw(
+  scope: ChatScope,
+  range: StatsRange,
+  platform: Exclude<DownloadPlatform, "all">,
+  pool: Pool = getPool()
+): Promise<StatsBreakdown> {
+  const result = await safeQuery<BreakdownRow>(
+    pool,
+    `SELECT scope, range, chats::text, downloads::text,
+            download_users::text, images::text, image_users::text,
+            music::text, music_users::text, cache_hits::text
+     FROM tt_stats_cache.platform_breakdown
+     WHERE scope = $1 AND range = $2 AND platform = $3`,
+    [scope, range, platform]
   )
   const row = result.rows[0]
   return row ? mapBreakdown(row) : missingSnapshot()

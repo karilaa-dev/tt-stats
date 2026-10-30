@@ -29,6 +29,14 @@ ALTER TABLE tt_stats_cache.breakdown
   ADD COLUMN IF NOT EXISTS cache_hits BIGINT NOT NULL DEFAULT 0
   CHECK (cache_hits >= 0);
 
+-- Platform snapshots preserve the aggregate table for existing deployments.
+-- Missing video_details identities participate in All platforms only.
+CREATE TABLE IF NOT EXISTS tt_stats_cache.platform_breakdown (
+  LIKE tt_stats_cache.breakdown INCLUDING DEFAULTS INCLUDING CONSTRAINTS,
+  platform TEXT NOT NULL CHECK (platform IN ('tiktok', 'instagram')),
+  PRIMARY KEY (scope, range, platform)
+);
+
 CREATE TABLE IF NOT EXISTS tt_stats_cache.time_series (
   metric TEXT NOT NULL CHECK (metric IN ('users', 'videos', 'music')),
   range TEXT NOT NULL CHECK (range IN ('24h', '7d', '31d', 'all')),
@@ -287,15 +295,17 @@ BEGIN
   PERFORM pg_advisory_xact_lock(20260812, 1);
 
   CREATE TEMP TABLE tt_stats_breakdown_stage (
-    LIKE tt_stats_cache.breakdown INCLUDING DEFAULTS
+    LIKE tt_stats_cache.breakdown INCLUDING DEFAULTS,
+    platform TEXT NOT NULL DEFAULT 'all'
   ) ON COMMIT DROP;
 
   INSERT INTO tt_stats_breakdown_stage (
     scope, range, chats, downloads, download_users,
-    images, image_users, music, music_users, cache_hits
+    images, image_users, music, music_users, cache_hits, platform
   )
-  SELECT scope, '24h', 0, 0, 0, 0, 0, 0, 0, 0
-  FROM (VALUES ('users'), ('groups'), ('all')) AS scopes(scope);
+  SELECT scope, '24h', 0, 0, 0, 0, 0, 0, 0, 0, platform
+  FROM (VALUES ('users'), ('groups'), ('all')) AS scopes(scope)
+  CROSS JOIN (VALUES ('all'), ('tiktok'), ('instagram')) AS platforms(platform);
 
   WITH counts AS (
     SELECT
@@ -327,6 +337,7 @@ BEGIN
         WHEN is_user THEN 'users'
         ELSE 'groups'
       END AS scope,
+      CASE WHEN grouping(platform) = 1 THEN 'all' ELSE platform END AS platform,
       count(*)::bigint AS total,
       count(DISTINCT user_id)::bigint AS users,
       count(*) FILTER (WHERE media_kind = 'images')::bigint AS images,
@@ -335,14 +346,16 @@ BEGIN
       )::bigint AS image_users,
       count(*) FILTER (WHERE cache_hit)::bigint AS cache_hits
     FROM (
-      SELECT user_id, user_id > 0 AS is_user, media_kind, cache_hit
-      FROM public.videos
+      SELECT videos.user_id, videos.user_id > 0 AS is_user,
+             videos.media_kind, videos.cache_hit, details.platform
+      FROM public.videos videos
+      LEFT JOIN public.video_details details ON details.pk_id = videos.video_details_id
       WHERE user_id <> 0
         AND downloaded_at IS NOT NULL
         AND downloaded_at >= v_start_epoch
         AND downloaded_at < v_end_epoch
     ) source
-    GROUP BY GROUPING SETS ((), (is_user))
+    GROUP BY GROUPING SETS ((), (is_user), (platform), (platform, is_user))
   )
   UPDATE tt_stats_breakdown_stage target
   SET downloads = counts.total,
@@ -351,7 +364,7 @@ BEGIN
       image_users = counts.image_users,
       cache_hits = counts.cache_hits
   FROM counts
-  WHERE target.scope = counts.scope;
+  WHERE target.scope = counts.scope AND target.platform = counts.platform;
 
   WITH counts AS (
     SELECT
@@ -376,7 +389,7 @@ BEGIN
   SET music = counts.total,
       music_users = counts.users
   FROM counts
-  WHERE target.scope = counts.scope;
+  WHERE target.scope = counts.scope AND target.platform IN ('all', 'tiktok');
 
   CREATE TEMP TABLE tt_stats_series_stage (
     LIKE tt_stats_cache.time_series INCLUDING DEFAULTS
@@ -398,7 +411,22 @@ BEGIN
   PERFORM tt_stats_cache._refresh_popular_videos(p_now, '24h');
 
   DELETE FROM tt_stats_cache.breakdown WHERE range = '24h';
-  INSERT INTO tt_stats_cache.breakdown SELECT * FROM tt_stats_breakdown_stage;
+  INSERT INTO tt_stats_cache.breakdown (
+    scope, range, chats, downloads, download_users,
+    images, image_users, music, music_users, cache_hits
+  )
+  SELECT scope, range, chats, downloads, download_users,
+         images, image_users, music, music_users, cache_hits
+  FROM tt_stats_breakdown_stage WHERE platform = 'all';
+
+  DELETE FROM tt_stats_cache.platform_breakdown WHERE range = '24h';
+  INSERT INTO tt_stats_cache.platform_breakdown (
+    scope, range, chats, downloads, download_users,
+    images, image_users, music, music_users, cache_hits, platform
+  )
+  SELECT scope, range, chats, downloads, download_users,
+         images, image_users, music, music_users, cache_hits, platform
+  FROM tt_stats_breakdown_stage WHERE platform <> 'all';
 
   DELETE FROM tt_stats_cache.time_series WHERE range = '24h';
   INSERT INTO tt_stats_cache.time_series SELECT * FROM tt_stats_series_stage;
@@ -443,15 +471,17 @@ BEGIN
     ('all', NULL);
 
   CREATE TEMP TABLE tt_stats_breakdown_stage (
-    LIKE tt_stats_cache.breakdown INCLUDING DEFAULTS
+    LIKE tt_stats_cache.breakdown INCLUDING DEFAULTS,
+    platform TEXT NOT NULL DEFAULT 'all'
   ) ON COMMIT DROP;
   INSERT INTO tt_stats_breakdown_stage (
     scope, range, chats, downloads, download_users,
-    images, image_users, music, music_users, cache_hits
+    images, image_users, music, music_users, cache_hits, platform
   )
-  SELECT scope, ranges.range, 0, 0, 0, 0, 0, 0, 0, 0
+  SELECT scope, ranges.range, 0, 0, 0, 0, 0, 0, 0, 0, platform
   FROM (VALUES ('users'), ('groups'), ('all')) AS scopes(scope)
-  CROSS JOIN tt_stats_ranges ranges;
+  CROSS JOIN tt_stats_ranges ranges
+  CROSS JOIN (VALUES ('all'), ('tiktok'), ('instagram')) AS platforms(platform);
 
   WITH counts AS (
     SELECT
@@ -487,6 +517,7 @@ BEGIN
         WHEN is_user THEN 'users'
         ELSE 'groups'
       END AS scope,
+      CASE WHEN grouping(platform) = 1 THEN 'all' ELSE platform END AS platform,
       count(*)::bigint AS total,
       count(DISTINCT user_id)::bigint AS users,
       count(*) FILTER (WHERE media_kind = 'images')::bigint AS images,
@@ -496,7 +527,7 @@ BEGIN
       count(*) FILTER (WHERE cache_hit)::bigint AS cache_hits
     FROM (
       SELECT ranges.range, videos.user_id, videos.user_id > 0 AS is_user,
-             videos.media_kind, videos.cache_hit
+             videos.media_kind, videos.cache_hit, details.platform
       FROM tt_stats_ranges ranges
       JOIN public.videos
         ON videos.user_id <> 0
@@ -504,8 +535,9 @@ BEGIN
        AND videos.downloaded_at >= 946684800
        AND videos.downloaded_at < v_end_epoch
        AND (ranges.start_epoch IS NULL OR videos.downloaded_at >= ranges.start_epoch)
+      LEFT JOIN public.video_details details ON details.pk_id = videos.video_details_id
     ) source
-    GROUP BY source.range, GROUPING SETS ((), (is_user))
+    GROUP BY source.range, GROUPING SETS ((), (is_user), (platform), (platform, is_user))
   )
   UPDATE tt_stats_breakdown_stage target
   SET downloads = counts.total,
@@ -514,7 +546,8 @@ BEGIN
       image_users = counts.image_users,
       cache_hits = counts.cache_hits
   FROM counts
-  WHERE target.range = counts.range AND target.scope = counts.scope;
+  WHERE target.range = counts.range AND target.scope = counts.scope
+    AND target.platform = counts.platform;
 
   WITH counts AS (
     SELECT
@@ -542,7 +575,8 @@ BEGIN
   SET music = counts.total,
       music_users = counts.users
   FROM counts
-  WHERE target.range = counts.range AND target.scope = counts.scope;
+  WHERE target.range = counts.range AND target.scope = counts.scope
+    AND target.platform IN ('all', 'tiktok');
 
   CREATE TEMP TABLE tt_stats_series_stage (
     LIKE tt_stats_cache.time_series INCLUDING DEFAULTS
@@ -645,7 +679,22 @@ BEGIN
     AND file_mode = TRUE;
 
   DELETE FROM tt_stats_cache.breakdown WHERE range IN ('7d', '31d', 'all');
-  INSERT INTO tt_stats_cache.breakdown SELECT * FROM tt_stats_breakdown_stage;
+  INSERT INTO tt_stats_cache.breakdown (
+    scope, range, chats, downloads, download_users,
+    images, image_users, music, music_users, cache_hits
+  )
+  SELECT scope, range, chats, downloads, download_users,
+         images, image_users, music, music_users, cache_hits
+  FROM tt_stats_breakdown_stage WHERE platform = 'all';
+
+  DELETE FROM tt_stats_cache.platform_breakdown WHERE range IN ('7d', '31d', 'all');
+  INSERT INTO tt_stats_cache.platform_breakdown (
+    scope, range, chats, downloads, download_users,
+    images, image_users, music, music_users, cache_hits, platform
+  )
+  SELECT scope, range, chats, downloads, download_users,
+         images, image_users, music, music_users, cache_hits, platform
+  FROM tt_stats_breakdown_stage WHERE platform <> 'all';
 
   DELETE FROM tt_stats_cache.time_series WHERE range IN ('7d', '31d', 'all');
   INSERT INTO tt_stats_cache.time_series SELECT * FROM tt_stats_series_stage;
@@ -971,6 +1020,6 @@ REVOKE ALL ON PROCEDURE tt_stats_cache.refresh_daily(TIMESTAMPTZ) FROM PUBLIC;
 REVOKE ALL ON PROCEDURE tt_stats_cache.run_manual_refresh(BIGINT, TEXT, TEXT) FROM PUBLIC;
 
 COMMENT ON PROCEDURE tt_stats_cache.refresh_rolling_24h(TIMESTAMPTZ)
-  IS 'tt-stats-schema-version:9';
+  IS 'tt-stats-schema-version:10';
 
 COMMIT;

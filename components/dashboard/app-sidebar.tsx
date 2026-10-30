@@ -52,7 +52,7 @@ const navigation = [
     label: "Breakdown",
     short: "Breakdown",
     icon: FunnelSimpleIcon,
-    description: "Compare periods and audiences",
+    description: "Compare platforms, periods, and audiences",
   },
   {
     href: "/dashboard/users",

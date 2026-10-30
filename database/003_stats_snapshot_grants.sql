@@ -12,6 +12,7 @@ GRANT SELECT ON TABLE public.users, public.videos, public.music, public.video_de
 GRANT USAGE ON SCHEMA tt_stats_cache TO :"app_role";
 GRANT SELECT ON tt_stats_cache.refresh_metadata,
                 tt_stats_cache.breakdown,
+                tt_stats_cache.platform_breakdown,
                 tt_stats_cache.time_series,
                 tt_stats_cache.rankings,
                 tt_stats_cache.popular_videos,
