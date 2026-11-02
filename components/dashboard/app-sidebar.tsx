@@ -83,6 +83,13 @@ const navigation = [
     description: "Languages and download leaders",
   },
   {
+    href: "/dashboard/accounts",
+    label: "Scraper accounts",
+    short: "Accounts",
+    icon: PulseIcon,
+    description: "TikTok and Instagram account health",
+  },
+  {
     href: "/dashboard/jobs",
     label: "Operations",
     short: "Operations",
@@ -98,7 +105,9 @@ export function AppSidebar() {
   const visibleNavigation = navigation.filter(
     (item) =>
       authenticated ||
-      !["/dashboard/users", "/dashboard/jobs"].includes(item.href)
+      !["/dashboard/users", "/dashboard/jobs", "/dashboard/accounts"].includes(
+        item.href
+      )
   )
   const { pathname, fakeMode } = useDashboardContext()
   const [openMobile, setOpenMobile] = useState(false)

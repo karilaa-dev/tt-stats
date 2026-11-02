@@ -2,6 +2,7 @@ import { ensureWebsiteSchema, cleanWebsiteStorage } from "@/lib/db/website"
 import { validateRuntimeConfiguration } from "@/lib/env"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 import { startVideoInactivityMonitor } from "./plugins/video-inactivity-listener"
+import { startInstagramAccountMonitor } from "./plugins/instagram-account-monitor"
 export { startVideoInactivityMonitor }
 export async function startRuntime() {
   if (isFakeDataEnabled()) return async () => {}
@@ -20,9 +21,10 @@ export async function startRuntime() {
   const timer = setInterval(clean, 300_000)
   timer.unref()
   const stopMonitor = startVideoInactivityMonitor()
+  const stopInstagram = startInstagramAccountMonitor()
   return async () => {
     clearInterval(timer)
     await cleaning
-    await stopMonitor?.()
+    await Promise.all([stopMonitor?.(), stopInstagram?.()])
   }
 }

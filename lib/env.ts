@@ -123,3 +123,30 @@ export function getAdminTelegramId(
   }
   return id
 }
+
+/** tt-scrap owns these tables in DB_URL; never migrate them from tt-stats. */
+export function getScraperSchema(
+  source: NodeJS.ProcessEnv = process.env
+): string {
+  return z
+    .string()
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/u)
+    .parse(source.SCRAP_DB_SCHEMA?.trim() || "public")
+}
+
+export function getInstagramMonitorEnv(
+  source: NodeJS.ProcessEnv = process.env
+): Extract<VideoMonitorEnv, { provider: "ntfy" }> | null {
+  const dedicated = Boolean(source.INSTAGRAM_DEAD_NTFY_URL?.trim())
+  const env = getVideoMonitorEnv({
+    VIDEO_INACTIVITY_NTFY_URL: dedicated
+      ? source.INSTAGRAM_DEAD_NTFY_URL
+      : source.VIDEO_INACTIVITY_NTFY_URL,
+    VIDEO_INACTIVITY_NTFY_TOKEN: dedicated
+      ? source.INSTAGRAM_DEAD_NTFY_TOKEN
+      : source.VIDEO_INACTIVITY_NTFY_TOKEN,
+  })
+  if (!dedicated && source.INSTAGRAM_DEAD_NTFY_TOKEN?.trim())
+    throw new Error("An Instagram ntfy token requires its own topic URL")
+  return env?.provider === "ntfy" ? env : null
+}

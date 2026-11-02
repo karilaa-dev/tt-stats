@@ -5,6 +5,13 @@ import { getPool } from "./pool"
 import { isFakeDataEnabled } from "@/lib/dev/fake-data"
 
 const expected: Record<string, Record<string, string>> = {
+  instagram_dead_notifications: {
+    notification_key: "text",
+    source_schema: "text",
+    account_id: "text",
+    incident: "text",
+    sent_at: "timestamptz",
+  },
   users: {
     telegram_id: "int8",
     display_name: "text",
@@ -86,6 +93,7 @@ export async function inspectWebsiteSchema(
     JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = c.conkey[1]
     WHERE n.nspname = 'tt_stats_web' AND c.contype = 'p' AND cardinality(c.conkey) = 1`)
   for (const [table, column] of Object.entries({
+    instagram_dead_notifications: "notification_key",
     users: "telegram_id",
     sessions: "token_hash",
     login_transactions: "token_hash",
@@ -128,7 +136,7 @@ export async function inspectWebsiteSchema(
       AND bool_and(coalesce(has_table_privilege(current_user, to_regclass('tt_stats_web.' || t), p), false)) AS allowed
       FROM unnest($1::text[]) AS t CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) AS p
       WHERE (t = 'users' AND p <> 'DELETE') OR (t = 'sessions' AND p <> 'UPDATE')
-        OR (t = 'login_transactions' AND p IN ('INSERT', 'DELETE')) OR t = 'query_cache'`,
+        OR (t = 'login_transactions' AND p IN ('INSERT', 'DELETE')) OR t IN ('query_cache', 'instagram_dead_notifications')`,
       [Object.keys(definitions)]
     )
     if (!access.rows[0]?.allowed)

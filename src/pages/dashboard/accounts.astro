@@ -1,0 +1,10 @@
+---
+import Layout from "@/src/layouts/base.astro"
+import Dashboard from "@/components/pages/accounts-island"
+import { dashboardPageProps } from "@/lib/page-data"
+const props = await dashboardPageProps(Astro)
+---
+
+<Layout title="Scraper accounts · @ttgrab Stats">
+  <Dashboard client:load {...props} />
+</Layout>

@@ -56,3 +56,16 @@ DO $$ BEGIN
 END $$;
 CREATE INDEX IF NOT EXISTS website_cache_expiry ON tt_stats_web.query_cache(expires_at);
 CREATE INDEX IF NOT EXISTS website_cache_lease ON tt_stats_web.query_cache(lease_until);
+
+DO $$ BEGIN
+  IF to_regclass('tt_stats_web.instagram_dead_notifications') IS NULL THEN
+    CREATE TABLE tt_stats_web.instagram_dead_notifications (
+      notification_key TEXT PRIMARY KEY,
+      source_schema TEXT NOT NULL,
+      account_id TEXT NOT NULL,
+      incident TEXT NOT NULL,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    REVOKE ALL ON TABLE tt_stats_web.instagram_dead_notifications FROM PUBLIC;
+  END IF;
+END $$;

@@ -94,7 +94,8 @@ fail readiness with an explicit error, requiring an intentional migration.
 Builds require no database connection. Use `bun run start` for production so the
 storage checks and cleanup worker run before the HTTP server starts.
 
-Website tables are `users`, `sessions`, `login_transactions`, and `query_cache`.
+Website tables are `users`, `sessions`, `login_transactions`, `query_cache`,
+and `instagram_dead_notifications`.
 Profiles contain the verified Telegram ID, display name, username, and first/last
 login times. Website users do not need a corresponding bot-owned `public.users`
 row. Session tokens are stored only as SHA-256 hashes. OAuth transactions expire
@@ -703,3 +704,58 @@ statistics. It queues the existing authorized PostgreSQL jobs, tracks their
 status, and reloads the affected views after success. Duplicate pending requests
 are disabled. Failed rebuilds retain existing snapshots. Operations retains its
 schedule and maintenance controls. Non-admin visitors have no update control.
+
+### Scraper accounts and Instagram death alerts
+
+Admins can open **Scraper accounts** at `/dashboard/accounts`. Both the page and
+its action require the Telegram admin session. The page refreshes every minute
+and reads tt-scrap's `scrap_instagram_accounts`, `scrap_instagram_attempts`,
+`scrap_identities`, and `scrap_proxies` tables from `DB_URL`. Set
+`SCRAP_DB_SCHEMA` if tt-scrap uses a schema other than `public`. Missing tables,
+older definitions, and missing SELECT permissions appear as unavailable sections,
+not healthy accounts or zero usage. tt-stats never migrates or writes these source tables.
+
+Instagram status uses `dead`, `dead_reason`, `dead_at`, and `cooldown_until`.
+TikTok status is a persisted checkpoint, including identity and proxy cooldowns,
+assignments, failures, and last use. It does not represent live leases or a fresh
+login test. Credentials, proxy URLs, cookies, and session objects are not returned
+to the browser.
+
+Fallback usage shows legacy attempts, successes, failures, unfinished attempts,
+and the share of successful extractions for 24 hours, 7 days, 30 days, or all time.
+The source tracks **extractions, not completed video downloads**; it also includes
+explicit legacy-mode requests. It cannot distinguish those from automatic
+fallback, count media items, or establish completed delivery. Cache hits do not
+create attempt rows. Unfinished attempts can include interrupted requests.
+
+The background monitor starts with `bun run start`, checks on startup and every
+minute, and works with the dashboard closed. It reuses `VIDEO_INACTIVITY_NTFY_URL`
+and its token, or accepts a separate `INSTAGRAM_DEAD_NTFY_URL` and optional
+`INSTAGRAM_DEAD_NTFY_TOKEN`. A dedicated URL never inherits the other topic's token.
+No ntfy URL means no death alerts; fake-data mode always disables them.
+
+Already-dead accounts alert on the first check. Up to 25 new incidents are grouped
+per check. Successful sends are recorded in
+`tt_stats_web.instagram_dead_notifications` (created by normal website startup),
+with an advisory lock to coordinate app instances. Failed sends retry on the next
+check. Recovery clears the recorded incident; a new `dead_at` also triggers a new
+alert. Delivery is at least once: an interruption after ntfy accepts a message
+but before the database commits may repeat it. Death/recovery transitions entirely
+between checks cannot be observed. The dashboard reports destination configuration,
+not confirmed notification delivery; monitor failures are logged server-side.
+
+The app role needs SELECT on the four source tables, plus SELECT, INSERT, UPDATE,
+and DELETE on `tt_stats_web.instagram_dead_notifications`. For example, substitute
+your actual role and scraper schema when provisioning permissions:
+
+```sql
+GRANT USAGE ON SCHEMA public TO tt_stats_app;
+GRANT SELECT ON public.scrap_instagram_accounts, public.scrap_instagram_attempts,
+  public.scrap_identities, public.scrap_proxies TO tt_stats_app;
+GRANT SELECT, INSERT, UPDATE, DELETE
+  ON tt_stats_web.instagram_dead_notifications TO tt_stats_app;
+```
+
+Apply source grants after tt-scrap has created its tables. Existing installations
+where a separate owner creates website tables must apply `database/005_website.sql`
+and the notification table grants as that owner before restarting the app.

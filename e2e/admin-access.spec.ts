@@ -49,7 +49,11 @@ test("private deep links redirect before loading private data", async ({
     )
       requests.push(request.url())
   })
-  for (const path of ["/dashboard/users?id=123456789", "/dashboard/jobs"]) {
+  for (const path of [
+    "/dashboard/users?id=123456789",
+    "/dashboard/jobs",
+    "/dashboard/accounts",
+  ]) {
     await page.goto(path)
     await expect(page).toHaveURL(/\/admin$/)
     await expect(
@@ -64,6 +68,7 @@ test("server authorization uses Telegram sessions and rejects the retired token 
   baseURL,
 }) => {
   for (const action of [
+    "getScraperStatus",
     "getTelegramChat",
     "getUserStats",
     "getUserDownloads",

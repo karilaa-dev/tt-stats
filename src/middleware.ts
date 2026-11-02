@@ -28,7 +28,11 @@ const publicActions = new Set([
   "getDownloadMedia",
 ])
 const userActions = new Set(["getMyStats", "getMyDownloads", "getMyActivity"])
-const adminPages = new Set(["/dashboard/users", "/dashboard/jobs"])
+const adminPages = new Set([
+  "/dashboard/users",
+  "/dashboard/jobs",
+  "/dashboard/accounts",
+])
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { action, serializeActionResult } = getActionContext(context)

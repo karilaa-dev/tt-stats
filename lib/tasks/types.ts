@@ -1,6 +1,7 @@
 // Only read operations participate. Administrative mutations keep their own
 // confirmation and job controls; cancelling a read cannot undo a mutation.
 export const databaseReads = {
+  getScraperStatus: "Loading scraper accounts",
   getSnapshotMetadata: "Checking statistics",
   getOverview: "Loading overview",
   getStatsBreakdown: "Loading statistics",

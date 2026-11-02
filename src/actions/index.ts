@@ -4,4 +4,12 @@ import * as notifications from "./notifications"
 
 import * as media from "./media"
 
-export const server = { ...stats, ...telegram, ...notifications, ...media }
+import * as scraper from "./scraper"
+
+export const server = {
+  ...scraper,
+  ...stats,
+  ...telegram,
+  ...notifications,
+  ...media,
+}

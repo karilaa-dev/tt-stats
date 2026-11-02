@@ -43,6 +43,13 @@ function AdminAccess() {
           </p>
         ) : admin ? (
           <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<a href="/dashboard/accounts" />}
+            >
+              <T>{"Scraper accounts"}</T>
+            </Button>
             <Button nativeButton={false} render={<a href="/dashboard/users" />}>
               <T>{"User lookup"}</T>
             </Button>
