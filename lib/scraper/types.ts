@@ -16,6 +16,8 @@ export interface TikTokIdentity {
   assignments: string
   failures: number
   lastFailure: string | null
+  lastFailureAt: string | null
+  proxyFailureAt: string | null
   proxyFailure: string | null
   cooldownUntil: string | null
   lastUsedAt: string | null
@@ -24,6 +26,10 @@ export interface TikTokIdentity {
 export interface FallbackStats {
   attempts: number
   successes: number
+  appAttempts: number
+  appSuccesses: number
+  appFailures: number
+  appPending: number
   fallbackAttempts: number
   fallbackSuccesses: number
   fallbackFailures: number

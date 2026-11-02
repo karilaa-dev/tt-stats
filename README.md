@@ -718,11 +718,15 @@ not healthy accounts or zero usage. tt-stats never migrates or writes these sour
 Instagram status uses `dead`, `dead_reason`, `dead_at`, and `cooldown_until`.
 TikTok status is a persisted checkpoint, including identity and proxy cooldowns,
 assignments, failures, and last use. It does not represent live leases or a fresh
-login test. Credentials, proxy URLs, cookies, and session objects are not returned
+login test. Live Instagram accounts and available TikTok sessions are the default
+views, with filters for dead accounts and cooldowns. Expired cooldowns are hidden;
+last request errors remain in expandable history and do not imply a dead account.
+Credentials, proxy URLs, cookies, and session objects are not returned
 to the browser.
 
-Fallback usage shows legacy attempts, successes, failures, unfinished attempts,
-and the share of successful extractions for 24 hours, 7 days, 30 days, or all time.
+Download methods show App (primary) and fallback outcomes separately: attempts,
+successes, failures, unfinished attempts, and success rates for 24 hours, 7 days,
+30 days, or all time. Fallback is used after App failure in the App-first flow.
 The source tracks **extractions, not completed video downloads**; it also includes
 explicit legacy-mode requests. It cannot distinguish those from automatic
 fallback, count media items, or establish completed delivery. Cache hits do not

@@ -449,7 +449,7 @@
   gap: 0.3rem;
   padding: 0.5rem 0.7rem;
   border-radius: 0.4rem;
-  background: color-mix(in srgb, var(--sa-danger) 7%, transparent);
+  background: var(--color-kumo-tint);
   font-size: 13px;
 }
 .sa-failures > div {
@@ -465,8 +465,8 @@
 }
 .sa-failures dd {
   min-width: 0;
-  color: var(--sa-danger-text);
-  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--text-color-kumo-default);
+  font-family: var(--font-sans);
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -557,7 +557,7 @@
   color: var(--text-color-kumo-subtle);
   font-size: 13px;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 /* Fallback ---------------------------------------------------------------- */
@@ -678,5 +678,56 @@
   }
   .sa-row {
     padding: 0.75rem 0.85rem;
+  }
+}
+
+/* Current status is always visible; past request errors are optional detail. */
+.sa-failure-history {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--text-color-kumo-subtle);
+  font-size: 14px;
+}
+.sa-failure-history summary,
+.sa-measurement-note summary {
+  cursor: pointer;
+  padding-block: 0.4rem;
+}
+.sa-failure-history summary:focus-visible,
+.sa-measurement-note summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.sa-failure-history[open] > p {
+  margin-block: 0.3rem 0.6rem;
+}
+.sa-failures dd {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 14px;
+}
+.sa-failures code {
+  color: var(--text-color-kumo-subtle);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.sa-method-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.sa-measurement-note {
+  font-size: 14px;
+  color: var(--text-color-kumo-subtle);
+}
+.sa-measurement-note p {
+  max-width: 75ch;
+  margin-top: 0.25rem;
+}
+@container (max-width: 30rem) {
+  .sa-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sa-state {
+    justify-content: flex-start;
   }
 }

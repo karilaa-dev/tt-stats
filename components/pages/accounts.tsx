@@ -32,7 +32,7 @@ import {
 } from "@/lib/browser-time"
 import { T, useTranslation } from "@/lib/i18n/provider"
 import { databaseAction } from "@/lib/tasks/action"
-import { cn } from "@/lib/utils"
+import { scraperFailureMessage } from "@/lib/scraper/presentation"
 import type {
   FallbackStats,
   InstagramAccount,
@@ -47,9 +47,9 @@ type Tone = "danger" | "warning" | "ok" | "neutral"
 
 const statusMeta: Record<Status, { label: string; tone: Tone; rank: number }> =
   {
-    dead: { label: "Dead", tone: "danger", rank: 0 },
+    dead: { label: "Dead", tone: "danger", rank: 2 },
     cooldown: { label: "Cooling down", tone: "warning", rank: 1 },
-    available: { label: "Available", tone: "ok", rank: 2 },
+    available: { label: "Available", tone: "ok", rank: 0 },
   }
 
 const ranges: { value: ScraperRange; short: string; label: string }[] = [
@@ -147,6 +147,9 @@ function StatusPill({ status }: { status: Status }) {
   const meta = statusMeta[status]
   return (
     <span className="sa-status" data-tone={meta.tone}>
+      <span className="sr-only">
+        <T>{"Status"}</T>:{" "}
+      </span>
       <span aria-hidden="true" className="sa-dot" />
       <T>{meta.label}</T>
     </span>
@@ -213,7 +216,7 @@ function ColumnHeads({ labels }: { labels: string[] }) {
   )
 }
 
-type Filter = "all" | Status
+type Filter = "all" | "live" | Status
 function StatusFilter({
   label,
   value,
@@ -225,10 +228,10 @@ function StatusFilter({
   value: Filter
   onChange: (value: Filter) => void
   counts: Record<Filter, number>
-  statuses: Status[]
+  statuses: Filter[]
 }) {
   const { t } = useTranslation()
-  const options: Filter[] = ["all", ...statuses]
+  const options = statuses
   return (
     <ToggleGroup
       aria-label={t(label)}
@@ -242,10 +245,22 @@ function StatusFilter({
         <ToggleGroupItem
           key={option}
           value={option}
-          data-tone={option === "all" ? undefined : statusMeta[option].tone}
+          data-tone={
+            option === "all" || option === "live"
+              ? undefined
+              : statusMeta[option].tone
+          }
         >
-          {option !== "all" && <span aria-hidden="true" className="sa-dot" />}
-          <T>{option === "all" ? "All" : statusMeta[option].label}</T>
+          {option !== "all" && option !== "live" && (
+            <span aria-hidden="true" className="sa-dot" />
+          )}
+          <T>
+            {option === "all"
+              ? "All"
+              : option === "live"
+                ? "Live"
+                : statusMeta[option].label}
+          </T>
           <span className="sa-filter-count">{counts[option]}</span>
         </ToggleGroupItem>
       ))}
@@ -256,6 +271,7 @@ function StatusFilter({
 function countStatuses(items: { status: Status }[]) {
   const counts: Record<Filter, number> = {
     all: items.length,
+    live: items.filter((item) => item.status !== "dead").length,
     dead: 0,
     cooldown: 0,
     available: 0,
@@ -332,21 +348,15 @@ function Overview({
       href: "#instagram-accounts-heading",
       label: "Instagram accounts",
       icon: InstagramLogoIcon,
-      tone: c.dead
-        ? "danger"
+      tone: c.available
+        ? "ok"
         : c.cooldown
           ? "warning"
-          : ig.length
-            ? "ok"
+          : c.dead
+            ? "danger"
             : "neutral",
-      value: c.dead
-        ? `${c.dead} ${t("dead")}`
-        : c.cooldown
-          ? `${c.cooldown} ${t("cooling down")}`
-          : ig.length
-            ? t("All available")
-            : t("None"),
-      detail: `${c.available}/${ig.length} ${t("available")}`,
+      value: `${c.available} ${t("available")}`,
+      detail: `${c.cooldown} ${t("cooling down")} · ${c.dead} ${t("dead")}`,
     })
   }
 
@@ -366,13 +376,9 @@ function Overview({
       href: "#tiktok-identities-heading",
       label: "TikTok identities",
       icon: TiktokLogoIcon,
-      tone: c.cooldown ? "warning" : tk.length ? "ok" : "neutral",
-      value: c.cooldown
-        ? `${c.cooldown} ${t("cooling down")}`
-        : tk.length
-          ? t("All available")
-          : t("None"),
-      detail: `${c.available}/${tk.length} ${t("available")}`,
+      tone: c.available ? "ok" : c.cooldown ? "warning" : "neutral",
+      value: `${c.available} ${t("available")}`,
+      detail: `${c.cooldown} ${t("cooling down")} · ${tk.length} ${t("total")}`,
     })
   }
 
@@ -380,17 +386,17 @@ function Overview({
   const rangeLabel = ranges.find((r) => r.value === range)!.short
   tiles.push({
     href: "#instagram-fallback-heading",
-    label: "Fallback share",
+    label: "App success rate",
     icon: ShuffleIcon,
     tone: fb ? "neutral" : "danger",
     value: stale
       ? t("Updating…")
       : !fb
         ? t("Unreadable")
-        : fb.successes
-          ? percent(fb.fallbackSuccesses, fb.successes)
+        : fb.appAttempts
+          ? percent(fb.appSuccesses, fb.appAttempts)
           : "—",
-    detail: !fb ? t("Source error") : `${t("of successes")} · ${rangeLabel}`,
+    detail: !fb ? t("Source error") : `${t("of App attempts")} · ${rangeLabel}`,
   })
 
   const alerts = {
@@ -484,14 +490,18 @@ function InstagramSection({
   locale: string
 }) {
   const { t } = useTranslation()
-  const [filter, setFilter] = useState<Filter>("all")
+  const [filter, setFilter] = useState<Filter>("live")
   const [search, setSearch] = useState("")
   const accounts = result.data
   const counts = useMemo(() => countStatuses(accounts ?? []), [accounts])
   const visible = useMemo(() => {
     const needle = search.trim().toLowerCase().replace(/^@/, "")
     return (accounts ?? [])
-      .filter((a) => filter === "all" || a.status === filter)
+      .filter(
+        (a) =>
+          filter === "all" ||
+          (filter === "live" ? a.status !== "dead" : a.status === filter)
+      )
       .filter(
         (a) =>
           !needle ||
@@ -527,7 +537,7 @@ function InstagramSection({
         meta={
           <T>
             {
-              "Available means no recorded death or active cooldown; it is not a live login check."
+              "Live accounts are shown first, including temporary cooldowns. Use Dead to view disabled accounts. Status comes from saved scraper state, not a live login check."
             }
           </T>
         }
@@ -569,7 +579,7 @@ function InstagramSection({
                 value={filter}
                 onChange={setFilter}
                 counts={counts}
-                statuses={["dead", "cooldown", "available"]}
+                statuses={["live", "cooldown", "dead", "all"]}
               />
               {accounts!.length > 8 || search ? (
                 <label className="sa-search">
@@ -589,7 +599,11 @@ function InstagramSection({
           ) : null}
           {visible.length === 0 ? (
             <EmptyNote>
-              <T>{"No accounts match this filter."}</T>
+              <T>
+                {filter === "live" && !search
+                  ? "No live accounts. Select Dead to view disabled accounts."
+                  : "No accounts match this filter."}
+              </T>
             </EmptyNote>
           ) : (
             <div className="sa-list" data-kind="instagram">
@@ -700,11 +714,11 @@ function FallbackSection({
       <SectionHeading
         id="instagram-fallback-heading"
         icon={ShuffleIcon}
-        title="Instagram fallback usage"
+        title="Instagram download methods"
         meta={
           <T>
             {
-              "Legacy extraction attempts, including directly selected legacy requests — not completed video downloads. Cache hits excluded; periods use the attempt start time."
+              "App is the primary method. When App fails, fallback is tried. Successes and failures are counted separately for each method."
             }
           </T>
         }
@@ -762,111 +776,101 @@ function FallbackBody({
   percent: (part: number, whole: number) => string
 }) {
   const { t } = useTranslation()
-  const appSuccesses = Math.max(0, stats.successes - stats.fallbackSuccesses)
-  const outcomes = [
+  const methods = [
     {
-      key: "success",
-      label: "Succeeded",
-      value: stats.fallbackSuccesses,
+      name: "App method",
+      description: "Primary method",
+      attempts: stats.appAttempts,
+      successes: stats.appSuccesses,
+      failures: stats.appFailures,
+      pending: stats.appPending,
     },
-    { key: "failure", label: "Failed", value: stats.fallbackFailures },
     {
-      key: "pending",
-      label: "Unfinished",
-      value: stats.fallbackPending,
+      name: "Fallback method",
+      description: "After App failure",
+      attempts: stats.fallbackAttempts,
+      successes: stats.fallbackSuccesses,
+      failures: stats.fallbackFailures,
+      pending: stats.fallbackPending,
     },
   ]
-  const share = (part: number, whole: number) =>
-    whole > 0 ? `${(part / whole) * 100}%` : "0%"
   return (
-    <div className="sa-fallback">
-      <div className="sa-metric">
-        <p className="sa-metric-label">
-          <T>{"Fallback share of successful extractions"}</T>
-        </p>
-        <p className="sa-metric-value">
-          {stats.successes
-            ? percent(stats.fallbackSuccesses, stats.successes)
-            : "—"}
-          <span className="sa-metric-context">
-            {number(stats.fallbackSuccesses)} / {number(stats.successes)}
-          </span>
-        </p>
-        {stats.successes > 0 ? (
-          <div
-            role="img"
-            aria-label={`${t("Fallback successes")}: ${number(stats.fallbackSuccesses)}; ${t("App successes")}: ${number(appSuccesses)}`}
-            className="sa-bar"
-          >
-            {stats.fallbackSuccesses > 0 && (
-              <span
-                data-series="fallback"
-                style={{
-                  width: share(stats.fallbackSuccesses, stats.successes),
-                }}
-              />
-            )}
-            {appSuccesses > 0 && <span data-series="app" style={{ flex: 1 }} />}
-          </div>
-        ) : (
-          <div className="sa-bar" aria-hidden="true" />
-        )}
-        <ul className="sa-legend">
-          <li>
-            <span aria-hidden="true" data-series="fallback" />
-            <T>{"Fallback successes"}</T>
-            <strong>{number(stats.fallbackSuccesses)}</strong>
-          </li>
-          <li>
-            <span aria-hidden="true" data-series="app" />
-            <T>{"App successes"}</T>
-            <strong>{number(appSuccesses)}</strong>
-          </li>
-        </ul>
+    <>
+      <div className="sa-fallback">
+        {methods.map((method) => {
+          const outcomes = [
+            { key: "success", label: "Succeeded", value: method.successes },
+            { key: "failure", label: "Failed", value: method.failures },
+            { key: "pending", label: "Unfinished", value: method.pending },
+          ]
+          return (
+            <div className="sa-metric" key={method.name}>
+              <h3 className="sa-method-title">
+                <T>{method.name}</T>
+              </h3>
+              <p className="sa-metric-label">
+                <T>{method.description}</T>
+              </p>
+              <p className="sa-metric-value">
+                {number(method.successes)}{" "}
+                <span className="sa-metric-context">
+                  <T>{"successful"}</T> / {number(method.attempts)}{" "}
+                  <T>{"attempts"}</T>
+                </span>
+              </p>
+              <p className="sa-metric-label">
+                {percent(method.successes, method.attempts)}{" "}
+                <T>{"success rate"}</T>
+              </p>
+              {method.attempts > 0 ? (
+                <div
+                  role="img"
+                  aria-label={`${t(method.name)}: ${outcomes.map((o) => `${t(o.label)} ${number(o.value)}`).join(", ")}`}
+                  className="sa-bar"
+                >
+                  {outcomes
+                    .filter((o) => o.value > 0)
+                    .map((o) => (
+                      <span
+                        key={o.key}
+                        data-series={o.key}
+                        style={{
+                          width: `${(o.value / method.attempts) * 100}%`,
+                        }}
+                      />
+                    ))}
+                </div>
+              ) : (
+                <p className="sa-section-meta">
+                  <T>{"No attempts in this period."}</T>
+                </p>
+              )}
+              <ul className="sa-legend">
+                {outcomes.map((o) => (
+                  <li key={o.key}>
+                    <span aria-hidden="true" data-series={o.key} />
+                    <T>{o.label}</T>
+                    <strong>{number(o.value)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        })}
       </div>
-      <div className="sa-metric">
-        <p className="sa-metric-label">
-          <T>{"Fallback attempts"}</T>
+      <details className="sa-measurement-note">
+        <summary>
+          <T>{"How these counts work"}</T>
+        </summary>
+        <p>
+          <T>
+            {
+              "These are extraction attempts, not confirmed video deliveries. Cache hits are excluded. Periods use attempt start time. The legacy records also include directly selected legacy requests and do not link individual App failures to fallback retries."
+            }
+          </T>
         </p>
-        <p className="sa-metric-value">
-          {number(stats.fallbackAttempts)}
-          <span className="sa-metric-context">
-            {percent(stats.fallbackAttempts, stats.attempts)} <T>{"of"}</T>{" "}
-            {number(stats.attempts)} <T>{"Instagram attempts"}</T>
-          </span>
-        </p>
-        {stats.fallbackAttempts > 0 ? (
-          <div
-            role="img"
-            aria-label={`${t("Fallback attempt outcomes")}: ${outcomes
-              .map((o) => `${t(o.label)} ${number(o.value)}`)
-              .join(", ")}`}
-            className="sa-bar"
-          >
-            {outcomes.map((o) =>
-              o.value > 0 ? (
-                <span
-                  key={o.key}
-                  data-series={o.key}
-                  style={{ width: share(o.value, stats.fallbackAttempts) }}
-                />
-              ) : null
-            )}
-          </div>
-        ) : (
-          <div className="sa-bar" aria-hidden="true" />
-        )}
-        <ul className="sa-legend">
-          {outcomes.map((o) => (
-            <li key={o.key}>
-              <span aria-hidden="true" data-series={o.key} />
-              <T>{o.label}</T>
-              <strong>{number(o.value)}</strong>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
+      </details>
+    </>
   )
 }
 
@@ -888,7 +892,7 @@ function TikTokSection({
   number: (value: number | string) => string
 }) {
   const { t } = useTranslation()
-  const [filter, setFilter] = useState<Filter>("all")
+  const [filter, setFilter] = useState<Filter>("available")
   const identities = result.data
   const counts = useMemo(() => countStatuses(identities ?? []), [identities])
   const visible = useMemo(
@@ -912,7 +916,7 @@ function TikTokSection({
         meta={
           <T>
             {
-              "Persisted checkpoints from tt-scrap. Availability includes identity and proxy cooldowns; live leases and credentials are not shown."
+              "Available sessions are shown first. Cooling down means a temporary retry delay. Previous request errors do not mean a session is dead. Status comes from saved checkpoints."
             }
           </T>
         }
@@ -935,7 +939,7 @@ function TikTokSection({
                 value={filter}
                 onChange={setFilter}
                 counts={counts}
-                statuses={["cooldown", "available"]}
+                statuses={["available", "cooldown", "all"]}
               />
             </div>
           ) : null}
@@ -950,7 +954,7 @@ function TikTokSection({
                   "Identity / proxy",
                   "Status",
                   "Assignments",
-                  "Failures",
+                  "Recent failures",
                   "Cooldown until",
                   "Last used",
                   "Checkpoint",
@@ -985,14 +989,8 @@ function TikTokSection({
                         <Field label="Assignments" numeric>
                           {number(identity.assignments)}
                         </Field>
-                        <Field label="Failures" numeric>
-                          <span
-                            className={cn(
-                              identity.failures > 0 && "text-kumo-danger"
-                            )}
-                          >
-                            {number(identity.failures)}
-                          </span>
+                        <Field label="Recent failures" numeric>
+                          {number(identity.failures)}
                         </Field>
                         <Field
                           label="Cooldown until"
@@ -1023,24 +1021,52 @@ function TikTokSection({
                         </Field>
                       </dl>
                       {hasFailures ? (
-                        <dl className="sa-failures">
-                          {identity.lastFailure ? (
-                            <div>
-                              <dt>
-                                <T>{"Last failure"}</T>
-                              </dt>
-                              <dd>{identity.lastFailure}</dd>
-                            </div>
-                          ) : null}
-                          {identity.proxyFailure ? (
-                            <div>
-                              <dt>
-                                <T>{"Proxy failure"}</T>
-                              </dt>
-                              <dd>{identity.proxyFailure}</dd>
-                            </div>
-                          ) : null}
-                        </dl>
+                        <details className="sa-failure-history">
+                          <summary>
+                            <T>{"Previous request errors"}</T>
+                          </summary>
+                          <p className="sa-section-meta">
+                            <T>
+                              {
+                                "These errors describe past requests, not the current account status."
+                              }
+                            </T>
+                          </p>
+                          <dl className="sa-failures">
+                            {[
+                              {
+                                label: "Session request",
+                                code: identity.lastFailure,
+                                at: identity.lastFailureAt,
+                              },
+                              {
+                                label: "Proxy request",
+                                code: identity.proxyFailure,
+                                at: identity.proxyFailureAt,
+                              },
+                            ]
+                              .filter((item) => item.code)
+                              .map((item) => (
+                                <div key={item.label}>
+                                  <dt>
+                                    <T>{item.label}</T>
+                                  </dt>
+                                  <dd>
+                                    <T>{scraperFailureMessage(item.code!)}</T>{" "}
+                                    <code>{item.code}</code>
+                                    {item.at && (
+                                      <When
+                                        value={item.at}
+                                        now={now}
+                                        time={time}
+                                        locale={locale}
+                                      />
+                                    )}
+                                  </dd>
+                                </div>
+                              ))}
+                          </dl>
+                        </details>
                       ) : null}
                     </li>
                   )

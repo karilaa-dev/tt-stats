@@ -27,17 +27,23 @@ test("only admins can read scraper accounts, including direct action requests", 
   await expect(
     page.getByRole("heading", { name: "Scraper accounts", exact: true })
   ).toBeVisible()
-  await expect(page.getByText("@demo_disabled", { exact: true })).toBeVisible()
-  await expect(page.getByText("login_required", { exact: true })).toBeVisible()
+  await expect(page.getByText("@demo_disabled", { exact: true })).toHaveCount(0)
+  await expect(page.getByText("@demo_account", { exact: true })).toBeVisible()
   await expect(
     page.getByText("Demo data only. Notifications are disabled.")
   ).toBeVisible()
   await expect(
-    page.getByRole("img", { name: /Fallback successes/ })
+    page.getByRole("img", {
+      name: /^App method: Succeeded 100, Failed 18, Unfinished 2/,
+    })
   ).toBeVisible()
   const statuses = page.getByRole("group", {
     name: "Filter Instagram accounts by status",
   })
+  await expect(statuses.getByRole("button", { name: /Live/ })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
   await statuses.getByRole("button", { name: /Dead/ }).click()
   await expect(page.getByText("@demo_account", { exact: true })).toHaveCount(0)
   await expect(page.getByText("@demo_disabled", { exact: true })).toBeVisible()
@@ -45,6 +51,32 @@ test("only admins can read scraper accounts, including direct action requests", 
   await expect(page.getByText("No accounts match this filter.")).toBeVisible()
   await statuses.getByRole("button", { name: /All/ }).click()
   await expect(page.getByText("@demo_account", { exact: true })).toBeVisible()
+  await statuses.getByRole("button", { name: /Live/ }).click()
+  await expect(page.getByText("@demo_disabled", { exact: true })).toHaveCount(0)
+  const identities = page.getByRole("list", {
+    name: "TikTok identities",
+    exact: true,
+  })
+  const status = identities.locator(".sa-status").first()
+  await expect(status).toContainText("Status: Available")
+  await status.scrollIntoViewIfNeeded()
+  await expect(status).toBeInViewport()
+  await expect(
+    identities.getByText("upstream_invalid_response", { exact: true })
+  ).toBeHidden()
+  await identities.getByText("Previous request errors", { exact: true }).click()
+  await expect(
+    identities.getByText("TikTok returned an unexpected response.")
+  ).toBeVisible()
+  await expect(
+    identities.getByText("The proxy could not reach TikTok.")
+  ).toBeVisible()
+  await identities.getByText("Previous request errors", { exact: true }).click()
+  await expect(
+    page.getByRole("img", {
+      name: /^Fallback method: Succeeded 20, Failed 8, Unfinished 2/,
+    })
+  ).toBeVisible()
   if (!isMobile) {
     for (const width of [1030, 1190]) {
       await page.setViewportSize({ width, height: 900 })

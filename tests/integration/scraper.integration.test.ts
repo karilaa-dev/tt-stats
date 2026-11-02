@@ -45,7 +45,7 @@ describe.runIf(process.env.RUN_DATABASE_INTEGRATION === "1")(
       INSERT INTO scraper_accounts_test.scrap_identities (id, proxy_id, ordinal, session, assignment_count, health)
         VALUES ('11111111-1111-1111-1111-111111111111', 1, 0, '{"identity":{"kind":"registered"},"cookie":"CREDENTIAL_SENTINEL"}', 9007199254740993, '{}');
       INSERT INTO scraper_accounts_test.scrap_instagram_attempts(legacy_used,succeeded,created_at)
-        VALUES (true, true, now()), (true, false, now()), (true, NULL, now()), (false, true, now()), (false, false, now()), (true, true, now() - interval '2 days');
+        VALUES (true, true, now()), (true, false, now()), (true, NULL, now()), (false, true, now()), (false, false, now()), (false, NULL, now()), (true, true, now() - interval '2 days');
       DELETE FROM tt_stats_web.instagram_dead_notifications WHERE source_schema = 'scraper_accounts_test';`)
     })
     afterAll(async () => {
@@ -59,7 +59,7 @@ describe.runIf(process.env.RUN_DATABASE_INTEGRATION === "1")(
     it("reads source states including proxy cooldown without disclosing credentials", async () => {
       const accounts = await getInstagramAccounts()
       const identities = await getTikTokIdentities()
-      expect(accounts.map((a) => a.status)).toEqual(["dead", "cooldown"])
+      expect(accounts.map((a) => a.status)).toEqual(["cooldown", "dead"])
       expect(identities[0]).toMatchObject({
         status: "cooldown",
         assignments: "9007199254740993",
@@ -69,9 +69,29 @@ describe.runIf(process.env.RUN_DATABASE_INTEGRATION === "1")(
         "CREDENTIAL_SENTINEL"
       )
     })
+    it("shows available status after cooldown expires while preserving optional error history", async () => {
+      await pool.query(`UPDATE scraper_accounts_test.scrap_proxies SET health = jsonb_build_object('cooldownUntil', (extract(epoch FROM now()) * 1000)::bigint - 120000, 'lastFailureCode', 'upstream_network_error', 'lastFailureAt', '2026-01-01T12:00:00Z');
+        UPDATE scraper_accounts_test.scrap_identities SET health = jsonb_build_object('failures', 1, 'cooldownUntil', (extract(epoch FROM now()) * 1000)::bigint - 60000, 'lastFailureCode', 'upstream_invalid_response', 'lastFailureAt', '2026-01-01T12:01:00Z');
+        UPDATE scraper_accounts_test.scrap_instagram_accounts SET cooldown_until = now() - interval '2 minutes' WHERE id = 'ig2';`)
+      expect((await getTikTokIdentities())[0]).toMatchObject({
+        status: "available",
+        cooldownUntil: null,
+        lastFailure: "upstream_invalid_response",
+        proxyFailure: "upstream_network_error",
+        lastFailureAt: "2026-01-01T12:01:00Z",
+        proxyFailureAt: "2026-01-01T12:00:00Z",
+      })
+      expect(
+        (await getInstagramAccounts()).find((a) => a.id === "ig2")
+      ).toMatchObject({ status: "available", cooldownUntil: null })
+    })
     it("counts fallback successes and distinguishes failures and unfinished attempts in each window", async () => {
       expect(await getFallbackStats("24h")).toEqual({
-        attempts: 5,
+        attempts: 6,
+        appAttempts: 3,
+        appSuccesses: 1,
+        appFailures: 1,
+        appPending: 1,
         successes: 2,
         fallbackAttempts: 3,
         fallbackSuccesses: 1,
@@ -82,7 +102,7 @@ describe.runIf(process.env.RUN_DATABASE_INTEGRATION === "1")(
         fallbackSuccesses: 2,
         successes: 3,
       })
-      expect(await getFallbackStats("all")).toMatchObject({ attempts: 6 })
+      expect(await getFallbackStats("all")).toMatchObject({ attempts: 7 })
     })
     it("deduplicates across instances and rearms after recovery or a new death timestamp", async () => {
       const fetcher = vi.fn(async () => new Response(null, { status: 200 }))

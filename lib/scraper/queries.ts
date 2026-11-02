@@ -25,8 +25,8 @@ export function scraperTable(
 export async function getInstagramAccounts(): Promise<InstagramAccount[]> {
   return query<InstagramAccount>(`SELECT id, username, user_id AS "userId",
     CASE WHEN dead THEN 'dead' WHEN cooldown_until > now() THEN 'cooldown' ELSE 'available' END AS status,
-    dead_reason AS "deadReason", dead_at::text AS "deadAt", cooldown_until::text AS "cooldownUntil"
-    FROM ${scraperTable("scrap_instagram_accounts")} ORDER BY dead DESC, ordinal`)
+    dead_reason AS "deadReason", dead_at::text AS "deadAt", CASE WHEN cooldown_until > now() THEN cooldown_until::text END AS "cooldownUntil"
+    FROM ${scraperTable("scrap_instagram_accounts")} ORDER BY dead, ordinal`)
 }
 export async function getTikTokIdentities(): Promise<TikTokIdentity[]> {
   return query<TikTokIdentity>(`SELECT i.id::text, i.proxy_id::text AS "proxyId",
@@ -34,7 +34,8 @@ export async function getTikTokIdentities(): Promise<TikTokIdentity[]> {
     CASE WHEN greatest(coalesce((i.health->>'cooldownUntil')::bigint, 0), coalesce((p.health->>'cooldownUntil')::bigint, 0)) > extract(epoch FROM now()) * 1000 THEN 'cooldown' ELSE 'available' END AS status,
     i.assignment_count::text AS assignments, coalesce((i.health->>'failures')::int, 0) AS failures,
     i.health->>'lastFailureCode' AS "lastFailure", p.health->>'lastFailureCode' AS "proxyFailure",
-    CASE WHEN greatest(coalesce((i.health->>'cooldownUntil')::bigint, 0), coalesce((p.health->>'cooldownUntil')::bigint, 0)) > 0
+    i.health->>'lastFailureAt' AS "lastFailureAt", p.health->>'lastFailureAt' AS "proxyFailureAt",
+    CASE WHEN greatest(coalesce((i.health->>'cooldownUntil')::bigint, 0), coalesce((p.health->>'cooldownUntil')::bigint, 0)) > extract(epoch FROM now()) * 1000
       THEN to_timestamp(greatest(coalesce((i.health->>'cooldownUntil')::bigint, 0), coalesce((p.health->>'cooldownUntil')::bigint, 0)) / 1000.0)::text END AS "cooldownUntil",
     i.last_used_at::text AS "lastUsedAt", i.updated_at::text AS "updatedAt"
     FROM ${scraperTable("scrap_identities")} i JOIN ${scraperTable("scrap_proxies")} p ON p.id = i.proxy_id
@@ -52,6 +53,10 @@ export async function getFallbackStats(
   const [row] = await query<Record<keyof FallbackStats, string>>(
     `SELECT count(*)::text AS attempts,
     count(*) FILTER (WHERE succeeded IS TRUE)::text AS successes,
+    count(*) FILTER (WHERE NOT legacy_used)::text AS "appAttempts",
+    count(*) FILTER (WHERE NOT legacy_used AND succeeded IS TRUE)::text AS "appSuccesses",
+    count(*) FILTER (WHERE NOT legacy_used AND succeeded IS FALSE)::text AS "appFailures",
+    count(*) FILTER (WHERE NOT legacy_used AND succeeded IS NULL)::text AS "appPending",
     count(*) FILTER (WHERE legacy_used)::text AS "fallbackAttempts",
     count(*) FILTER (WHERE legacy_used AND succeeded IS TRUE)::text AS "fallbackSuccesses",
     count(*) FILTER (WHERE legacy_used AND succeeded IS FALSE)::text AS "fallbackFailures",

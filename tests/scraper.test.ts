@@ -27,6 +27,10 @@ it("counts successful fallback separately from failed and unfinished attempts wi
     {
       attempts: "6",
       successes: "3",
+      appAttempts: "2",
+      appSuccesses: "1",
+      appFailures: "1",
+      appPending: "0",
       fallbackAttempts: "4",
       fallbackSuccesses: "2",
       fallbackFailures: "1",
@@ -34,6 +38,10 @@ it("counts successful fallback separately from failed and unfinished attempts wi
     },
   ])
   expect(await getFallbackStats("7d")).toMatchObject({
+    appAttempts: 2,
+    appSuccesses: 1,
+    appFailures: 1,
+    appPending: 0,
     fallbackSuccesses: 2,
     fallbackFailures: 1,
     fallbackPending: 1,
