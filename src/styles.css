@@ -118,6 +118,13 @@
   html {
     @apply font-sans;
     scroll-padding-top: 6rem;
+    scrollbar-color: var(--color-kumo-interact) transparent;
+    accent-color: var(--primary);
+    caret-color: var(--primary);
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 32%, transparent);
+    color: var(--text-color-kumo-strong);
   }
 }
 
@@ -177,7 +184,10 @@
   font-weight: 500;
 }
 .desktop-sidebar nav {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 1.25rem;
   overflow-y: auto;
 }
 .sidebar-menu {
@@ -257,8 +267,19 @@
   object-fit: contain;
 }
 .workspace-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
   color: var(--text-color-kumo-subtle);
   font-size: 14px;
+}
+.workspace-label [aria-current="page"] {
+  color: var(--text-color-kumo-default);
+  font-weight: 500;
+}
+.workspace-label-separator {
+  color: var(--text-color-kumo-inactive);
 }
 .topbar-actions {
   display: flex;
@@ -598,13 +619,10 @@ a:focus-visible {
 }
 .personal-metrics > div {
   padding: 0.4rem 1rem 0.4rem 0;
+}
+/* Two columns: only a left-hand cell with a neighbour gets the divider. */
+.personal-metrics > div:nth-child(odd):not(:last-child) {
   border-right: 1px solid var(--border);
-}
-.personal-metrics > div:last-child {
-  border: 0;
-}
-.personal-metrics > div:nth-child(2) {
-  border: 0;
 }
 .personal-metrics dt {
   font-size: 0.8rem;
@@ -744,9 +762,6 @@ a:focus-visible {
   .personal-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-  }
-  .personal-metrics > div:nth-child(2) {
-    border: 0;
   }
   .download-entry {
     grid-template-columns: minmax(0, 1fr);
@@ -1325,6 +1340,13 @@ a:focus-visible {
   text-align: right;
   white-space: nowrap;
 }
+.ranking-no-media {
+  display: inline-block;
+  min-width: 6.5rem;
+  color: var(--text-color-kumo-inactive);
+  font-size: 0.75rem;
+  text-align: center;
+}
 .ranking-video-id {
   display: inline-flex;
   align-items: center;
@@ -1435,7 +1457,8 @@ a:focus-visible {
     width: 4.5rem;
     white-space: normal;
   }
-  .ranking-action-label {
+  .ranking-action-label,
+  .ranking-no-media {
     display: none;
   }
   .ranking-action .control-button {

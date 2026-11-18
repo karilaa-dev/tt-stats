@@ -240,7 +240,11 @@ export function VideosPage() {
                               <T>{"View media"}</T>
                             </span>
                           </Button>
-                        ) : null}
+                        ) : (
+                          <span className="ranking-no-media">
+                            <T>{"No preview"}</T>
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

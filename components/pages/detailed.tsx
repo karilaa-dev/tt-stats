@@ -5,7 +5,7 @@ import {
 } from "@/lib/dashboard-context"
 import { useQuery } from "@tanstack/react-query"
 import {
-  ArrowUpRightIcon,
+  ArrowRightIcon,
   DatabaseIcon,
   DownloadSimpleIcon,
   ImagesIcon,
@@ -149,7 +149,7 @@ export function DetailedPage() {
               ? "View activity over time "
               : "View all-platform trends"}
           </T>
-          <ArrowUpRightIcon data-icon="inline-end" />
+          <ArrowRightIcon data-icon="inline-end" />
         </Button>
       </div>
       <T>

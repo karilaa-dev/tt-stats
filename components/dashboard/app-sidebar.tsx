@@ -2,6 +2,7 @@ import { T, useTranslation } from "@/lib/i18n/provider"
 import {
   PulseIcon,
   ArrowUpRightIcon,
+  CaretRightIcon,
   ChartBarIcon,
   ChartLineUpIcon,
   DatabaseIcon,
@@ -25,9 +26,19 @@ import { useRef, useState } from "react"
 import { useDashboardContext } from "@/lib/dashboard-context"
 import { useAdminAccess } from "./admin-access"
 
-const navigation = [
+export const navigationGroups = ["Personal", "Statistics", "Admin"] as const
+
+export const navigation: {
+  href: string
+  label: string
+  short: string
+  icon: typeof UserIcon
+  description: string
+  group: (typeof navigationGroups)[number]
+}[] = [
   {
     href: "/dashboard/me",
+    group: "Personal",
     label: "My profile",
     short: "My profile",
     icon: UserIcon,
@@ -35,6 +46,7 @@ const navigation = [
   },
   {
     href: "/dashboard",
+    group: "Statistics",
     label: "Overview",
     short: "Home",
     icon: SquaresFourIcon,
@@ -42,6 +54,7 @@ const navigation = [
   },
   {
     href: "/dashboard/analytics",
+    group: "Statistics",
     label: "Trends",
     short: "Trends",
     icon: ChartLineUpIcon,
@@ -49,20 +62,15 @@ const navigation = [
   },
   {
     href: "/dashboard/detailed",
+    group: "Statistics",
     label: "Breakdown",
     short: "Breakdown",
     icon: FunnelSimpleIcon,
     description: "Compare platforms, periods, and audiences",
   },
   {
-    href: "/dashboard/users",
-    label: "User lookup",
-    short: "Lookup",
-    icon: MagnifyingGlassIcon,
-    description: "Find a chat and its history",
-  },
-  {
     href: "/dashboard/videos",
+    group: "Statistics",
     label: "Top videos",
     short: "Videos",
     icon: VideoCameraIcon,
@@ -70,6 +78,7 @@ const navigation = [
   },
   {
     href: "/dashboard/referrals",
+    group: "Statistics",
     label: "Referrals",
     short: "Referrals",
     icon: ShareNetworkIcon,
@@ -77,13 +86,23 @@ const navigation = [
   },
   {
     href: "/dashboard/other",
+    group: "Statistics",
     label: "Audience",
     short: "Audience",
     icon: ChartBarIcon,
     description: "Languages and download leaders",
   },
   {
+    href: "/dashboard/users",
+    group: "Admin",
+    label: "User lookup",
+    short: "Lookup",
+    icon: MagnifyingGlassIcon,
+    description: "Find a chat and its history",
+  },
+  {
     href: "/dashboard/accounts",
+    group: "Admin",
     label: "Scraper accounts",
     short: "Accounts",
     icon: PulseIcon,
@@ -91,6 +110,7 @@ const navigation = [
   },
   {
     href: "/dashboard/jobs",
+    group: "Admin",
     label: "Operations",
     short: "Operations",
     icon: DatabaseIcon,
@@ -133,25 +153,38 @@ export function AppSidebar() {
           </strong>
         </a>
         <nav aria-label={t("Main navigation")}>
-          <p className="sidebar-caption">
-            <T>{"Statistics"}</T>
-          </p>
-          <ul className="sidebar-menu">
-            {visibleNavigation.map(({ href, label, icon: Icon }) => (
-              <li key={href}>
-                <a
-                  href={href}
-                  aria-current={current === href ? "page" : undefined}
+          {navigationGroups.map((group) => {
+            const items = visibleNavigation.filter(
+              (item) => item.group === group
+            )
+            if (!items.length) return null
+            return (
+              <div key={group} className="sidebar-group">
+                <p className="sidebar-caption" id={`sidebar-${group}`}>
+                  <T>{group}</T>
+                </p>
+                <ul
+                  className="sidebar-menu"
+                  aria-labelledby={`sidebar-${group}`}
                 >
-                  <Icon
-                    aria-hidden="true"
-                    weight={current === href ? "fill" : "regular"}
-                  />
-                  <T>{label}</T>
-                </a>
-              </li>
-            ))}
-          </ul>
+                  {items.map(({ href, label, icon: Icon }) => (
+                    <li key={href}>
+                      <a
+                        href={href}
+                        aria-current={current === href ? "page" : undefined}
+                      >
+                        <Icon
+                          aria-hidden="true"
+                          weight={current === href ? "fill" : "regular"}
+                        />
+                        <T>{label}</T>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })}
         </nav>
         <a
           className="sidebar-bot"
@@ -220,7 +253,7 @@ export function AppSidebar() {
                       <T>{description}</T>
                     </small>
                   </span>
-                  <ArrowUpRightIcon aria-hidden="true" />
+                  <CaretRightIcon aria-hidden="true" />
                 </a>
               )
             )}

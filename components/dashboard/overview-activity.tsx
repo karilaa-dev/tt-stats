@@ -3,7 +3,7 @@ import { ExactCounter } from "./exact-counter"
 import { useId } from "react"
 import { useQuery } from "@tanstack/react-query"
 import {
-  ArrowUpRightIcon,
+  ArrowRightIcon,
   WaveformIcon,
   ChartLineUpIcon,
   DownloadSimpleIcon,
@@ -228,7 +228,7 @@ export function OverviewActivity({
                 className="overview-ledger-link"
               >
                 <T>{"See full breakdown "}</T>
-                <ArrowUpRightIcon data-icon="inline-end" />
+                <ArrowRightIcon data-icon="inline-end" />
               </Button>
             </CardContent>
           </Card>
@@ -248,7 +248,7 @@ export function OverviewActivity({
               <T>{"Explore download and audience trends"}</T>
             </small>
           </span>
-          <ArrowUpRightIcon aria-hidden="true" />
+          <ArrowRightIcon aria-hidden="true" />
         </a>
         {authenticated ? (
           <a href="/dashboard/users">
@@ -261,7 +261,7 @@ export function OverviewActivity({
                 <T>{"Find activity by Telegram ID"}</T>
               </small>
             </span>
-            <ArrowUpRightIcon aria-hidden="true" />
+            <ArrowRightIcon aria-hidden="true" />
           </a>
         ) : (
           <a href="/dashboard/videos">
@@ -274,7 +274,7 @@ export function OverviewActivity({
                 <T>{"The most downloaded videos by period"}</T>
               </small>
             </span>
-            <ArrowUpRightIcon aria-hidden="true" />
+            <ArrowRightIcon aria-hidden="true" />
           </a>
         )}
       </div>

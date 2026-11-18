@@ -6,11 +6,7 @@ import {
   useDashboardNavigate,
   useHydrated,
 } from "@/lib/dashboard-context"
-import {
-  ArrowUpRightIcon,
-  MagnifyingGlassIcon,
-  XIcon,
-} from "@phosphor-icons/react"
+import { MagnifyingGlassIcon, XIcon } from "@phosphor-icons/react"
 
 import { Button } from "@/components/controls"
 import {
@@ -219,16 +215,14 @@ export function UserLookupForm({
                 disabled={!hydrated}
                 onClick={() => form.setFieldValue("id", "123456789")}
               >
-                <T>{"Private user "}</T>
-                <ArrowUpRightIcon data-icon="inline-end" />
+                <T>{"Private user"}</T>
               </Button>
               <Button
                 variant="outline"
                 disabled={!hydrated}
                 onClick={() => form.setFieldValue("id", "-1001234567890")}
               >
-                <T>{"Group "}</T>
-                <ArrowUpRightIcon data-icon="inline-end" />
+                <T>{"Group"}</T>
               </Button>
             </div>
           </CardFooter>

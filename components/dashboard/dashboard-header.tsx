@@ -4,7 +4,8 @@ import { TelegramLoginButton } from "./session-access"
 import { useAdminAccess } from "./admin-access"
 import { useEffect, useRef } from "react"
 import { useIsFetching, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useHydrated } from "@/lib/dashboard-context"
+import { useDashboardContext, useHydrated } from "@/lib/dashboard-context"
+import { navigation } from "./app-sidebar"
 import { Badge, Spinner } from "@/components/controls"
 import { StatsRefresh } from "./stats-refresh"
 import { invalidateSnapshotViews } from "@/lib/stats/snapshot-refresh"
@@ -37,6 +38,9 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
   const { t } = useTranslation()
 
   const { authenticated } = useAdminAccess()
+  const { pathname } = useDashboardContext()
+  const current = pathname.replace(/\/$/, "") || "/dashboard"
+  const page = navigation.find((item) => item.href === current)
   const hydrated = useHydrated()
   const queryClient = useQueryClient()
   const time = useBrowserTime()
@@ -85,9 +89,21 @@ export function DashboardHeader({ fakeMode = false }: { fakeMode?: boolean }) {
           </strong>
         </a>
         <span className="topbar-divider" aria-hidden="true" />
-        <span className="workspace-label">
-          <T>{"Download activity"}</T>
-        </span>
+        <nav className="workspace-label" aria-label={t("Breadcrumb")}>
+          <span>
+            <T>{page?.group ?? "Admin"}</T>
+          </span>
+          {page ? (
+            <>
+              <span className="workspace-label-separator" aria-hidden="true">
+                /
+              </span>
+              <span aria-current="page">
+                <T>{page.label}</T>
+              </span>
+            </>
+          ) : null}
+        </nav>
         <div className="topbar-actions">
           <T>
             {refreshing ? (

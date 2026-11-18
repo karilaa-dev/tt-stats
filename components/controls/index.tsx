@@ -438,7 +438,7 @@ export function Switch({
     >
       <BaseSwitch.Thumb
         className={cn(
-          "bg-kumo-subtle data-checked:bg-kumo-inverse absolute top-0 bottom-0 left-0 rounded-full shadow-[0_1px_2px_var(--color-kumo-shadow-drop)] transition-all duration-150 ease-out motion-reduce:transition-none",
+          "absolute top-0 bottom-0 left-0 rounded-full bg-(--text-color-kumo-subtle) shadow-[0_1px_2px_var(--color-kumo-shadow-drop)] transition-all duration-150 ease-out data-checked:bg-(--text-color-kumo-inverse) motion-reduce:transition-none",
           size === "sm"
             ? "w-4 data-checked:left-4"
             : "w-4.5 data-checked:left-4.5"

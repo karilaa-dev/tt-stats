@@ -7,12 +7,26 @@ import Layout from "../layouts/base.astro"
 
 <Layout title="Page not found · @ttgrab Stats">
   <main
-    class="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center"
+    class="flex min-h-svh flex-col items-center justify-center gap-5 p-6 text-center"
   >
-    <h1 class="text-2xl font-semibold">
-      {translate("Page not found", locale)}
-    </h1>
-    <a href="/dashboard" class="text-primary underline underline-offset-4"
+    <img
+      src="/ttgrab-logo.png"
+      alt=""
+      width="48"
+      height="48"
+      class="rounded-xl"
+    />
+    <div class="flex flex-col gap-2">
+      <h1 class="text-2xl font-semibold text-balance">
+        {translate("Page not found", locale)}
+      </h1>
+      <p class="text-sm text-kumo-subtle">
+        {translate("This page doesn't exist or has moved.", locale)}
+      </p>
+    </div>
+    <a
+      href="/dashboard"
+      class="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-kumo-default ring ring-kumo-line transition-colors hover:bg-kumo-tint focus-visible:ring-2 focus-visible:ring-kumo-brand focus-visible:outline-none"
       >{translate("Return to dashboard", locale)}</a
     >
   </main>
